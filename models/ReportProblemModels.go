@@ -12,6 +12,7 @@ type ReportProblemRequest struct {
 	Other   string `json:"other"`
 	Program string `json:"program"`
 	Problem string `json:"problem"`
+	Status  string `json:"status"`
 }
 
 // ReportProblemResponse ตอบกลับการรายงานปัญหา

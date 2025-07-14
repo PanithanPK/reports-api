@@ -3,10 +3,10 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"golang_API/db"
-	"golang_API/models"
 	"log"
 	"net/http"
+	"reports-api/db"
+	"reports-api/models"
 	"time"
 
 	"github.com/gorilla/mux"

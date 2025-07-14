@@ -46,7 +46,7 @@ func ReportProblemHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Insert into database
 	query := `INSERT INTO report_problem (ip_phone, program, other, problem, status) VALUES (NULLIF(?, ''), ?, ?, ?, 'Pending')`
-	result, err := db.DB.Exec(query, req.IpPhone, req.Program, req.Other, req.Problem)
+	result, err := db.DB.Exec(query, req.IpPhone, req.Program, req.Other, req.Problem, req.status)
 	if err != nil {
 		problemLogger.Printf("❌ Error inserting problem: %v", err)
 		response := models.ReportProblemResponse{
