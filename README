@@ -1,0 +1,341 @@
+# 📚 API Documentation
+
+## 📁 Project Structure
+```
+PROJECT_ROOT/
+│
+├── 📁 Frontend/                  # Frontend folder
+│   └── frontend.html            # Main web page
+│
+├── 📁 golang_API/               # Backend folder
+│   ├── 📁 db/                   # Database connection folder
+│   │   └── db.go                # Database connection file with following settings:
+│   │                            # dbUser = "root"
+│   │                            # dbPass = "123456"
+│   │                            # dbHost = "192.168.1.153"
+│   │                            # dbPort = "3306"
+│   │                            # dbName = "MySQLdatabases"
+│   │
+│   ├── 📁 handlers/             # Folder containing handlers for managing different endpoints
+│   │   ├── branchoffice.go      # Branch office data manager: Add, Delete, Edit, View branch data
+│   │   ├── problem.go           # Problem data manager: Add, Delete, Edit, View problems and send data to Dashboard
+│   │   ├── program.go           # Program data manager: Add, Delete, Edit, View program data
+│   │   ├── solution.go          # Solution data manager: Add, Delete, Edit, View solution data
+│   │   └── user.go              # User data manager: Add, Delete, Edit, View user data
+│   │
+│   ├── 📁 models/               # Folder containing models for managing different endpoints
+│   │   ├── authmodels.go        # Authentication data manager
+│   │   ├── branchofficeModel.go # Branch office data model
+│   │   ├── programModel.go      # Program data model
+│   │   ├── ReportProblemModel.go # Problem data model
+│   │   └── utils.go             # Solution data utilities
+│   │
+│   ├── 📁 routes/               # Folder containing routes for managing endpoints
+│   │   └── routes.go            # Routes accessible by frontend
+│   │
+│   ├── .env                     # Environment variables like DB credentials
+│   ├── Dockerfile              # For building Docker container to run the system
+│   ├── go.mod                  # Go dependencies list
+│   ├── go.sum                  # Dependencies hash
+│   └── main.go                 # Application entry point
+│
+└── readme                      # Project documentation
+```
+
+## 🔐 Authentication System API
+
+### 1. Login
+**Endpoint:** `/auth/login`  
+**Method:** `POST`  
+**Request Body:**
+```json
+{
+    "username": "admin",
+    "password": "123456"
+}
+```
+
+### 2. Register
+**Endpoint:** `/auth/register`  
+**Method:** `POST`  
+**Request Body:**
+```json
+{
+    "username": "admin",
+    "password": "123456",
+    "role": "admin"
+}
+```
+
+### 3. Logout
+**Endpoint:** `/auth/logout`  
+**Method:** `POST`  
+**Request Body:**
+```json
+{
+    "username": "admin",
+    "password": "123456",
+    "role": "admin"
+}
+```
+
+### 4. Update User
+**Endpoint:** `/auth/updateUser`  
+**Method:** `PUT`  
+**Request Body:**
+```json
+{
+    "username": "admin",
+    "password": "123456",
+    "role": "admin"
+}
+```
+
+### 5. Delete User
+**Endpoint:** `/auth/deleteUser`  
+**Method:** `DELETE`  
+**Request Body:**
+```json
+{
+    "id": 1
+}
+```
+
+## 🏢 Branch Office System API
+
+### 1. Add Branch Office
+**Endpoint:** `/entry/branchOffice`  
+**Method:** `POST`  
+**Request Body:**
+```json
+{
+    "name": "Branch 1",
+    "address": "Bangkok",
+    "phone": "0812345678"
+}
+```
+
+### 2. Update Branch Office
+**Endpoint:** `/entry/branchOffice/{ip_phone}`  
+**Method:** `PUT`  
+**Request Body:**
+```json
+{
+    "name": "Branch 1",
+    "address": "Bangkok",
+    "phone": "0812345678"
+}
+```
+
+### 3. Delete Branch Office
+**Endpoint:** `/entry/branchOffice/{ip_phone}`  
+**Method:** `DELETE`  
+**Request Body:**
+```json
+{
+    "ip_phone": "0812345678"
+}
+```
+
+### 4. Get All Branch Offices
+**Endpoint:** `/entry/branchOffices`  
+**Method:** `GET`
+
+## 🔧 Problem System API
+
+### 1. Report Problem
+**Endpoint:** `/entry/reportProblem`  
+**Method:** `POST`  
+**Request Body:**
+```json
+{
+    "name": "Problem 1",
+    "description": "Problem 1",
+    "branchOffice": "Branch 1"
+}
+```
+
+### 2. Get All Problems
+**Endpoint:** `/entry/problems`  
+**Method:** `GET`
+
+### 3. Get Problem by ID
+**Endpoint:** `/entry/problem/{id}`  
+**Method:** `GET`
+
+### 4. Delete Problem
+**Endpoint:** `/entry/problem/{id}`  
+**Method:** `DELETE`  
+**Request Body:**
+```json
+{
+    "id": 1
+}
+```
+
+### 5. Update Problem
+**Endpoint:** `/entry/problem/{id}`  
+**Method:** `PUT`  
+**Request Body:**
+```json
+{
+    "id": 1,
+    "name": "Problem 1",
+    "description": "Problem 1",
+    "branchOffice": "Branch 1"
+}
+```
+
+## ✅ Solution System API
+
+### 1. Solve Problem
+**Endpoint:** `/entry/solveProblem`  
+**Method:** `PUT`  
+**Request Body:**
+```json
+{
+    "id": 1,
+    "solution": "Solution 1",
+    "solutionUser": "Solver 1"
+}
+```
+
+### 2. Reset Solution
+**Endpoint:** `/entry/problem/{id}/reset-solution`  
+**Method:** `PUT`  
+**Request Body:**
+```json
+{
+    "id": 1
+}
+```
+
+### 3. Update Solution
+**Endpoint:** `/entry/problem/{id}/update-solution`  
+**Method:** `PUT`  
+**Request Body:**
+```json
+{
+    "id": 1,
+    "solution": "Solution 1",
+    "solutionUser": "Solver 1"
+}
+```
+
+## 💻 Program System API
+
+### 1. Add Program
+**Endpoint:** `/entry/program`  
+**Method:** `POST`  
+**Request Body:**
+```json
+{
+    "name": "Program 1",
+    "description": "Program 1"
+}
+```
+
+### 2. Get All Programs
+**Endpoint:** `/entry/programs`  
+**Method:** `GET`
+
+### 3. Update Program
+**Endpoint:** `/entry/program/{id}`  
+**Method:** `PUT`  
+**Request Body:**
+```json
+{
+    "id": 1,
+    "name": "Program 1",
+    "description": "Program 1"
+}
+```
+
+### 4. Delete Program
+**Endpoint:** `/entry/program/{id}`  
+**Method:** `DELETE`  
+**Request Body:**
+```json
+{
+    "id": 1
+}
+```
+
+## 👥 User System API
+
+### 1. Add User
+**Endpoint:** `/entry/user`  
+**Method:** `POST`  
+**Request Body:**
+```json
+{
+    "username": "username",
+    "password": "password",
+    "role": "role"
+}
+```
+
+### 2. Get All Users
+**Endpoint:** `/entry/users`  
+**Method:** `GET`
+
+### 3. Update User
+**Endpoint:** `/entry/user/{id}`  
+**Method:** `PUT`  
+**Request Body:**
+```json
+{
+    "id": 1,
+    "username": "username",
+    "password": "password",
+    "role": "role"
+}
+```
+
+### 4. Delete User
+**Endpoint:** `/entry/user/{id}`  
+**Method:** `DELETE`  
+**Request Body:**
+```json
+{
+    "id": 1
+}
+```
+
+## 📊 Dashboard System API
+
+### 1. Get Dashboard Data
+**Endpoint:** `/entry/dashboard`  
+**Method:** `GET`
+
+## 🗑️ Delete All System API
+
+### 1. Delete All Problems
+**Endpoint:** `/entry/deleteAllProblems`  
+**Method:** `DELETE`  
+**Request Body:**
+```json
+{
+    "id": 1
+}
+```
+
+### 2. Delete All Branch Offices
+**Endpoint:** `/entry/deleteAllBranchOffices`  
+**Method:** `DELETE`  
+**Request Body:**
+```json
+{
+    "id": 1
+}
+```
+
+### 3. Delete All Programs
+**Endpoint:** `/entry/deleteAllPrograms`  
+**Method:** `DELETE`  
+**Request Body:**
+```json
+{
+    "id": 1
+}
+```
