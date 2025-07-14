@@ -38,7 +38,7 @@ func InitDB() error {
 
 		dbHost := os.Getenv("DB_HOST")
 		if dbHost == "" {
-			dbHost = "192.168.1.153"
+			dbHost = "192.168.0.192"
 			log.Printf("⚠️ Using default DB_HOST: %s", dbHost)
 		} else {
 			log.Printf("✅ Using DB_HOST: %s", dbHost)
