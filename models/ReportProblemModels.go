@@ -8,11 +8,13 @@ import (
 
 // ReportProblemRequest ใช้สำหรับรับข้อมูลจาก client
 type ReportProblemRequest struct {
-	IpPhone string `json:"ipPhone"`
-	Other   string `json:"other"`
-	Program string `json:"program"`
-	Problem string `json:"problem"`
-	Status  string `json:"status"`
+	IpPhone      string `json:"ipPhone"`
+	Other        string `json:"other"`
+	Program      string `json:"program"`
+	Problem      string `json:"problem"`
+	Solution     string `json:"solution"`
+	SolutionUser string `json:"solutionUser"`
+	Status       string `json:"status"`
 }
 
 // ReportProblemResponse ตอบกลับการรายงานปัญหา
@@ -157,11 +159,14 @@ type GetUsersResponse struct {
 
 // UpdateProblemRequest สำหรับอัพเดตข้อมูลปัญหา
 type UpdateProblemRequest struct {
-	ID      int    `json:"id"`
-	IpPhone string `json:"ipPhone"`
-	Other   string `json:"other"`
-	Program string `json:"program"`
-	Problem string `json:"problem"`
+	ID           int    `json:"id"`
+	IpPhone      string `json:"ipPhone"`
+	Other        string `json:"other"`
+	Program      string `json:"program"`
+	Problem      string `json:"problem"`
+	Solution     string `json:"solution"`
+	SolutionUser string `json:"solutionUser"`
+	Status       string `json:"status"`
 }
 
 // UpdateProblemResponse ตอบกลับการอัพเดตปัญหา
