@@ -54,7 +54,7 @@ func InitDB() error {
 
 		dbName := os.Getenv("DB_NAME")
 		if dbName == "" {
-			dbName = "MySQLdatabases"
+			dbName = "report_db"
 			log.Printf("⚠️ Using default DB_NAME: %s", dbName)
 		} else {
 			log.Printf("✅ Using DB_NAME: %s", dbName)

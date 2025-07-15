@@ -1,7 +1,7 @@
 package models
 
-// Program สำหรับแสดงข้อมูล systems_program
-type Program struct {
+// Branch สำหรับแสดงข้อมูล branches
+type Branch struct {
 	ID        int     `json:"id"`
 	Name      *string `json:"name"`
 	CreatedAt *string `json:"created_at"`
@@ -12,8 +12,8 @@ type Program struct {
 	DeletedBy *int    `json:"deleted_by"`
 }
 
-// ProgramRequest สำหรับรับข้อมูลเพิ่ม/แก้ไขโปรแกรม
-type ProgramRequest struct {
+// BranchRequest สำหรับรับข้อมูลเพิ่ม/แก้ไขสาขา
+type BranchRequest struct {
 	Name      *string `json:"name"`
 	CreatedBy *int    `json:"created_by"`
 	UpdatedBy *int    `json:"updated_by"`

@@ -2,129 +2,98 @@ package handlers
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"reports-api/db"
 	"reports-api/models"
-	"strings"
-
-	"github.com/go-playground/validator/v10"
 )
 
-var validate = validator.New()
-
-// AddUserHandler handles POST requests to add new users
-func AddUserHandler(w http.ResponseWriter, r *http.Request) {
+// LoginHandler handles user login
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	var req models.UserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	var credentials models.Credentials
+	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Validate input
-	if err := validate.Struct(req); err != nil {
-		response := models.UserResponse{
-			Success: false,
-			Message: err.Error(),
-		}
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
-		return
+	// ตัวอย่างตรวจสอบ username/password แบบ hardcoded
+	if credentials.Username == "admin" && credentials.Password == "password" {
+		json.NewEncoder(w).Encode(models.LoginResponse{Message: "Login successful"})
+	} else {
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 	}
-
-	// Validate required fields
-	if req.Username == "" || req.Password == "" {
-		response := models.UserResponse{
-			Success: false,
-			Message: "Missing required fields: username, password",
-		}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	// Set default role if not provided
-	if req.Role == "" {
-		req.Role = "user"
-	}
-
-	// Validate role
-	if req.Role != "admin" && req.Role != "user" {
-		response := models.UserResponse{
-			Success: false,
-			Message: "Invalid role. Must be 'admin' or 'user'",
-		}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	// Insert into database
-	query := `INSERT INTO users (username, password, role) VALUES (?, ?, ?)`
-	_, err := db.DB.Exec(query, req.Username, req.Password, req.Role)
-	if err != nil {
-		log.Printf("Error inserting user: %v", err)
-
-		// Check if error is due to duplicate username
-		if strings.Contains(err.Error(), "Duplicate entry") && strings.Contains(err.Error(), "users.username") {
-			response := models.UserResponse{
-				Success: false,
-				Message: "ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว กรุณาใช้ชื่อผู้ใช้อื่น",
-			}
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-
-		response := models.UserResponse{
-			Success: false,
-			Message: "Failed to add user",
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	response := models.UserResponse{
-		Success: true,
-		Message: "User added successfully",
-	}
-	json.NewEncoder(w).Encode(response)
 }
 
-// GetUsersHandler handles GET requests to retrieve all users
-func GetUsersHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	query := `SELECT id, username, role FROM users ORDER BY username`
-
-	rows, err := db.DB.Query(query)
-	if err != nil {
-		log.Printf("Error querying users: %v", err)
-		response := models.GetUsersResponse{
-			Success: false,
-			Message: "Failed to retrieve users",
+// RegisterHandler returns a handler for registering a user or admin
+func RegisterHandler(role string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var user models.Credentials
+		if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
 		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
+		// Insert user into DB with role ("user" or "admin")
+		_, err := db.DB.Exec("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", user.Username, user.Password, role)
+		if err != nil {
+			http.Error(w, "Failed to register user", http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]string{"message": "Registered as " + role})
+	}
+}
+
+// UpdateUserHandler updates user info
+func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var req struct {
+		ID       int    `json:"id"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	defer rows.Close()
-
-	var users []models.User
-	for rows.Next() {
-		var user models.User
-		err := rows.Scan(&user.ID, &user.Username, &user.Role)
-		if err != nil {
-			log.Printf("Error scanning user: %v", err)
-			continue
-		}
-		users = append(users, user)
+	// Update user in DB
+	_, err := db.DB.Exec("UPDATE users SET username = ?, password = ? WHERE id = ?", req.Username, req.Password, req.ID)
+	if err != nil {
+		http.Error(w, "Failed to update user", http.StatusInternalServerError)
+		return
 	}
+	json.NewEncoder(w).Encode(map[string]string{"message": "User updated"})
+}
 
-	response := models.GetUsersResponse{
-		Success: true,
-		Message: "Users retrieved successfully",
-		Users:   users,
+// DeleteUserHandler deletes a user
+func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var req struct {
+		ID int `json:"id"`
 	}
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	// Delete user from DB
+	_, err := db.DB.Exec("DELETE FROM users WHERE id = ?", req.ID)
+	if err != nil {
+		http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": "User deleted"})
+}
+
+// LogoutHandler logs out a user
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	// ลบ session cookie (ถ้ามี)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+	json.NewEncoder(w).Encode(map[string]string{"message": "Logged out"})
 }
