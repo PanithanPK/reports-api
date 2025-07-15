@@ -33,6 +33,12 @@ func ReportProblemHandler(w http.ResponseWriter, r *http.Request) {
 	problemLogger.Printf("📋 Problem report data - IP: %s, Program: %s, Other: %s",
 		req.IpPhone, req.Program, req.Other)
 
+	if req.Solution != "" {
+		problemLogger.Printf("📋 Solution provided: %s by user %s", req.Solution, req.SolutionUser)
+	} else {
+		problemLogger.Printf("📋 No solution provided")
+	}
+
 	// Validate required fields
 	if (req.IpPhone == "" && req.Other == "") || req.Program == "" || req.Problem == "" {
 		problemLogger.Printf("❌ Missing required fields from %s", r.RemoteAddr)
@@ -45,8 +51,16 @@ func ReportProblemHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert into database
-	query := `INSERT INTO report_problem (ip_phone, program, other, problem, status) VALUES (NULLIF(?, ''), ?, ?, ?, ?)`
-	result, err := db.DB.Exec(query, req.IpPhone, req.Program, req.Other, req.Problem, req.Status)
+	var query string
+	var result sql.Result
+	var err error
+	if req.Solution != "" {
+		query = `INSERT INTO report_problem (ip_phone, program, other, problem, solution, solution_user, status, solution_date) VALUES (NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), CURRENT_TIMESTAMP)`
+		result, err = db.DB.Exec(query, req.IpPhone, req.Program, req.Other, req.Problem, req.Solution, req.SolutionUser, req.Status)
+	} else {
+		query = `INSERT INTO report_problem (ip_phone, program, other, problem, solution, solution_user, status) VALUES (NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''))`
+		result, err = db.DB.Exec(query, req.IpPhone, req.Program, req.Other, req.Problem, req.Solution, req.SolutionUser, req.Status)
+	}
 	if err != nil {
 		problemLogger.Printf("❌ Error inserting problem: %v", err)
 		response := models.ReportProblemResponse{
@@ -77,8 +91,8 @@ func GetProblemsHandler(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT rp.id, rp.ip_phone, rp.program, rp.other, rp.problem, rp.solution, 
-		       rp.solution_date, rp.solution_user, rp.status, rp.created_at,
-		       bo.branchoffice
+			   rp.solution_date, rp.solution_user, rp.status, rp.created_at,
+			   bo.branchoffice
 		FROM report_problem rp
 		LEFT JOIN branch_office bo ON rp.ip_phone = bo.ip_phone
 		ORDER BY rp.created_at DESC
@@ -162,8 +176,8 @@ func GetProblemByIDHandler(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT rp.id, rp.ip_phone, rp.program, rp.other, rp.problem, rp.solution, 
-		       rp.solution_date, rp.solution_user, rp.status, rp.created_at,
-		       COALESCE(bo.branchoffice, '') as branchoffice
+			   rp.solution_date, rp.solution_user, rp.status, rp.created_at,
+			   COALESCE(bo.branchoffice, '') as branchoffice
 		FROM report_problem rp
 		LEFT JOIN branch_office bo ON rp.ip_phone = bo.ip_phone
 		WHERE rp.id = ?
@@ -245,12 +259,20 @@ func UpdateProblemHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	problemLogger.Printf("📋 Update data for problem %s - IP: %s, Program: %s, Other: %s",
-		problemID, req.IpPhone, req.Program, req.Other)
+	problemLogger.Printf("📋 Update data for problem %s - IP: %s, Program: %s, Other: %s, Solution: %s, SolutionUser, %s, Status: %s",
+		problemID, req.IpPhone, req.Program, req.Other, req.Solution, req.SolutionUser, req.Status)
 
 	// Update database
-	query := `UPDATE report_problem SET ip_phone = ?, other = ?, program = ?, problem = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	result, err := db.DB.Exec(query, req.IpPhone, req.Other, req.Program, req.Problem, problemID)
+	var query string
+	var result sql.Result
+	var err error
+	if req.Solution != "" {
+		query = `UPDATE report_problem SET ip_phone = ?, other = ?, program = ?, problem = ?, solution = ?, solution_user = ?, status = ?, solution_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+		result, err = db.DB.Exec(query, req.IpPhone, req.Other, req.Program, req.Problem, req.Solution, req.SolutionUser, req.Status, problemID)
+	} else {
+		query = `UPDATE report_problem SET ip_phone = ?, other = ?, program = ?, problem = ?, solution = ?, solution_user = ?, status = ?, solution_date = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+		result, err = db.DB.Exec(query, req.IpPhone, req.Other, req.Program, req.Problem, req.Solution, req.SolutionUser, req.Status, problemID)
+	}
 	if err != nil {
 		problemLogger.Printf("❌ Error updating problem ID %s: %v", problemID, err)
 		response := models.UpdateProblemResponse{
@@ -419,7 +441,7 @@ func GetDashboardDataHandler(w http.ResponseWriter, r *http.Request) {
 	// ปรับ query ให้รองรับ filter เดือนและปี
 	problemsQuery := `
 		SELECT p.id, p.ip_phone, p.program, p.other, p.problem, p.solution, 
-		       p.solution_date, p.solution_user, p.status, p.created_at
+			   p.solution_date, p.solution_user, p.status, p.created_at
 		FROM report_problem p
 		WHERE 1=1
 	`
