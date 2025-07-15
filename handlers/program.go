@@ -6,187 +6,83 @@ import (
 	"net/http"
 	"reports-api/db"
 	"reports-api/models"
-
-	"github.com/gorilla/mux"
+	"strconv"
+	"time"
 )
 
-// AddProgramHandler handles POST requests to add new programs
-func AddProgramHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	var req models.ProgramRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// Validate required fields
-	if req.Name == "" {
-		response := models.ProgramResponse{
-			Success: false,
-			Message: "Missing required field: name",
-		}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	// Insert into database
-	query := `INSERT INTO program (name) VALUES (?)`
-	_, err := db.DB.Exec(query, req.Name)
+// แสดงรายการโปรแกรมทั้งหมด
+func ListProgramsHandler(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.DB.Query(`SELECT id, name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by FROM systems_program WHERE deleted_at IS NULL`)
 	if err != nil {
-		log.Printf("Error inserting program: %v", err)
-		response := models.ProgramResponse{
-			Success: false,
-			Message: "Failed to add program",
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	response := models.ProgramResponse{
-		Success: true,
-		Message: "Program added successfully",
-	}
-	json.NewEncoder(w).Encode(response)
-}
-
-// GetProgramsHandler handles GET requests to retrieve all programs
-func GetProgramsHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	query := `SELECT id, name FROM program ORDER BY name`
-
-	rows, err := db.DB.Query(query)
-	if err != nil {
-		log.Printf("Error querying programs: %v", err)
-		response := models.GetProgramsResponse{
-			Success: false,
-			Message: "Failed to retrieve programs",
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Failed to query programs", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
 	var programs []models.Program
 	for rows.Next() {
-		var program models.Program
-		err := rows.Scan(&program.ID, &program.Name)
+		var p models.Program
+		err := rows.Scan(&p.ID, &p.Name, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt, &p.CreatedBy, &p.UpdatedBy, &p.DeletedBy)
 		if err != nil {
 			log.Printf("Error scanning program: %v", err)
 			continue
 		}
-		programs = append(programs, program)
+		programs = append(programs, p)
 	}
-
-	response := models.GetProgramsResponse{
-		Success:  true,
-		Message:  "Programs retrieved successfully",
-		Programs: programs,
-	}
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "programs": programs})
 }
 
-func UpdateProgramHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	vars := mux.Vars(r)
-	id := vars["id"]
-
+// เพิ่มโปรแกรม
+func CreateProgramHandler(w http.ResponseWriter, r *http.Request) {
 	var req models.ProgramRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-
-	// Validate required fields
-	if req.Name == "" {
-		response := models.ProgramResponse{
-			Success: false,
-			Message: "Missing required field: name",
-		}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	// Update database
-	query := `UPDATE program SET name = ? WHERE id = ?`
-	_, err := db.DB.Exec(query, req.Name, id)
+	res, err := db.DB.Exec(`INSERT INTO systems_program (name, created_by, updated_by) VALUES (?, ?, ?)`, req.Name, req.CreatedBy, req.UpdatedBy)
 	if err != nil {
-		log.Printf("Error updating program: %v", err)
-		response := models.ProgramResponse{
-			Success: false,
-			Message: "Failed to update program",
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Failed to insert program", http.StatusInternalServerError)
 		return
 	}
-
-	response := models.ProgramResponse{
-		Success: true,
-		Message: "Program updated successfully",
-	}
-	json.NewEncoder(w).Encode(response)
+	id, _ := res.LastInsertId()
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
 }
 
+// แก้ไขโปรแกรม
+func UpdateProgramHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid id", http.StatusBadRequest)
+		return
+	}
+	var req models.ProgramRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	_, err = db.DB.Exec(`UPDATE systems_program SET name=?, updated_by=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, req.Name, req.UpdatedBy, time.Now(), id)
+	if err != nil {
+		http.Error(w, "Failed to update program", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+}
+
+// ลบโปรแกรม (soft delete)
 func DeleteProgramHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	vars := mux.Vars(r)
-	id := vars["id"]
-
-	// Delete from database
-	query := `DELETE FROM program WHERE id = ?`
-	_, err := db.DB.Exec(query, id)
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		log.Printf("Error deleting program: %v", err)
-		response := models.ProgramResponse{
-			Success: false,
-			Message: "Failed to delete program",
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Invalid id", http.StatusBadRequest)
 		return
 	}
-
-	response := models.ProgramResponse{
-		Success: true,
-		Message: "Program deleted successfully",
-	}
-	json.NewEncoder(w).Encode(response)
-}
-
-// DeleteAllPrograms ลบข้อมูลโปรแกรมทั้งหมด
-func DeleteAllProgramsHandler(w http.ResponseWriter, r *http.Request) {
-	database := db.DB
-
-	// ลบข้อมูลทั้งหมดจากตาราง program และรีเซ็ต auto-increment
-	// ใช้ DELETE FROM แทน TRUNCATE TABLE เพื่อหลีกเลี่ยง foreign key constraints
-	_, err := database.Exec("DELETE FROM program")
+	deletedByStr := r.URL.Query().Get("deleted_by")
+	deletedBy, _ := strconv.Atoi(deletedByStr)
+	_, err = db.DB.Exec(`UPDATE systems_program SET deleted_at=?, deleted_by=? WHERE id=? AND deleted_at IS NULL`, time.Now(), deletedBy, id)
 	if err != nil {
-		log.Printf("Error deleting all programs: %v", err)
-		response := models.DeleteAllProgramsResponse{
-			Success: false,
-			Message: "Failed to delete all programs: " + err.Error(),
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Failed to delete program", http.StatusInternalServerError)
 		return
 	}
-
-	// รีเซ็ต auto-increment counter
-	_, err = database.Exec("ALTER TABLE program AUTO_INCREMENT = 1")
-	if err != nil {
-		log.Printf("Error resetting auto increment: %v", err)
-		// ไม่ return error เพราะข้อมูลถูกลบแล้ว
-	}
-
-	response := models.DeleteAllProgramsResponse{
-		Success: true,
-		Message: "All programs deleted successfully",
-	}
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }

@@ -1,27 +1,26 @@
 package models
 
-type LoginRequest struct {
+// Credentials represents the structure of user login credentials
+type Credentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-type LoginResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-	Role    string `json:"role,omitempty"`
+// User สำหรับแสดงข้อมูลผู้ใช้
+type User struct {
+	ID       int    `json:"id"`
+	Username string `json:"username"`
+	Role     string `json:"role"`
 }
 
+// RegisterRequest สำหรับรับข้อมูลสมัครสมาชิก
 type RegisterRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Role     string `json:"role"`
 }
 
-type RegisterResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
+// UpdateUserRequest สำหรับรับข้อมูลแก้ไขผู้ใช้
 type UpdateUserRequest struct {
 	ID       int    `json:"id"`
 	Username string `json:"username"`
@@ -29,21 +28,14 @@ type UpdateUserRequest struct {
 	Role     string `json:"role"`
 }
 
-type UpdateUserResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-type DeleteUserRequest struct {
+// LogoutRequest สำหรับรับข้อมูล logout
+type LogoutRequest struct {
 	ID int `json:"id"`
 }
 
-type DeleteUserResponse struct {
-	Success bool   `json:"success"`
+// LoginResponse สำหรับตอบกลับ login
+type LoginResponse struct {
 	Message string `json:"message"`
-}
-
-type LogoutResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+	Token   string `json:"token,omitempty"`
+	User    *User  `json:"user,omitempty"`
 }
