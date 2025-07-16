@@ -7,7 +7,6 @@ import (
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
-	"time"
 )
 
 // ListProgramsHandler returns a handler for listing all programs
@@ -39,7 +38,7 @@ func CreateProgramHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-	res, err := db.DB.Exec(`INSERT INTO systems_program (name, created_by, updated_by) VALUES (?, ?, ?)`, req.Name, req.CreatedBy, req.UpdatedBy)
+	res, err := db.DB.Exec(`INSERT INTO systems_program (name, created_by) VALUES (?, ?)`, req.Name, req.CreatedBy)
 	if err != nil {
 		http.Error(w, "Failed to insert program", http.StatusInternalServerError)
 		return
@@ -61,7 +60,7 @@ func UpdateProgramHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-	_, err = db.DB.Exec(`UPDATE systems_program SET name=?, updated_by=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, req.Name, req.UpdatedBy, time.Now(), id)
+	_, err = db.DB.Exec(`UPDATE systems_program SET name=?, updated_by=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL`, req.Name, req.UpdatedBy, id)
 	if err != nil {
 		http.Error(w, "Failed to update program", http.StatusInternalServerError)
 		return
@@ -79,7 +78,7 @@ func DeleteProgramHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	deletedByStr := r.URL.Query().Get("deleted_by")
 	deletedBy, _ := strconv.Atoi(deletedByStr)
-	_, err = db.DB.Exec(`UPDATE systems_program SET deleted_at=?, deleted_by=? WHERE id=? AND deleted_at IS NULL`, time.Now(), deletedBy, id)
+	_, err = db.DB.Exec(`UPDATE systems_program SET deleted_at=CURRENT_TIMESTAMP, deleted_by=? WHERE id=? AND deleted_at IS NULL`, deletedBy, id)
 	if err != nil {
 		http.Error(w, "Failed to delete program", http.StatusInternalServerError)
 		return
