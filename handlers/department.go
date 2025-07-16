@@ -85,7 +85,7 @@ func DeleteDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
 		return
 	}
-	_, err = db.DB.Exec(`UPDATE departments SET deleted_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL`, id)
+	_, err = db.DB.Exec(`DELETE FROM departments WHERE id=?`, id)
 	if err != nil {
 		http.Error(w, "Failed to delete department", http.StatusInternalServerError)
 		return

@@ -92,9 +92,7 @@ func DeleteIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
 		return
 	}
-	deletedByStr := r.URL.Query().Get("deleted_by")
-	deletedBy, _ := strconv.Atoi(deletedByStr)
-	_, err = db.DB.Exec(`UPDATE ip_phones SET deleted_at=CURRENT_TIMESTAMP, deleted_by=? WHERE id=? AND deleted_at IS NULL`, deletedBy, id)
+	_, err = db.DB.Exec(`DELETE FROM ip_phones WHERE id=?`, id)
 	if err != nil {
 		http.Error(w, "Failed to delete ip_phone", http.StatusInternalServerError)
 		return
