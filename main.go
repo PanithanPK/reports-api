@@ -8,6 +8,7 @@ import (
 	"reports-api/routes"
 	"runtime"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -50,6 +51,9 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		// Log request
 		logger.Info.Printf("Request: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 
+		// Add logging for incoming requests
+		logger.Info.Printf("Incoming request: %s %s", r.Method, r.URL.Path)
+
 		// Call next handler
 		next.ServeHTTP(w, r)
 
@@ -91,13 +95,13 @@ func main() {
 	r.Use(loggingMiddleware)
 
 	// Serve static files
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("../Fontend"))))
+	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./frontend"))))
 	logger.Info.Println("📁 Static file server configured")
 
-	// Serve frontend.html at root
+	// Serve index.html at root
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		logger.Info.Printf("📄 Serving frontend.html to %s", r.RemoteAddr)
-		http.ServeFile(w, r, "../Fontend/frontend.html")
+		logger.Info.Printf("📄 Serving index.html to %s", r.RemoteAddr)
+		http.ServeFile(w, r, "./frontend/index.html")
 	})
 
 	// Register API routes
@@ -121,12 +125,12 @@ func main() {
 	})
 	logger.Info.Println("🌐 CORS configured")
 
-	// Catch-all: serve frontend.html for all other GET requests (for SPA)
+	// Catch-all: serve index.html for all other GET requests (for SPA)
 	// ต้องวางไว้หลัง API routes เพื่อไม่ให้จับ API requests
 	r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
-			logger.Info.Printf("📄 Serving frontend.html (catch-all) to %s", r.RemoteAddr)
-			http.ServeFile(w, r, "../Fontend/frontend.html")
+		if r.Method == "GET" && !strings.HasPrefix(r.URL.Path, "/static/") && !strings.HasPrefix(r.URL.Path, "/problemEntry/") {
+			logger.Info.Printf("📄 Serving index.html (catch-all) to %s", r.RemoteAddr)
+			http.ServeFile(w, r, "./frontend/index.html")
 		} else {
 			logger.Warn.Printf("⚠️ 404 Not Found: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 			http.NotFound(w, r)

@@ -17,25 +17,32 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ตัวอย่างตรวจสอบ username/password แบบ hardcoded
-	if credentials.Username == "admin" && credentials.Password == "password" {
-		json.NewEncoder(w).Encode(models.LoginResponse{Message: "Login successful"})
-	} else {
+	var id int
+	var username, password string
+	err := db.DB.QueryRow("SELECT id, username, password FROM users WHERE username = ? AND deleted_at IS NULL", credentials.Username).Scan(&id, &username, &password)
+	if err != nil {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
 	}
+
+	if credentials.Password != password {
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	}
+
+	json.NewEncoder(w).Encode(models.LoginResponse{Message: "Login successful", User: &models.User{ID: id, Username: username}})
 }
 
 // RegisterHandler returns a handler for registering a user or admin
 func RegisterHandler(role string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		var user models.Credentials
-		if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		var req models.RegisterUserRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		// Insert user into DB with role ("user" or "admin")
-		_, err := db.DB.Exec("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", user.Username, user.Password, role)
+		_, err := db.DB.Exec("INSERT INTO users (username, password, role, created_by) VALUES (?, ?, ?, ?)", req.Username, req.Password, role, req.CreatedBy)
 		if err != nil {
 			http.Error(w, "Failed to register user", http.StatusInternalServerError)
 			return
@@ -47,17 +54,12 @@ func RegisterHandler(role string) http.HandlerFunc {
 // UpdateUserHandler updates user info
 func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	var req struct {
-		ID       int    `json:"id"`
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
+	var req models.UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	// Update user in DB
-	_, err := db.DB.Exec("UPDATE users SET username = ?, password = ? WHERE id = ?", req.Username, req.Password, req.ID)
+	_, err := db.DB.Exec("UPDATE users SET username = ?, password = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL", req.Username, req.Password, req.UpdatedBy, req.ID)
 	if err != nil {
 		http.Error(w, "Failed to update user", http.StatusInternalServerError)
 		return
@@ -68,15 +70,12 @@ func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 // DeleteUserHandler deletes a user
 func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	var req struct {
-		ID int `json:"id"`
-	}
+	var req models.DeleteUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	// Delete user from DB
-	_, err := db.DB.Exec("DELETE FROM users WHERE id = ?", req.ID)
+	_, err := db.DB.Exec("UPDATE users SET deleted_at = CURRENT_TIMESTAMP, deleted_by = ? WHERE id = ? AND deleted_at IS NULL", req.DeletedBy, req.ID)
 	if err != nil {
 		http.Error(w, "Failed to delete user", http.StatusInternalServerError)
 		return

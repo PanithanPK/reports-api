@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"reports-api/db"
 	"reports-api/models"
+	"strconv"
+	"time"
 )
 
-// GetTasksHandler คืนค่าข้อมูล tasks ทั้งหมด
+// GetTasksHandler returns a handler for listing all tasks with details
 func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -51,4 +53,63 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"tasks":   tasks,
 	})
+}
+
+// CreateTaskHandler เพิ่ม task ใหม่
+func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
+	var req models.TaskRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	status := req.Status
+	if status == "" {
+		status = "0"
+	}
+	res, err := db.DB.Exec(`INSERT INTO tasks (phone_id, system_id, text, status, created_by) VALUES (?, ?, ?, ?, ?)`, req.PhoneID, req.SystemID, req.Text, status, req.CreatedBy)
+	if err != nil {
+		http.Error(w, "Failed to insert task", http.StatusInternalServerError)
+		return
+	}
+	id, _ := res.LastInsertId()
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
+}
+
+// UpdateTaskHandler แก้ไข task
+func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid id", http.StatusBadRequest)
+		return
+	}
+	var req models.TaskRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, text=?, status=?, updated_at=?, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.Text, req.Status, time.Now(), req.UpdatedBy, id)
+	if err != nil {
+		http.Error(w, "Failed to update task", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+}
+
+// DeleteTaskHandler (soft delete)
+func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid id", http.StatusBadRequest)
+		return
+	}
+	deletedByStr := r.URL.Query().Get("deleted_by")
+	deletedBy, _ := strconv.Atoi(deletedByStr)
+	_, err = db.DB.Exec(`UPDATE tasks SET deleted_at=?, deleted_by=? WHERE id=? AND deleted_at IS NULL`, time.Now(), deletedBy, id)
+	if err != nil {
+		http.Error(w, "Failed to delete task", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }

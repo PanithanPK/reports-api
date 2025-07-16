@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// แสดงรายการโปรแกรมทั้งหมด
+// ListProgramsHandler returns a handler for listing all programs
 func ListProgramsHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.DB.Query(`SELECT id, name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by FROM systems_program WHERE deleted_at IS NULL`)
 	if err != nil {
@@ -32,7 +32,7 @@ func ListProgramsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "programs": programs})
 }
 
-// เพิ่มโปรแกรม
+// CreateProgramHandler returns a handler for creating a new program
 func CreateProgramHandler(w http.ResponseWriter, r *http.Request) {
 	var req models.ProgramRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -48,7 +48,7 @@ func CreateProgramHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
 }
 
-// แก้ไขโปรแกรม
+// UpdateProgramHandler returns a handler for updating an existing program
 func UpdateProgramHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
@@ -69,7 +69,7 @@ func UpdateProgramHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
-// ลบโปรแกรม (soft delete)
+// DeleteProgramHandler returns a handler for deleting a program (soft delete)
 func DeleteProgramHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)

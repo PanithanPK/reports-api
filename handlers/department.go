@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// แสดงรายการแผนกทั้งหมด
+// ListDepartmentsHandler returns a handler for listing all departments
 func ListDepartmentsHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.DB.Query(`SELECT id, name, branch_id, created_at, updated_at, deleted_at FROM departments WHERE deleted_at IS NULL`)
 	if err != nil {
@@ -32,7 +32,7 @@ func ListDepartmentsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "departments": departments})
 }
 
-// เพิ่มแผนก
+// CreateDepartmentHandler returns a handler for creating a new department
 func CreateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 	var req models.DepartmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -48,7 +48,7 @@ func CreateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
 }
 
-// แก้ไขแผนก
+// UpdateDepartmentHandler returns a handler for updating an existing department
 func UpdateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
@@ -69,7 +69,7 @@ func UpdateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
-// ลบแผนก (soft delete)
+// DeleteDepartmentHandler returns a handler for deleting a department
 func DeleteDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
