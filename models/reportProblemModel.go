@@ -1,5 +1,15 @@
 package models
 
+// TaskRequest สำหรับรับข้อมูลเพิ่ม/แก้ไข task
+type TaskRequest struct {
+	PhoneID   int    `json:"phone_id"`
+	SystemID  int    `json:"system_id"`
+	Text      string `json:"text"`
+	Status    string `json:"status"`
+	CreatedBy int    `json:"created_by"`
+	UpdatedBy int    `json:"updated_by"`
+}
+
 // TaskWithDetails สำหรับแสดง tasks พร้อมรายละเอียดจาก ip_phone และ systems_program
 type TaskWithDetails struct {
 	ID             int    `json:"id"`

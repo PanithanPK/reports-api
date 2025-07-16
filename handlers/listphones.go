@@ -10,9 +10,9 @@ import (
 	"time"
 )
 
-// แสดงรายการ ip_phones ทั้งหมด
+// ListIPPhonesHandler returns a handler for listing all IP phones
 func ListIPPhonesHandler(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.DB.Query(`SELECT id, number, name, department_id, created_at, updated_at, deleted_at, created_by, uodated_by, deleted_by FROM ip_phones WHERE deleted_at IS NULL`)
+	rows, err := db.DB.Query(`SELECT id, number, name, department_id, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by FROM ip_phones WHERE deleted_at IS NULL`)
 	if err != nil {
 		http.Error(w, "Failed to query ip_phones", http.StatusInternalServerError)
 		return
@@ -32,14 +32,14 @@ func ListIPPhonesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "ip_phones": phones})
 }
 
-// เพิ่ม ip_phone
+// CreateIPPhoneHandler returns a handler for creating a new IP phone
 func CreateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 	var req models.IPPhoneRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-	res, err := db.DB.Exec(`INSERT INTO ip_phones (number, name, department_id, created_by, uodated_by) VALUES (?, ?, ?, ?, ?)`, req.Number, req.Name, req.DepartmentID, req.CreatedBy, req.UpdatedBy)
+	res, err := db.DB.Exec(`INSERT INTO ip_phones (number, name, department_id, created_by, updated_by) VALUES (?, ?, ?, ?, ?)`, req.Number, req.Name, req.DepartmentID, req.CreatedBy, req.UpdatedBy)
 	if err != nil {
 		http.Error(w, "Failed to insert ip_phone", http.StatusInternalServerError)
 		return
@@ -48,7 +48,7 @@ func CreateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
 }
 
-// แก้ไข ip_phone
+// UpdateIPPhoneHandler returns a handler for updating an existing IP phone
 func UpdateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
@@ -61,7 +61,7 @@ func UpdateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-	_, err = db.DB.Exec(`UPDATE ip_phones SET number=?, name=?, department_id=?, uodated_by=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, req.Number, req.Name, req.DepartmentID, req.UpdatedBy, time.Now(), id)
+	_, err = db.DB.Exec(`UPDATE ip_phones SET number=?, name=?, department_id=?, updated_by=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, req.Number, req.Name, req.DepartmentID, req.UpdatedBy, time.Now(), id)
 	if err != nil {
 		http.Error(w, "Failed to update ip_phone", http.StatusInternalServerError)
 		return
@@ -69,7 +69,7 @@ func UpdateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
-// ลบ ip_phone (soft delete)
+// DeleteIPPhoneHandler returns a handler for deleting an IP phone
 func DeleteIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
