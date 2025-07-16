@@ -7,6 +7,8 @@ import (
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 // ListBranchesHandler returns a handler for listing all branches
@@ -49,7 +51,8 @@ func CreateBranchHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdateBranchHandler returns a handler for updating an existing branch
 func UpdateBranchHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	vars := mux.Vars(r)
+	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
@@ -70,7 +73,8 @@ func UpdateBranchHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteBranchHandler returns a handler for deleting a branch
 func DeleteBranchHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	vars := mux.Vars(r)
+	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)

@@ -7,6 +7,8 @@ import (
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 // ListProgramsHandler returns a handler for listing all programs
@@ -49,7 +51,8 @@ func CreateProgramHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdateProgramHandler returns a handler for updating an existing program
 func UpdateProgramHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	vars := mux.Vars(r)
+	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
@@ -70,7 +73,8 @@ func UpdateProgramHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteProgramHandler returns a handler for deleting a program (soft delete)
 func DeleteProgramHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	vars := mux.Vars(r)
+	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)

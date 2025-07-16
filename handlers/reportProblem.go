@@ -7,6 +7,8 @@ import (
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 // GetTasksHandler returns a handler for listing all tasks with details
@@ -61,11 +63,8 @@ func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-	status := req.Status
-	if status == "" {
-		status = "0"
-	}
-	res, err := db.DB.Exec(`INSERT INTO tasks (phone_id, system_id, text, status, created_by) VALUES (?, ?, ?, ?, ?)`, req.PhoneID, req.SystemID, req.Text, status, req.CreatedBy)
+
+	res, err := db.DB.Exec(`INSERT INTO tasks (phone_id, system_id, text, status, created_by) VALUES (?, ?, ?, 0, ?)`, req.PhoneID, req.SystemID, req.Text, req.CreatedBy)
 	if err != nil {
 		http.Error(w, "Failed to insert task", http.StatusInternalServerError)
 		return
@@ -76,7 +75,8 @@ func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdateTaskHandler แก้ไข task
 func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	vars := mux.Vars(r)
+	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
@@ -97,7 +97,8 @@ func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteTaskHandler (soft delete)
 func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	vars := mux.Vars(r)
+	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
