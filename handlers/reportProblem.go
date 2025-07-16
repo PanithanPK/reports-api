@@ -15,7 +15,7 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	query := `
-		SELECT t.id, t.phone_id, COALESCE(p.name, ''), t.system_id, COALESCE(s.name, ''),
+		SELECT t.id, t.phone_id, COALESCE(p.number, 0), COALESCE(p.name, ''), t.system_id, COALESCE(s.name, ''),
 		COALESCE(p.department_id, 0), COALESCE(d.name, ''), COALESCE(d.branch_id, 0), COALESCE(b.name, ''),
 		t.text, t.status, t.created_at, t.updated_at
 		FROM tasks t
@@ -35,7 +35,7 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	var tasks []models.TaskWithDetails
 	for rows.Next() {
 		var t models.TaskWithDetails
-		err := rows.Scan(&t.ID, &t.PhoneID, &t.PhoneName, &t.SystemID, &t.SystemName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+		err := rows.Scan(&t.ID, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Status, &t.CreatedAt, &t.UpdatedAt)
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue

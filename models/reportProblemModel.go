@@ -14,6 +14,7 @@ type TaskRequest struct {
 type TaskWithDetails struct {
 	ID             int    `json:"id"`
 	PhoneID        int    `json:"phone_id"`
+	Number         int    `json:"number"`
 	PhoneName      string `json:"phone_name"`
 	SystemID       int    `json:"system_id"`
 	SystemName     string `json:"system_name"`
