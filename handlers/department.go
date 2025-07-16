@@ -7,7 +7,6 @@ import (
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
-	"time"
 )
 
 // ListDepartmentsHandler returns a handler for listing all departments
@@ -66,7 +65,7 @@ func UpdateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-	_, err = db.DB.Exec(`UPDATE departments SET name=?, branch_id=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, req.Name, req.BranchID, time.Now(), id)
+	_, err = db.DB.Exec(`UPDATE departments SET name=?, branch_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL`, req.Name, req.BranchID, id)
 	if err != nil {
 		http.Error(w, "Failed to update department", http.StatusInternalServerError)
 		return
@@ -82,7 +81,7 @@ func DeleteDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
 		return
 	}
-	_, err = db.DB.Exec(`UPDATE departments SET deleted_at=? WHERE id=? AND deleted_at IS NULL`, time.Now(), id)
+	_, err = db.DB.Exec(`UPDATE departments SET deleted_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL`, id)
 	if err != nil {
 		http.Error(w, "Failed to delete department", http.StatusInternalServerError)
 		return

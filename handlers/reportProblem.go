@@ -7,7 +7,6 @@ import (
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
-	"time"
 )
 
 // GetTasksHandler returns a handler for listing all tasks with details
@@ -88,7 +87,7 @@ func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-	_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, text=?, status=?, updated_at=?, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.Text, req.Status, time.Now(), req.UpdatedBy, id)
+	_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.Text, req.Status, req.UpdatedBy, id)
 	if err != nil {
 		http.Error(w, "Failed to update task", http.StatusInternalServerError)
 		return
@@ -106,7 +105,7 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	deletedByStr := r.URL.Query().Get("deleted_by")
 	deletedBy, _ := strconv.Atoi(deletedByStr)
-	_, err = db.DB.Exec(`UPDATE tasks SET deleted_at=?, deleted_by=? WHERE id=? AND deleted_at IS NULL`, time.Now(), deletedBy, id)
+	_, err = db.DB.Exec(`UPDATE tasks SET deleted_at=CURRENT_TIMESTAMP, deleted_by=? WHERE id=? AND deleted_at IS NULL`, deletedBy, id)
 	if err != nil {
 		http.Error(w, "Failed to delete task", http.StatusInternalServerError)
 		return

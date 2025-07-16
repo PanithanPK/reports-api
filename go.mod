@@ -1,6 +1,6 @@
 module reports-api
 
-go 1.21.1
+go 1.23.4
 
 require (
 	github.com/go-sql-driver/mysql v1.9.3
