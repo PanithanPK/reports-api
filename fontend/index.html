@@ -143,15 +143,24 @@
 <body>
   <div class="container">
     <h1>📋 รายการปัญหาทั้งหมด (Report Problems)</h1>
-    <form class="add-form" id="addForm">
-      <label>ชื่อโทรศัพท์ <input type="text" name="phone_name" required /></label>
-      <label>ระบบ <input type="text" name="system_name" required /></label>
-      <label>แผนก <input type="text" name="department_name" required /></label>
-      <label>สาขา <input type="text" name="branch_name" required /></label>
-      <label>รายละเอียด <input type="text" name="text" required /></label>
-      <label>สถานะ <input type="text" name="status" required /></label>
-      <button type="submit">➕ เพิ่มปัญหา</button>
-    </form>
+    <button id="openAddModal" style="margin-bottom:1.2rem;padding:10px 22px;font-size:1.1rem;background:#1976d2;color:#fff;border:none;border-radius:6px;cursor:pointer;">➕ เพิ่มปัญหา</button>
+    <div id="addModal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.25);align-items:center;justify-content:center;">
+      <div style="background:#fff;padding:2rem 1.5rem 1.2rem 1.5rem;border-radius:10px;min-width:320px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,0.18);position:relative;">
+        <h2 style="margin-top:0;text-align:center;color:#1976d2;">เพิ่มปัญหาใหม่</h2>
+        <form class="add-form" id="addForm">
+          <label>ชื่อโทรศัพท์ <input type="text" name="phone_name" required /></label>
+          <label>ระบบ <input type="text" name="system_name" required /></label>
+          <label>แผนก <input type="text" name="department_name" required /></label>
+          <label>สาขา <input type="text" name="branch_name" required /></label>
+          <label>รายละเอียด <input type="text" name="text" required /></label>
+          <label>สถานะ <input type="text" name="status" required /></label>
+          <div style="display:flex;gap:1rem;justify-content:center;margin-top:1rem;">
+            <button type="submit">บันทึก</button>
+            <button type="button" id="closeAddModal" style="background:#b0bec5;color:#263238;">ยกเลิก</button>
+          </div>
+        </form>
+      </div>
+    </div>
     <div id="tableContainer"></div>
     <div id="errorMsg" class="error"></div>
   </div>
@@ -170,34 +179,42 @@
 
     async function getProblems() {
       try {
-        const res = await fetch(`${API_BASE}/problemEntry/reportProblem`);
+        const res = await fetch(`${API_BASE}/api/v1/problem/list`);
         if (!res.ok) throw new Error('API error: ' + res.status);
         const data = await res.json();
-        renderTable(data.tasks);
+        renderTable(data.data);
       } catch (err) {
         document.getElementById('errorMsg').textContent = err.message;
       }
     }
 
+    // Modal logic
+    const addModal = document.getElementById('addModal');
+    document.getElementById('openAddModal').onclick = () => { addModal.style.display = 'flex'; };
+    document.getElementById('closeAddModal').onclick = () => { addModal.style.display = 'none'; };
     document.getElementById('addForm').onsubmit = async function(e) {
       e.preventDefault();
       const form = e.target;
       // หมายเหตุ: ใน backend ต้อง mapping ชื่อกับ id จริงเอง (demo นี้ใช้ text field)
       const data = {
-        phone_id: 0,
-        system_id: 0,
+        phone_name: form.phone_name.value,
+        system_name: form.system_name.value,
+        department_name: form.department_name.value,
+        branch_name: form.branch_name.value,
         text: form.text.value,
         status: form.status.value,
-        created_by: 1
+        created_by: 1,
+        updated_by: 1
       };
       try {
-        const res = await fetch(`${API_BASE}/problemEntry/reportProblem`, {
+        const res = await fetch(`${API_BASE}/api/v1/problem/create`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
         if (!res.ok) throw new Error('API error: ' + res.status);
         form.reset();
+        addModal.style.display = 'none';
         getProblems();
       } catch (err) {
         document.getElementById('errorMsg').textContent = err.message;
@@ -207,7 +224,7 @@
     async function deleteProblem(id) {
       if (!confirm('คุณต้องการลบปัญหานี้ใช่หรือไม่?')) return;
       try {
-        const res = await fetch(`${API_BASE}/problemEntry/reportProblem/${id}?deleted_by=1`, {
+        const res = await fetch(`${API_BASE}/api/v1/problem/delete/${id}?deleted_by=1`, {
           method: 'DELETE'
         });
         if (!res.ok) throw new Error('API error: ' + res.status);
@@ -225,14 +242,21 @@
 
     async function saveEdit(id) {
       try {
+        // ใช้ค่าเดิมจาก editingRow
+        const textInput = document.getElementById('edit_text');
+        const statusInput = document.getElementById('edit_status');
+        if (!textInput || !statusInput) {
+          alert('ไม่พบ input สำหรับแก้ไข กรุณารีเฟรชหน้าใหม่');
+          return;
+        }
         const data = {
-          phone_id: 0,
-          system_id: 0,
-          text: document.getElementById('edit_text').value,
-          status: document.getElementById('edit_status').value,
+          phone_id: editingRow.phone_id,
+          system_id: editingRow.system_id,
+          text: textInput.value,
+          status: statusInput.value,
           updated_by: 1
         };
-        const res = await fetch(`${API_BASE}/problemEntry/reportProblem/${id}?id=${id}`, {
+        const res = await fetch(`${API_BASE}/api/v1/problem/update/${id}?id=${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
@@ -257,7 +281,7 @@
         return;
       }
       const columns = [
-        { key: 'id', label: 'ID' },
+        { key: 'number', label: 'หมายเลข' },
         { key: 'phone_name', label: 'ชื่อโทรศัพท์' },
         { key: 'system_name', label: 'ระบบ' },
         { key: 'department_name', label: 'แผนก' },

@@ -19,7 +19,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	var id int
 	var username, password string
-	err := db.DB.QueryRow("SELECT id, username, password FROM users WHERE username = ? AND deleted_at IS NULL", credentials.Username).Scan(&id, &username, &password)
+	var role string
+	err := db.DB.QueryRow("SELECT id, username, password, role FROM users WHERE username = ? AND deleted_at IS NULL", credentials.Username).Scan(&id, &username, &password, &role)
 	if err != nil {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
@@ -30,7 +31,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(models.LoginResponse{Message: "Login successful", Data: &models.Data{ID: id, Username: username}})
+	json.NewEncoder(w).Encode(models.LoginResponse{Message: "Login successful", Data: &models.Data{ID: id, Username: username, Role: role}})
 }
 
 // RegisterHandler returns a handler for registering a user or admin
