@@ -5,7 +5,7 @@ type TaskRequest struct {
 	PhoneID   int    `json:"phone_id"`
 	SystemID  int    `json:"system_id"`
 	Text      string `json:"text"`
-	Status    string `json:"status"`
+	Status    int    `json:"status"`
 	CreatedBy int    `json:"created_by"`
 	UpdatedBy int    `json:"updated_by"`
 }
@@ -23,7 +23,7 @@ type TaskWithDetails struct {
 	BranchID       int    `json:"branch_id"`
 	BranchName     string `json:"branch_name"`
 	Text           string `json:"text"`
-	Status         string `json:"status"`
+	Status         int    `json:"status"`
 	CreatedAt      string `json:"created_at"`
 	UpdatedAt      string `json:"updated_at"`
 }

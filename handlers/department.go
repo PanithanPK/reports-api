@@ -7,6 +7,8 @@ import (
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 // ListDepartmentsHandler returns a handler for listing all departments
@@ -54,7 +56,8 @@ func CreateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdateDepartmentHandler returns a handler for updating an existing department
 func UpdateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	vars := mux.Vars(r)
+	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
@@ -75,7 +78,8 @@ func UpdateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteDepartmentHandler returns a handler for deleting a department
 func DeleteDepartmentHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	vars := mux.Vars(r)
+	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
