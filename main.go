@@ -95,13 +95,13 @@ func main() {
 	r.Use(loggingMiddleware)
 
 	// Serve static files
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./frontend"))))
+	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./fontend"))))
 	logger.Info.Println("📁 Static file server configured")
 
 	// Serve index.html at root
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		logger.Info.Printf("📄 Serving index.html to %s", r.RemoteAddr)
-		http.ServeFile(w, r, "./frontend/index.html")
+		http.ServeFile(w, r, "./fontend/index.html")
 	})
 
 	// Register API routes
@@ -130,7 +130,7 @@ func main() {
 	r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && !strings.HasPrefix(r.URL.Path, "/static/") && !strings.HasPrefix(r.URL.Path, "/problemEntry/") {
 			logger.Info.Printf("📄 Serving index.html (catch-all) to %s", r.RemoteAddr)
-			http.ServeFile(w, r, "./frontend/index.html")
+			http.ServeFile(w, r, "./fontend/index.html")
 		} else {
 			logger.Warn.Printf("⚠️ 404 Not Found: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 			http.NotFound(w, r)

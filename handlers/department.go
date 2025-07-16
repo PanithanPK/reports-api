@@ -12,7 +12,12 @@ import (
 
 // ListDepartmentsHandler returns a handler for listing all departments
 func ListDepartmentsHandler(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.DB.Query(`SELECT id, name, branch_id, created_at, updated_at, deleted_at FROM departments WHERE deleted_at IS NULL`)
+	rows, err := db.DB.Query(`
+   SELECT d.id, d.name, d.branch_id, b.name as branch_name, d.created_at, d.updated_at, d.deleted_at
+   FROM departments d
+   LEFT JOIN branches b ON d.branch_id = b.id
+   WHERE d.deleted_at IS NULL
+ `)
 	if err != nil {
 		http.Error(w, "Failed to query departments", http.StatusInternalServerError)
 		return
@@ -22,14 +27,14 @@ func ListDepartmentsHandler(w http.ResponseWriter, r *http.Request) {
 	var departments []models.Department
 	for rows.Next() {
 		var d models.Department
-		err := rows.Scan(&d.ID, &d.Name, &d.BranchID, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
+		err := rows.Scan(&d.ID, &d.Name, &d.BranchID, &d.BranchName, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
 		if err != nil {
 			log.Printf("Error scanning department: %v", err)
 			continue
 		}
 		departments = append(departments, d)
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "departments": departments})
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": departments})
 }
 
 // CreateDepartmentHandler returns a handler for creating a new department
