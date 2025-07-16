@@ -76,7 +76,7 @@ func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	_, err := db.DB.Exec("UPDATE users SET deleted_at = CURRENT_TIMESTAMP, deleted_by = ? WHERE id = ? AND deleted_at IS NULL", req.DeletedBy, req.ID)
+	_, err := db.DB.Exec("DELETE FROM users WHERE id = ?", req.ID)
 	if err != nil {
 		http.Error(w, "Failed to delete user", http.StatusInternalServerError)
 		return
