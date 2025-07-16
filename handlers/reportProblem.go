@@ -51,7 +51,7 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"tasks":   tasks,
+		"data":    tasks,
 	})
 }
 

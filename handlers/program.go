@@ -29,7 +29,7 @@ func ListProgramsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		programs = append(programs, p)
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "programs": programs})
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": programs})
 }
 
 // CreateProgramHandler returns a handler for creating a new program

@@ -29,7 +29,7 @@ func ListBranchesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		branches = append(branches, b)
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "branches": branches})
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": branches})
 }
 
 // CreateBranchHandler returns a handler for creating a new branch

@@ -1,6 +1,12 @@
 package models
 
 // User สำหรับแสดงข้อมูลผู้ใช้
+
+type Data struct {
+	ID       int    `json:"id"`
+	Username string `json:"username"`
+}
+
 type User struct {
 	ID       int    `json:"id"`
 	Username string `json:"username"`
@@ -17,7 +23,7 @@ type Credentials struct {
 type LoginResponse struct {
 	Message string `json:"message"`
 	Token   string `json:"token,omitempty"`
-	User    *User  `json:"user,omitempty"`
+	Data    *Data  `json:"data,omitempty"`
 }
 
 // RegisterUserRequest สำหรับรับข้อมูลสมัครสมาชิก

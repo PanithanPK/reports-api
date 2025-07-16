@@ -30,7 +30,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(models.LoginResponse{Message: "Login successful", User: &models.User{ID: id, Username: username}})
+	json.NewEncoder(w).Encode(models.LoginResponse{Message: "Login successful", Data: &models.Data{ID: id, Username: username}})
 }
 
 // RegisterHandler returns a handler for registering a user or admin

@@ -12,7 +12,15 @@ import (
 
 // ListIPPhonesHandler returns a handler for listing all IP phones
 func ListIPPhonesHandler(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.DB.Query(`SELECT id, number, name, department_id, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by FROM ip_phones WHERE deleted_at IS NULL`)
+	rows, err := db.DB.Query(`
+   SELECT ip.id, ip.number, ip.name, ip.department_id,
+          d.name as department_name, d.branch_id, b.name as branch_name,
+          ip.created_at, ip.updated_at, ip.deleted_at, ip.created_by, ip.updated_by, ip.deleted_by
+   FROM ip_phones ip
+   LEFT JOIN departments d ON ip.department_id = d.id
+   LEFT JOIN branches b ON d.branch_id = b.id
+   WHERE ip.deleted_at IS NULL
+ `)
 	if err != nil {
 		http.Error(w, "Failed to query ip_phones", http.StatusInternalServerError)
 		return
@@ -22,14 +30,18 @@ func ListIPPhonesHandler(w http.ResponseWriter, r *http.Request) {
 	var phones []models.IPPhone
 	for rows.Next() {
 		var p models.IPPhone
-		err := rows.Scan(&p.ID, &p.Number, &p.Name, &p.DepartmentID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt, &p.CreatedBy, &p.UpdatedBy, &p.DeletedBy)
+		err := rows.Scan(
+			&p.ID, &p.Number, &p.Name, &p.DepartmentID,
+			&p.DepartmentName, &p.BranchID, &p.BranchName,
+			&p.CreatedAt, &p.UpdatedAt, &p.DeletedAt, &p.CreatedBy, &p.UpdatedBy, &p.DeletedBy,
+		)
 		if err != nil {
 			log.Printf("Error scanning ip_phone: %v", err)
 			continue
 		}
 		phones = append(phones, p)
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "ip_phones": phones})
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": phones})
 }
 
 // CreateIPPhoneHandler returns a handler for creating a new IP phone

@@ -10,34 +10,34 @@ import (
 func RegisterRoutes(r *mux.Router) {
 
 	// Problem routes
-	r.HandleFunc("/problemEntry/reportProblem", handlers.GetTasksHandler).Methods("GET")
-	r.HandleFunc("/problemEntry/reportProblem", handlers.CreateTaskHandler).Methods("POST")
-	r.HandleFunc("/problemEntry/reportProblem/{id}", handlers.UpdateTaskHandler).Methods("PUT")
-	r.HandleFunc("/problemEntry/reportProblem/{id}", handlers.DeleteTaskHandler).Methods("DELETE")
+	r.HandleFunc("/api/v1/problem/list", handlers.GetTasksHandler).Methods("GET")
+	r.HandleFunc("/api/v1/problem/create", handlers.CreateTaskHandler).Methods("POST")
+	r.HandleFunc("/api/v1/problem/update/{id}", handlers.UpdateTaskHandler).Methods("PUT")
+	r.HandleFunc("/api/v1/problem/delete/{id}", handlers.DeleteTaskHandler).Methods("DELETE")
 
 	// Phone routes
-	r.HandleFunc("/phoneEntry/ipPhones", handlers.ListIPPhonesHandler).Methods("GET")
-	r.HandleFunc("/phoneEntry/ipPhone", handlers.CreateIPPhoneHandler).Methods("POST")
-	r.HandleFunc("/phoneEntry/ipPhone", handlers.UpdateIPPhoneHandler).Methods("PUT")
-	r.HandleFunc("/phoneEntry/ipPhone/{id}", handlers.DeleteIPPhoneHandler).Methods("DELETE")
+	r.HandleFunc("/api/v1/ipphone/list", handlers.ListIPPhonesHandler).Methods("GET")
+	r.HandleFunc("/api/v1/ipphone/create", handlers.CreateIPPhoneHandler).Methods("POST")
+	r.HandleFunc("/api/v1/ipphone/update/{id}", handlers.UpdateIPPhoneHandler).Methods("PUT")
+	r.HandleFunc("/api/v1/ipphone/delete/{id}", handlers.DeleteIPPhoneHandler).Methods("DELETE")
 
 	// Program routes
-	r.HandleFunc("/programEntry/programs", handlers.ListProgramsHandler).Methods("GET")
-	r.HandleFunc("/programEntry/program", handlers.CreateProgramHandler).Methods("POST")
-	r.HandleFunc("/programEntry/program/{id}", handlers.UpdateProgramHandler).Methods("PUT")
-	r.HandleFunc("/programEntry/program/{id}", handlers.DeleteProgramHandler).Methods("DELETE")
+	r.HandleFunc("/api/v1/program/list", handlers.ListProgramsHandler).Methods("GET")
+	r.HandleFunc("/api/v1/program/create", handlers.CreateProgramHandler).Methods("POST")
+	r.HandleFunc("/api/v1/program/update/{id}", handlers.UpdateProgramHandler).Methods("PUT")
+	r.HandleFunc("/api/v1/program/delete/{id}", handlers.DeleteProgramHandler).Methods("DELETE")
 
 	// Department routes
-	r.HandleFunc("/departmentEntry/departments", handlers.ListDepartmentsHandler).Methods("GET")
-	r.HandleFunc("/departmentEntry/department", handlers.CreateDepartmentHandler).Methods("POST")
-	r.HandleFunc("/departmentEntry/department/{id}", handlers.UpdateDepartmentHandler).Methods("PUT")
-	r.HandleFunc("/departmentEntry/department/{id}", handlers.DeleteDepartmentHandler).Methods("DELETE")
+	r.HandleFunc("/api/v1/department/list", handlers.ListDepartmentsHandler).Methods("GET")
+	r.HandleFunc("/api/v1/department/create", handlers.CreateDepartmentHandler).Methods("POST")
+	r.HandleFunc("/api/v1/department/update/{id}", handlers.UpdateDepartmentHandler).Methods("PUT")
+	r.HandleFunc("/api/v1/department/delete/{id}", handlers.DeleteDepartmentHandler).Methods("DELETE")
 
 	// branch routes
-	r.HandleFunc("/branchEntry/branches", handlers.ListBranchesHandler).Methods("GET")
-	r.HandleFunc("/branchEntry/branch", handlers.CreateBranchHandler).Methods("POST")
-	r.HandleFunc("/branchEntry/branch/{id}", handlers.UpdateBranchHandler).Methods("PUT")
-	r.HandleFunc("/branchEntry/branch/{id}", handlers.DeleteBranchHandler).Methods("DELETE")
+	r.HandleFunc("/api/v1/branch/list", handlers.ListBranchesHandler).Methods("GET")
+	r.HandleFunc("/api/v1/branch/create", handlers.CreateBranchHandler).Methods("POST")
+	r.HandleFunc("/api/v1/branch/update/{id}", handlers.UpdateBranchHandler).Methods("PUT")
+	r.HandleFunc("/api/v1/branch/delete/{id}", handlers.DeleteBranchHandler).Methods("DELETE")
 
 }
 
