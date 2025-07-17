@@ -39,7 +39,10 @@ func RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/api/v1/branch/update/{id}", handlers.UpdateBranchHandler).Methods("PUT")
 	r.HandleFunc("/api/v1/branch/delete/{id}", handlers.DeleteBranchHandler).Methods("DELETE")
 
+	//Dashboard routes
 	r.HandleFunc("/api/v1/dashboard/data", handlers.GetDashboardDataHandler).Methods("GET")
+
+	r.HandleFunc("/api/v1/telegramMessen", handlers.SendTelegramNotificationHandler).Methods("POST")
 }
 
 // RegisterAuthRoutes registers all authentication-related routes
