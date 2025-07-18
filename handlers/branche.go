@@ -138,7 +138,6 @@ func GetBranchDetailHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error counting departments: %v", err)
 		// branchDetail.DepartmentsCount = 0 // Default to 0 if error?
 	}
-
 	// Count IP phones in this branch
 	err = db.DB.QueryRow(`
 		SELECT COUNT(*) FROM ip_phones ip
