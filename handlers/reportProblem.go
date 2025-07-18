@@ -111,3 +111,36 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
+
+func GetTaskDetailHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var task models.TaskWithDetails
+	err = db.DB.QueryRow(`
+		SELECT t.id, t.phone_id, COALESCE(p.number, 0), COALESCE(p.name, ''), t.system_id, COALESCE(s.name, ''),
+		COALESCE(p.department_id, 0), COALESCE(d.name, ''), COALESCE(d.branch_id, 0), COALESCE(b.name, ''),
+		t.text, t.status, t.created_at, t.updated_at
+		FROM tasks t
+		LEFT JOIN ip_phones p ON t.phone_id = p.id
+		LEFT JOIN departments d ON p.department_id = d.id
+		LEFT JOIN branches b ON d.branch_id = b.id
+		LEFT JOIN systems_program s ON t.system_id = s.id
+		WHERE t.id = ?
+	`, id).Scan(&task.ID, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Status, &task.CreatedAt, &task.UpdatedAt)
+
+	if err != nil {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"data":    task,
+	})
+}
