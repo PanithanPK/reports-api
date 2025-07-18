@@ -87,3 +87,59 @@ func DeleteBranchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
+
+// GetBranchDetailHandler returns detailed information about a specific branch
+func GetBranchDetailHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid id", http.StatusBadRequest)
+		return
+	}
+
+	// 1. Get branch information
+	var branchDetail models.BranchDetail
+	err = db.DB.QueryRow(`
+		SELECT id, name, created_at, updated_at 
+		FROM branches 
+		WHERE id = ? AND deleted_at IS NULL
+	`, id).Scan(&branchDetail.ID, &branchDetail.Name, &branchDetail.CreatedAt, &branchDetail.UpdatedAt)
+
+	if err != nil {
+		log.Printf("Error fetching branch details: %v", err)
+		http.Error(w, "Branch not found", http.StatusNotFound)
+		return
+	}
+
+	// 2. Count departments in this branch
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) 
+		FROM departments 
+		WHERE branch_id = ? AND deleted_at IS NULL
+	`, id).Scan(&branchDetail.DepartmentsCount)
+
+	if err != nil {
+		log.Printf("Error counting departments: %v", err)
+		branchDetail.DepartmentsCount = 0 // Default to 0 if error
+	}
+
+	// 3. Count IP phones in this branch
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM ip_phones ip
+		JOIN departments d ON ip.department_id = d.id
+		WHERE d.branch_id = ? AND ip.deleted_at IS NULL
+	`, id).Scan(&branchDetail.IPPhonesCount)
+
+	if err != nil {
+		log.Printf("Error counting IP phones: %v", err)
+		branchDetail.IPPhonesCount = 0 // Default to 0 if error
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"data":    branchDetail,
+	})
+}

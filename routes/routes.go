@@ -35,6 +35,7 @@ func RegisterRoutes(r *mux.Router) {
 
 	// branch routes
 	r.HandleFunc("/api/v1/branch/list", handlers.ListBranchesHandler).Methods("GET")
+	r.HandleFunc("/api/v1/branch/{id}", handlers.GetBranchDetailHandler).Methods("GET")
 	r.HandleFunc("/api/v1/branch/create", handlers.CreateBranchHandler).Methods("POST")
 	r.HandleFunc("/api/v1/branch/update/{id}", handlers.UpdateBranchHandler).Methods("PUT")
 	r.HandleFunc("/api/v1/branch/delete/{id}", handlers.DeleteBranchHandler).Methods("DELETE")

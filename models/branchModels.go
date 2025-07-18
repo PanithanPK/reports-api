@@ -18,3 +18,13 @@ type BranchRequest struct {
 	CreatedBy *int    `json:"created_by"`
 	UpdatedBy *int    `json:"updated_by"`
 }
+
+// BranchDetail สำหรับแสดงข้อมูลสาขาพร้อมรายละเอียดเพิ่มเติม
+type BranchDetail struct {
+	ID               int     `json:"id"`
+	Name             *string `json:"name"`
+	CreatedAt        *string `json:"created_at"`
+	UpdatedAt        *string `json:"updated_at"`
+	DepartmentsCount *int    `json:"departments_count"`
+	IPPhonesCount    *int    `json:"ip_phones_count"`
+}
