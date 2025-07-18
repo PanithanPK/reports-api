@@ -11,7 +11,7 @@ func RegisterRoutes(r *mux.Router) {
 
 	// Problem routes
 	r.HandleFunc("/api/v1/problem/list", handlers.GetTasksHandler).Methods("GET")
-
+	r.HandleFunc("/api/v1/problem/{id}", handlers.GetTaskDetailHandler).Methods("GET")
 	r.HandleFunc("/api/v1/problem/create", handlers.CreateTaskHandler).Methods("POST")
 	r.HandleFunc("/api/v1/problem/update/{id}", handlers.UpdateTaskHandler).Methods("PUT")
 	r.HandleFunc("/api/v1/problem/delete/{id}", handlers.DeleteTaskHandler).Methods("DELETE")
