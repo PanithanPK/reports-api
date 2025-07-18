@@ -1,6 +1,6 @@
 package models
 
-// IPPhone สำหรับแสดงข้อมูล ip_phones
+// IPPhone model for displaying IP phone information
 type IPPhone struct {
 	ID             int     `json:"id"`
 	Number         *int    `json:"number"`
@@ -17,7 +17,7 @@ type IPPhone struct {
 	DeletedBy      *int    `json:"deleted_by"`
 }
 
-// IPPhoneRequest สำหรับรับข้อมูลเพิ่ม/แก้ไข ip_phone
+// IPPhoneRequest model for creating or updating an IP phone
 type IPPhoneRequest struct {
 	Number       *int    `json:"number"`
 	Name         *string `json:"name"`

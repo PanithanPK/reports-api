@@ -1,7 +1,6 @@
 package models
 
-// DashboardResponse สำหรับ response dashboard
-// (ปรับให้ตรงกับ response ที่ dashboard.go ใช้)
+// DashboardResponse model for dashboard response
 type DashboardResponse struct {
 	Success     bool                `json:"success"`
 	Message     string              `json:"message"`
@@ -13,6 +12,7 @@ type DashboardResponse struct {
 	ChartData   ChartData           `json:"chartdata"`
 }
 
+// TaskWithDetailsDb model for task with details
 type TaskWithDetailsDb struct {
 	ID             int     `json:"id"`
 	PhoneID        int     `json:"phone_id"`
@@ -32,59 +32,55 @@ type TaskWithDetailsDb struct {
 	Year           string  `json:"year"`
 }
 
-// ChartData สำหรับข้อมูลกราฟ
-// (ใช้ใน calculateChartData)
+// ChartData model for chart data
 type ChartData struct {
 	YearStats []YearStat `json:"yearStats"`
 }
 
-// YearStat, MonthStat, BranchStat สำหรับโครงสร้างใหม่
-// (ต้องตรงกับที่ใช้ใน dashboard.go)
+// YearStat model for year statistics
 type ProgramStat struct {
 	ProgramId     *int   `json:"programId"`
 	ProgramName   string `json:"programName"`
 	TotalProblems int    `json:"total_problems"`
 }
 
+// IPPhoneStat model for IP phone statistics
 type IPPhoneStat struct {
 	IPPhoneId     *int          `json:"ipphoneId"`
 	IPPhoneName   string        `json:"ipphoneName"`
 	TotalProblems int           `json:"total_problems"`
 	Programs      []ProgramStat `json:"programs"`
 }
+
+// DepartmentStat model for department statistics
 type DepartmentStat struct {
 	DepartmentId   *int          `json:"departmentId"`
 	DepartmentName string        `json:"departmentName"`
 	TotalProblems  int           `json:"total_problems"`
 	IPPhones       []IPPhoneStat `json:"ipphones"`
 }
+
+// BranchStat model for branch statistics
 type BranchStat struct {
 	BranchId      *int             `json:"branchId"`
 	BranchName    string           `json:"branchName"`
 	TotalProblems int              `json:"total_problems"`
 	Departments   []DepartmentStat `json:"departments"`
 }
+
+// MonthStat model for month statistics
 type MonthStat struct {
 	Month    string       `json:"month"`
 	Branches []BranchStat `json:"branches"`
 }
+
+// ChartData model for chart data
 type YearStat struct {
 	Year   string      `json:"year"`
 	Months []MonthStat `json:"months"`
 }
 
-type BarChartData struct {
-	BranchName  string         `json:"branchName"`
-	TotalCount  int            `json:"totalCount"`
-	ProgramData map[string]int `json:"programData"`
-}
-
-type PieChartData struct {
-	ProgramName string  `json:"programName"`
-	Count       int     `json:"count"`
-	Percentage  float64 `json:"percentage"`
-}
-
+// BranchDb model for branch database representation
 type BranchDb struct {
 	ID        int     `json:"id"`
 	Name      *string `json:"name"`
@@ -92,6 +88,7 @@ type BranchDb struct {
 	UpdatedAt *string `json:"updated_at"`
 }
 
+// DepartmentDb model for department database representation
 type DepartmentDb struct {
 	ID         int     `json:"id"`
 	Name       *string `json:"name"`
@@ -101,6 +98,7 @@ type DepartmentDb struct {
 	UpdatedAt  *string `json:"updated_at"`
 }
 
+// ProgramDb model for program database representation
 type ProgramDb struct {
 	ID        int     `json:"id"`
 	Name      *string `json:"name"`
@@ -108,6 +106,7 @@ type ProgramDb struct {
 	UpdatedAt *string `json:"updated_at"`
 }
 
+// IPPhoneDb model for IP phone database representation
 type IPPhoneDb struct {
 	ID             int     `json:"id"`
 	Number         *int    `json:"number"`

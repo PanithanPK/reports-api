@@ -1,6 +1,6 @@
 package models
 
-// Department สำหรับแสดงข้อมูล departments
+// Department model for displaying department information
 type Department struct {
 	ID         int     `json:"id"`
 	Name       *string `json:"name"`
@@ -11,13 +11,13 @@ type Department struct {
 	DeletedAt  *string `json:"deleted_at"`
 }
 
-// DepartmentRequest สำหรับรับข้อมูลเพิ่ม/แก้ไขแผนก
+// Department Request model for creating or updating a department
 type DepartmentRequest struct {
 	Name     *string `json:"name"`
 	BranchID *int    `json:"branch_id"`
 }
 
-// DepartmentDetail สำหรับแสดงข้อมูลแผนกพร้อมรายละเอียดเพิ่มเติม
+// Department Detail model for detailed view of a department
 type DepartmentDetail struct {
 	ID            int     `json:"id"`
 	Name          *string `json:"name"`
