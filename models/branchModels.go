@@ -1,6 +1,6 @@
 package models
 
-// Branch สำหรับแสดงข้อมูล branches
+// Branch model for displaying branch information
 type Branch struct {
 	ID        int     `json:"id"`
 	Name      *string `json:"name"`
@@ -12,14 +12,14 @@ type Branch struct {
 	DeletedBy *int    `json:"deleted_by"`
 }
 
-// BranchRequest สำหรับรับข้อมูลเพิ่ม/แก้ไขสาขา
+// BranchRequest model for receiving branch data
 type BranchRequest struct {
 	Name      *string `json:"name"`
 	CreatedBy *int    `json:"created_by"`
 	UpdatedBy *int    `json:"updated_by"`
 }
 
-// BranchDetail สำหรับแสดงข้อมูลสาขาพร้อมรายละเอียดเพิ่มเติม
+// BranchDetail model for displaying branch details
 type BranchDetail struct {
 	ID               int     `json:"id"`
 	Name             *string `json:"name"`

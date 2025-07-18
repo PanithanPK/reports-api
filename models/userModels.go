@@ -1,7 +1,6 @@
 package models
 
-// User สำหรับแสดงข้อมูลผู้ใช้
-
+// Data model for user information
 type Data struct {
 	ID       int    `json:"id"`
 	Username string `json:"username"`
@@ -14,20 +13,21 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
-// LoginResponse สำหรับตอบกลับ login
+// LoginResponse represents the structure of the response after a user logs in
 type LoginResponse struct {
 	Message string `json:"message"`
 	Token   string `json:"token,omitempty"`
 	Data    *Data  `json:"data,omitempty"`
 }
 
-// RegisterUserRequest สำหรับรับข้อมูลสมัครสมาชิก
+// RegisterUserRequest represents the structure of the request to register a new user
 type RegisterUserRequest struct {
 	Username  string `json:"username"`
 	Password  string `json:"password"`
 	CreatedBy int    `json:"created_by"`
 }
 
+// UserDetailResponse represents the structure of user details response
 type UpdateUserRequest struct {
 	ID        int    `json:"id"`
 	Username  string `json:"username"`
@@ -35,6 +35,7 @@ type UpdateUserRequest struct {
 	UpdatedBy int    `json:"updated_by"`
 }
 
+// UserDetailResponse represents the structure of user details response
 type DeleteUserRequest struct {
 	ID        int `json:"id"`
 	DeletedBy int `json:"deleted_by"`

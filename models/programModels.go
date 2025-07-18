@@ -1,6 +1,6 @@
 package models
 
-// Program สำหรับแสดงข้อมูล systems_program
+// Program model for displaying program information
 type Program struct {
 	ID        int     `json:"id"`
 	Name      *string `json:"name"`
@@ -12,7 +12,7 @@ type Program struct {
 	DeletedBy *int    `json:"deleted_by"`
 }
 
-// ProgramRequest สำหรับรับข้อมูลเพิ่ม/แก้ไขโปรแกรม
+// ProgramRequest model for receiving program data
 type ProgramRequest struct {
 	Name      *string `json:"name"`
 	CreatedBy *int    `json:"created_by"`
