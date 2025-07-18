@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"reports-api/db"
 	"reports-api/models"
+	"time"
 )
 
 // LoginHandler handles user login
@@ -26,12 +27,25 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Simple password comparison (will be replaced with bcrypt in future)
 	if credentials.Password != password {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
-	json.NewEncoder(w).Encode(models.LoginResponse{Message: "Login successful", Data: &models.Data{ID: id, Username: username, Role: role}})
+	// Set session cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    username, // Simple session value (will be replaced with secure token in future)
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   3600 * 24, // 24 hours
+	})
+
+	json.NewEncoder(w).Encode(models.LoginResponse{
+		Message: "Login successful",
+		Data:    &models.Data{ID: id, Username: username, Role: role},
+	})
 }
 
 // RegisterHandler returns a handler for registering a user or admin
@@ -43,11 +57,28 @@ func RegisterHandler(role string) http.HandlerFunc {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		_, err := db.DB.Exec("INSERT INTO users (username, password, role, created_by) VALUES (?, ?, ?, ?)", req.Username, req.Password, role, req.CreatedBy)
+
+		// Check if username already exists
+		var count int
+		err := db.DB.QueryRow("SELECT COUNT(*) FROM users WHERE username = ?", req.Username).Scan(&count)
+		if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+		if count > 0 {
+			http.Error(w, "Username already exists", http.StatusConflict)
+			return
+		}
+
+		_, err = db.DB.Exec(
+			"INSERT INTO users (username, password, role, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
+			req.Username, req.Password, role, req.CreatedBy, time.Now(),
+		)
 		if err != nil {
 			http.Error(w, "Failed to register user", http.StatusInternalServerError)
 			return
 		}
+
 		json.NewEncoder(w).Encode(map[string]string{"message": "Registered as " + role})
 	}
 }
@@ -60,11 +91,28 @@ func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	_, err := db.DB.Exec("UPDATE users SET username = ?, password = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL", req.Username, req.Password, req.UpdatedBy, req.ID)
+
+	// Check if user exists
+	var count int
+	err := db.DB.QueryRow("SELECT COUNT(*) FROM users WHERE id = ? AND deleted_at IS NULL", req.ID).Scan(&count)
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if count == 0 {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	_, err = db.DB.Exec(
+		"UPDATE users SET username = ?, password = ?, updated_by = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
+		req.Username, req.Password, req.UpdatedBy, time.Now(), req.ID,
+	)
 	if err != nil {
 		http.Error(w, "Failed to update user", http.StatusInternalServerError)
 		return
 	}
+
 	json.NewEncoder(w).Encode(map[string]string{"message": "User updated"})
 }
 
@@ -76,18 +124,24 @@ func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	_, err := db.DB.Exec("DELETE FROM users WHERE id = ?", req.ID)
+
+	// Use soft delete
+	_, err := db.DB.Exec(
+		"UPDATE users SET deleted_at = ?, deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
+		time.Now(), req.DeletedBy, req.ID,
+	)
 	if err != nil {
 		http.Error(w, "Failed to delete user", http.StatusInternalServerError)
 		return
 	}
+
 	json.NewEncoder(w).Encode(map[string]string{"message": "User deleted"})
 }
 
 // LogoutHandler logs out a user
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	// ลบ session cookie (ถ้ามี)
+	// Clear session cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
 		Value:    "",

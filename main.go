@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"reports-api/db"
+	"reports-api/middleware"
 	"reports-api/routes"
 	"runtime"
 	"runtime/debug"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
-	"github.com/rs/cors"
 )
 
 // Custom logger with levels
@@ -91,8 +91,19 @@ func main() {
 	// Create router
 	r := mux.NewRouter()
 
-	// Add logging middleware
+	// Add middleware
+	r.Use(middleware.RecoveryMiddleware) // ต้องใส่เป็นตัวแรกเพื่อจับ panic ในทุก middleware อื่นๆ
 	r.Use(loggingMiddleware)
+	r.Use(middleware.BasicSecurityHeadersMiddleware)
+
+	// Configure CORS
+	allowedOrigins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
+	if len(allowedOrigins) == 0 || (len(allowedOrigins) == 1 && allowedOrigins[0] == "") {
+		allowedOrigins = []string{"*"} // Default to allow all origins
+		logger.Warn.Println("⚠️ No ALLOWED_ORIGINS specified, defaulting to allow all origins")
+	}
+	r.Use(middleware.CORSMiddleware(allowedOrigins))
+	logger.Info.Printf("🌐 CORS configured with allowed origins: %v", allowedOrigins)
 
 	// Serve static files
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./fontend"))))
@@ -113,29 +124,13 @@ func main() {
 	logger.Info.Println("🔐 Registering Authentication routes...")
 	routes.RegisterAuthRoutes(r)
 	logger.Info.Println("✅ Authentication routes registered successfully")
-
-	// Configure CORS
-	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	})
-	logger.Info.Println("🌐 CORS configured")
-
-	// Catch-all: serve index.html for all other GET requests (for SPA)
-	// ต้องวางไว้หลัง API routes เพื่อไม่ให้จับ API requests
-	r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" && !strings.HasPrefix(r.URL.Path, "/static/") && !strings.HasPrefix(r.URL.Path, "/problemEntry/") {
-			logger.Info.Printf("📄 Serving index.html (catch-all) to %s", r.RemoteAddr)
-			http.ServeFile(w, r, "./fontend/index.html")
-		} else {
-			logger.Warn.Printf("⚠️ 404 Not Found: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
-			http.NotFound(w, r)
-		}
-	})
+	
+	// Test route for RecoveryMiddleware
+	r.HandleFunc("/test-panic", func(w http.ResponseWriter, r *http.Request) {
+		logger.Info.Println("🧪 Testing RecoveryMiddleware with a deliberate panic")
+		panic("This is a test panic to verify RecoveryMiddleware is working")
+	}).Methods("GET")
+	logger.Info.Println("🧪 Test route for RecoveryMiddleware added at /test-panic")
 
 	// Get port from environment variable
 	port := os.Getenv("PORT")
@@ -151,11 +146,10 @@ func main() {
 	logger.Info.Printf("📊 Go Version: %s", runtime.Version())
 
 	// Start server
-	handler := c.Handler(r)
 	logger.Info.Printf("🚀 Server starting on http://localhost:%s", port)
 	logger.Info.Println("🎯 Server is ready to handle requests!")
 
-	if err := http.ListenAndServe(":"+port, handler); err != nil {
+	if err := http.ListenAndServe(":"+port, r); err != nil {
 		logger.Error.Printf("❌ Server failed to start: %v", err)
 		log.Fatal(err)
 	}
