@@ -11,12 +11,12 @@ func RegisterRoutes(r *mux.Router) {
 
 	// Problem routes
 	r.HandleFunc("/api/v1/problem/list", handlers.GetTasksHandler).Methods("GET")
+
 	r.HandleFunc("/api/v1/problem/create", handlers.CreateTaskHandler).Methods("POST")
 	r.HandleFunc("/api/v1/problem/update/{id}", handlers.UpdateTaskHandler).Methods("PUT")
 	r.HandleFunc("/api/v1/problem/delete/{id}", handlers.DeleteTaskHandler).Methods("DELETE")
 
 	// Phone routes
-	r.HandleFunc("/api/v1/ipphone/list", handlers.ListIPPhonesHandler).Methods("GET")
 	r.HandleFunc("/api/v1/ipphone/create", handlers.CreateIPPhoneHandler).Methods("POST")
 	r.HandleFunc("/api/v1/ipphone/update/{id}", handlers.UpdateIPPhoneHandler).Methods("PUT")
 	r.HandleFunc("/api/v1/ipphone/delete/{id}", handlers.DeleteIPPhoneHandler).Methods("DELETE")
@@ -29,6 +29,7 @@ func RegisterRoutes(r *mux.Router) {
 
 	// Department routes
 	r.HandleFunc("/api/v1/department/list", handlers.ListDepartmentsHandler).Methods("GET")
+	r.HandleFunc("/api/v1/department/{id}", handlers.GetDepartmentDetailHandler).Methods("GET")
 	r.HandleFunc("/api/v1/department/create", handlers.CreateDepartmentHandler).Methods("POST")
 	r.HandleFunc("/api/v1/department/update/{id}", handlers.UpdateDepartmentHandler).Methods("PUT")
 	r.HandleFunc("/api/v1/department/delete/{id}", handlers.DeleteDepartmentHandler).Methods("DELETE")

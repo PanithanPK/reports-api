@@ -92,3 +92,65 @@ func DeleteDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
+
+// GetDepartmentDetailHandler returns detailed information about a specific department
+func GetDepartmentDetailHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid id", http.StatusBadRequest)
+		return
+	}
+
+	// 1. Get department information
+	var departmentDetail models.DepartmentDetail
+	err = db.DB.QueryRow(`
+		SELECT d.id, d.name, d.branch_id, b.name, d.created_at, d.updated_at 
+		FROM departments d
+		LEFT JOIN branches b ON d.branch_id = b.id
+		WHERE d.id = ? AND d.deleted_at IS NULL
+	`, id).Scan(
+		&departmentDetail.ID, 
+		&departmentDetail.Name, 
+		&departmentDetail.BranchID, 
+		&departmentDetail.BranchName, 
+		&departmentDetail.CreatedAt, 
+		&departmentDetail.UpdatedAt,
+	)
+
+	if err != nil {
+		log.Printf("Error fetching department details: %v", err)
+		http.Error(w, "Department not found", http.StatusNotFound)
+		return
+	}
+
+	// 2. Count IP phones in this department
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) 
+		FROM ip_phones 
+		WHERE department_id = ? AND deleted_at IS NULL
+	`, id).Scan(&departmentDetail.IPPhonesCount)
+
+	if err != nil {
+		log.Printf("Error counting IP phones: %v", err)
+	}
+
+	// 3. Count tasks related to this department
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM tasks t
+		JOIN ip_phones ip ON t.phone_id = ip.id
+		WHERE ip.department_id = ? AND t.deleted_at IS NULL
+	`, id).Scan(&departmentDetail.TasksCount)
+
+	if err != nil {
+		log.Printf("Error counting tasks: %v", err)
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"data":    departmentDetail,
+	})
+}
