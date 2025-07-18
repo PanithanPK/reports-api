@@ -123,7 +123,7 @@ func GetBranchDetailHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("Error counting departments: %v", err)
-		branchDetail.DepartmentsCount = 0 // Default to 0 if error
+		// branchDetail.DepartmentsCount = 0 // Default to 0 if error?
 	}
 
 	// 3. Count IP phones in this branch
@@ -135,7 +135,7 @@ func GetBranchDetailHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("Error counting IP phones: %v", err)
-		branchDetail.IPPhonesCount = 0 // Default to 0 if error
+		// branchDetail.IPPhonesCount = 0 // Default to 0 if error
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
