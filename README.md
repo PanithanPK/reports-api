@@ -1,10 +1,11 @@
 # Reports API
 
 ## Overview
-The Reports API is a backend service built with Go that provides endpoints for managing problems, IP phones, programs, departments, and branches. It also includes authentication routes for user and admin management.
+The Reports API is a backend service built with Go that provides endpoints for managing problems, tasks, IP phones, programs, departments, and branches. It also includes authentication routes for user and admin management.
 
 ## Features
 - **Problem Management**: Create, update, delete, and list problems.
+- **Task Management**: Create, update, and track tasks with phone and system details.
 - **IP Phone Management**: Manage IP phones.
 - **Program Management**: Manage programs.
 - **Department Management**: Manage departments.
@@ -18,6 +19,12 @@ The Reports API is a backend service built with Go that provides endpoints for m
 - `POST /api/v1/problem/create`: Create a new problem.
 - `PUT /api/v1/problem/update/{id}`: Update a problem by ID.
 - `DELETE /api/v1/problem/delete/{id}`: Delete a problem by ID.
+
+### Task Routes
+- `GET /api/v1/task/list`: List all tasks with detailed information.
+- `POST /api/v1/task/create`: Create a new task.
+- `PUT /api/v1/task/update/{id}`: Update a task by ID.
+- `DELETE /api/v1/task/delete/{id}`: Delete a task by ID.
 
 ### IP Phone Routes
 - `GET /api/v1/ipphone/list`: List all IP phones.
@@ -89,6 +96,60 @@ go run main.go
 ```
 
 The server will run on `http://localhost:5000`.
+
+### Environment Variables
+The application uses the following environment variables:
+- `PORT`: Server port (default: 5000)
+- `DB_HOST`: Database host
+- `DB_PORT`: Database port
+- `DB_USER`: Database username
+- `DB_PASSWORD`: Database password
+- `DB_NAME`: Database name
+- `JWT_SECRET`: Secret key for JWT token generation
+- `TOKEN_HOUR_LIFESPAN`: JWT token lifespan in hours
+
+## Security
+
+### Authentication
+- JWT-based authentication system
+- Secure password hashing using bcrypt
+- Role-based access control for admin and regular users
+
+### API Security
+- HTTPS support for secure communication
+- Input validation to prevent injection attacks
+- Rate limiting to prevent brute force attacks
+- CORS configuration for frontend integration
+
+## Error Handling
+The API uses standard HTTP status codes:
+- `200 OK`: Request successful
+- `201 Created`: Resource created successfully
+- `400 Bad Request`: Invalid input
+- `401 Unauthorized`: Authentication required
+- `403 Forbidden`: Insufficient permissions
+- `404 Not Found`: Resource not found
+- `500 Internal Server Error`: Server-side error
+
+All error responses include a JSON object with an `error` field containing a descriptive message.
+
+## Deployment
+
+### Docker
+A Dockerfile is provided for containerization:
+```bash
+# Build the Docker image
+docker build -t reports-api .
+
+# Run the container
+docker run -p 5000:5000 --env-file .env reports-api
+```
+
+### Production Considerations
+- Use a reverse proxy (Nginx, Traefik) for SSL termination
+- Set up proper logging and monitoring
+- Configure database connection pooling
+- Implement proper backup strategies
 
 ## License
 This project is licensed under the MIT License.
