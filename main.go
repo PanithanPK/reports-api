@@ -11,10 +11,14 @@ import (
 	"runtime/debug"
 	"strings"
 	"time"
+	"flag"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
+
+// CurrentEnvironment เก็บสภาพแวดล้อมปัจจุบัน (dev, prod, หรือ default)
+var CurrentEnvironment string
 
 // Custom logger with levels
 type Logger struct {
@@ -66,12 +70,50 @@ func loggingMiddleware(next http.Handler) http.Handler {
 func main() {
 	logger.Info.Println("🚀 Starting Problem Report System...")
 
-	// Load environment variables
-	err := godotenv.Load()
-	if err != nil {
-		logger.Warn.Println("⚠️ .env file not found, using environment variables")
+	// Parse command-line arguments
+	env := flag.String("env", "", "Environment (dev or prod)")
+	devFlag := flag.Bool("d", false, "Use development environment")
+	prodFlag := flag.Bool("p", false, "Use production environment")
+	flag.Parse()
+
+	// Check flags and positional arguments
+	selectedEnv := *env
+	if *devFlag {
+		selectedEnv = "dev"
+	} else if *prodFlag {
+		selectedEnv = "prod"
+	} else if len(flag.Args()) > 0 && selectedEnv == "" {
+		// Check if environment is passed as a positional argument
+		arg := flag.Args()[0]
+		if arg == "dev" || arg == "prod" {
+			selectedEnv = arg
+		}
+	}
+
+	// Load environment variables based on environment
+	envFile := ".env"
+	CurrentEnvironment = "default"
+	if selectedEnv == "dev" {
+		envFile = ".env.dev"
+		CurrentEnvironment = "dev"
+		logger.Info.Println("🔧 Running in DEVELOPMENT environment")
+	} else if selectedEnv == "prod" {
+		envFile = ".env.prod"
+		CurrentEnvironment = "prod"
+		logger.Info.Println("🔧 Running in PRODUCTION environment")
 	} else {
-		logger.Info.Println("✅ Environment variables loaded from .env file")
+		logger.Info.Println("🔧 Running with default environment")
+	}
+	
+	// เก็บสภาพแวดล้อมใน environment variable เพื่อให้โค้ดส่วนอื่นเข้าถึงได้
+	os.Setenv("APP_ENV", CurrentEnvironment)
+
+	// Load environment variables
+	err := godotenv.Load(envFile)
+	if err != nil {
+		logger.Warn.Printf("⚠️ %s file not found, using environment variables", envFile)
+	} else {
+		logger.Info.Printf("✅ Environment variables loaded from %s file", envFile)
 	}
 
 	// Initialize database connection
