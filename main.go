@@ -116,22 +116,23 @@ func main() {
 	// r.Use(middleware.RateLimitMiddleware(60)) // จำกัดการเข้าถึงที่ 60 คำขอต่อวินาที
 	// r.Use(middleware.BasicSecurityHeadersMiddleware)
 
-	// Disable CORS by allowing all origins
-	// r.Use(func(next http.Handler) http.Handler {
-	// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	// 		w.Header().Set("Access-Control-Allow-Origin", "*")
-	// 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	// 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	// Enable CORS for localhost:3000
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-	// 		if r.Method == "OPTIONS" {
-	// 			w.WriteHeader(http.StatusOK)
-	// 			return
-	// 		}
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
 
-	// 		next.ServeHTTP(w, r)
-	// 	})
-	// })
-	// logger.Info.Println("🌐 CORS disabled - allowing all origins")
+			next.ServeHTTP(w, r)
+		})
+	})
+	logger.Info.Println("🌐 CORS enabled - allowing requests from http://localhost:3000")
 
 	// Serve static files
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./fontend"))))
