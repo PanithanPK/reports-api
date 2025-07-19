@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"runtime/debug"
 	"strings"
 	"time"
-	"flag"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -104,7 +104,7 @@ func main() {
 	} else {
 		logger.Info.Println("🔧 Running with default environment")
 	}
-	
+
 	// เก็บสภาพแวดล้อมใน environment variable เพื่อให้โค้ดส่วนอื่นเข้าถึงได้
 	os.Setenv("APP_ENV", CurrentEnvironment)
 
@@ -134,10 +134,10 @@ func main() {
 	r := mux.NewRouter()
 
 	// Add middleware
-	r.Use(middleware.RecoveryMiddleware) // ต้องใส่เป็นตัวแรกเพื่อจับ panic ในทุก middleware อื่นๆ
+	// r.Use(middleware.RecoveryMiddleware) // ต้องใส่เป็นตัวแรกเพื่อจับ panic ในทุก middleware อื่นๆ
 	r.Use(loggingMiddleware)
 	r.Use(middleware.RateLimitMiddleware(60)) // จำกัดการเข้าถึงที่ 60 คำขอต่อวินาที
-	r.Use(middleware.BasicSecurityHeadersMiddleware)
+	// r.Use(middleware.BasicSecurityHeadersMiddleware)
 
 	// Configure CORS
 	allowedOrigins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
