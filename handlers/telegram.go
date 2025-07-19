@@ -48,9 +48,17 @@ func SendTelegramNotificationHandler(w http.ResponseWriter, r *http.Request) {
 		msg += "[ดูรายละเอียดเพิ่มเติม](" + req.URL + ")\n"
 	}
 
-	// --- ตั้งค่าตามจริง ---
 	botToken := os.Getenv("botToken")
 	chatID := os.Getenv("chatID")
+
+	// แสดงสภาพแวดล้อมที่กำลังใช้งาน
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "default"
+	}
+
+	fmt.Printf("[Telegram][%s], chatID: %s\n", env, chatID)
+
 	telegramAPI := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
 
 	payload := map[string]interface{}{
