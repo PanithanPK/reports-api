@@ -137,14 +137,22 @@ func main() {
 	// r.Use(middleware.RateLimitMiddleware(60)) // จำกัดการเข้าถึงที่ 60 คำขอต่อวินาที
 	// r.Use(middleware.BasicSecurityHeadersMiddleware)
 
-	// Configure CORS
-	// allowedOrigins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
-	// if len(allowedOrigins) == 0 || (len(allowedOrigins) == 1 && allowedOrigins[0] == "") {
-	// 	allowedOrigins = []string{"*"} // Default to allow all origins
-	// 	logger.Warn.Println("⚠️ No ALLOWED_ORIGINS specified, defaulting to allow all origins")
-	// }
-	// r.Use(middleware.CORSMiddleware(allowedOrigins))
-	// logger.Info.Printf("🌐 CORS configured with allowed origins: %v", allowedOrigins)
+	// Disable CORS by allowing all origins
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			
+			next.ServeHTTP(w, r)
+		})
+	})
+	logger.Info.Println("🌐 CORS disabled - allowing all origins")
 
 	// Serve static files
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./fontend"))))
