@@ -9,7 +9,6 @@ import (
 	"reports-api/routes"
 	"runtime"
 	"runtime/debug"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -43,26 +42,6 @@ func init() {
 		Warn:  log.New(os.Stdout, "[WARN] ", log.Ldate|log.Ltime),
 		Error: log.New(os.Stderr, "[ERROR] ", log.Ldate|log.Ltime),
 	}
-}
-
-// Middleware for logging HTTP requests
-func loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-
-		// Log request
-		logger.Info.Printf("Request: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
-
-		// Add logging for incoming requests
-		logger.Info.Printf("Incoming request: %s %s", r.Method, r.URL.Path)
-
-		// Call next handler
-		next.ServeHTTP(w, r)
-
-		// Log response time
-		duration := time.Since(start)
-		logger.Info.Printf("Response: %s %s completed in %v", r.Method, r.URL.Path, duration)
-	})
 }
 
 func main() {
