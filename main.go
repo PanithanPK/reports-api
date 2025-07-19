@@ -145,7 +145,7 @@ func main() {
 		allowedOrigins = []string{"*"} // Default to allow all origins
 		logger.Warn.Println("⚠️ No ALLOWED_ORIGINS specified, defaulting to allow all origins")
 	}
-	r.Use(middleware.CORSMiddleware(allowedOrigins))
+	// r.Use(middleware.CORSMiddleware(allowedOrigins))
 	logger.Info.Printf("🌐 CORS configured with allowed origins: %v", allowedOrigins)
 
 	// Serve static files
