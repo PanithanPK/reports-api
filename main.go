@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/rs/cors"
 )
 
 // CurrentEnvironment เก็บสภาพแวดล้อมปัจจุบัน (dev, prod, หรือ default)
@@ -118,24 +119,18 @@ func main() {
 	// r.Use(middleware.RateLimitMiddleware(60)) // จำกัดการเข้าถึงที่ 60 คำขอต่อวินาที
 	// r.Use(middleware.BasicSecurityHeadersMiddleware)
 
-	// Enable CORS for localhost:3000
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Accpet", "*/*")
-
-			if r.Method == "OPTIONS" {
-				w.WriteHeader(http.StatusOK)
-				return
-			}
-
-			next.ServeHTTP(w, r)
-		})
+	// Setup CORS using rs/cors package
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"}, // Allow all origins
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With"},
+		AllowCredentials: true,
+		MaxAge:           86400, // 24 hours
 	})
-	logger.Info.Println("🌐 CORS enabled - allowing requests from http://localhost:3000")
+	
+	// Use the CORS handler
+	handler := c.Handler(r)
+	logger.Info.Println("🌐 CORS enabled using github.com/rs/cors package")
 
 	// Serve static files
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./fontend"))))
@@ -181,7 +176,7 @@ func main() {
 	logger.Info.Printf("🚀 Server starting on http://localhost:%s", port)
 	logger.Info.Println("🎯 Server is ready to handle requests!")
 
-	if err := http.ListenAndServe(":"+port, r); err != nil {
+	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		logger.Error.Printf("❌ Server failed to start: %v", err)
 		log.Fatal(err)
 	}
