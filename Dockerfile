@@ -24,7 +24,12 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/main .
-COPY --from=builder /app/.env .
+COPY --from=builder /app/.env* .
+
+# Set default environment
+ARG ENV=prod
+# ARG ENV=dev
+ENV APP_ENV=${ENV}
 
 # Set environment variables
 ENV PORT=5000
@@ -36,4 +41,6 @@ ENV GOMAXPROCS=2
 EXPOSE 5000
 
 # Run with memory limits
-CMD ["./main"] 
+# Use environment variable to set the environment flag
+# Default to production (-p) if no environment is specified
+CMD if [ "${APP_ENV}" = "dev" ]; then ./main -d; else ./main -p; fi
