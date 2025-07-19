@@ -6,11 +6,9 @@ import (
 	"net/http"
 	"os"
 	"reports-api/db"
-	"reports-api/middleware"
 	"reports-api/routes"
 	"runtime"
 	"runtime/debug"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -135,18 +133,18 @@ func main() {
 
 	// Add middleware
 	// r.Use(middleware.RecoveryMiddleware) // ต้องใส่เป็นตัวแรกเพื่อจับ panic ในทุก middleware อื่นๆ
-	r.Use(loggingMiddleware)
-	r.Use(middleware.RateLimitMiddleware(60)) // จำกัดการเข้าถึงที่ 60 คำขอต่อวินาที
+	// r.Use(loggingMiddleware)
+	// r.Use(middleware.RateLimitMiddleware(60)) // จำกัดการเข้าถึงที่ 60 คำขอต่อวินาที
 	// r.Use(middleware.BasicSecurityHeadersMiddleware)
 
 	// Configure CORS
-	allowedOrigins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
-	if len(allowedOrigins) == 0 || (len(allowedOrigins) == 1 && allowedOrigins[0] == "") {
-		allowedOrigins = []string{"*"} // Default to allow all origins
-		logger.Warn.Println("⚠️ No ALLOWED_ORIGINS specified, defaulting to allow all origins")
-	}
+	// allowedOrigins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
+	// if len(allowedOrigins) == 0 || (len(allowedOrigins) == 1 && allowedOrigins[0] == "") {
+	// 	allowedOrigins = []string{"*"} // Default to allow all origins
+	// 	logger.Warn.Println("⚠️ No ALLOWED_ORIGINS specified, defaulting to allow all origins")
+	// }
 	// r.Use(middleware.CORSMiddleware(allowedOrigins))
-	logger.Info.Printf("🌐 CORS configured with allowed origins: %v", allowedOrigins)
+	// logger.Info.Printf("🌐 CORS configured with allowed origins: %v", allowedOrigins)
 
 	// Serve static files
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./fontend"))))
