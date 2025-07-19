@@ -110,6 +110,8 @@ func main() {
 	// Create router
 	r := mux.NewRouter()
 
+	// mux.CORSMethodMiddleware(r)
+
 	// Add middleware
 	// r.Use(middleware.RecoveryMiddleware) // ต้องใส่เป็นตัวแรกเพื่อจับ panic ในทุก middleware อื่นๆ
 	// r.Use(loggingMiddleware)
@@ -123,6 +125,7 @@ func main() {
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Accpet", "*/*")
 
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
