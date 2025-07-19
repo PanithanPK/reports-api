@@ -28,8 +28,6 @@ COPY --from=builder /app/.env* .
 
 # Set default environment
 # ARG ENV=prod
-ARG ENV=dev
-ENV APP_ENV=${ENV}
 
 # Set environment variables
 ENV PORT=5000
