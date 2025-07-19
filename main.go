@@ -94,6 +94,7 @@ func main() {
 	// Add middleware
 	r.Use(middleware.RecoveryMiddleware) // ต้องใส่เป็นตัวแรกเพื่อจับ panic ในทุก middleware อื่นๆ
 	r.Use(loggingMiddleware)
+	r.Use(middleware.RateLimitMiddleware(60)) // จำกัดการเข้าถึงที่ 60 คำขอต่อวินาที
 	r.Use(middleware.BasicSecurityHeadersMiddleware)
 
 	// Configure CORS
@@ -124,7 +125,7 @@ func main() {
 	logger.Info.Println("🔐 Registering Authentication routes...")
 	routes.RegisterAuthRoutes(r)
 	logger.Info.Println("✅ Authentication routes registered successfully")
-	
+
 	// Test route for RecoveryMiddleware
 	r.HandleFunc("/test-panic", func(w http.ResponseWriter, r *http.Request) {
 		logger.Info.Println("🧪 Testing RecoveryMiddleware with a deliberate panic")
