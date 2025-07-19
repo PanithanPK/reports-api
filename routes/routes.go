@@ -17,6 +17,7 @@ func RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/api/v1/problem/delete/{id}", handlers.DeleteTaskHandler).Methods("DELETE")
 
 	// Phone routes
+	r.HandleFunc("/api/v1/ipphone/list", handlers.ListIPPhonesHandler).Methods("GET")
 	r.HandleFunc("/api/v1/ipphone/create", handlers.CreateIPPhoneHandler).Methods("POST")
 	r.HandleFunc("/api/v1/ipphone/update/{id}", handlers.UpdateIPPhoneHandler).Methods("PUT")
 	r.HandleFunc("/api/v1/ipphone/delete/{id}", handlers.DeleteIPPhoneHandler).Methods("DELETE")
