@@ -10,6 +10,12 @@ type TaskRequest struct {
 	UpdatedBy int    `json:"updated_by"`
 }
 
+type TaskStatusUpdateRequest struct {
+	ID        int `json:"id"`
+	Status    int `json:"status"`
+	UpdatedBy int `json:"updated_by"`
+}
+
 // TaskWithDetailsDb model for task with details in the database
 type TaskWithDetails struct {
 	ID             int    `json:"id"`
