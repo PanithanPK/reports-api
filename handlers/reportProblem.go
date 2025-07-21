@@ -93,6 +93,21 @@ func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
+func UpdateTaskStatusHandler(w http.ResponseWriter, r *http.Request) {
+	var req models.TaskStatusUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	_, err := db.DB.Exec(`UPDATE tasks SET status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.Status, req.UpdatedBy, req.ID)
+	if err != nil {
+		http.Error(w, "Failed to update task status", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+}
+
 // DeleteTaskHandler (soft delete)
 func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)

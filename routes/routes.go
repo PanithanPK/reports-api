@@ -45,7 +45,9 @@ func RegisterRoutes(r *mux.Router) {
 	//Dashboard routes
 	r.HandleFunc("/api/v1/dashboard/data", handlers.GetDashboardDataHandler).Methods("GET")
 
-	r.HandleFunc("/api/v1/telegramMessen", handlers.SendTelegramNotificationHandler).Methods("POST")
+	r.HandleFunc("/api/v1/telegramMessage", handlers.SendTelegramNotificationHandler).Methods("POST")
+
+	r.HandleFunc("/api/v1/updateTaskStatus", handlers.UpdateTaskStatusHandler).Methods("PUT")
 }
 
 // RegisterAuthRoutes registers all authentication-related routes
