@@ -12,7 +12,6 @@ import (
 
 // SendTelegramNotificationHandler รับ POST แล้วส่งข้อความไป Telegram
 func SendTelegramNotificationHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		json.NewEncoder(w).Encode(models.TelegramResponse{Success: false, Message: "Method not allowed"})
