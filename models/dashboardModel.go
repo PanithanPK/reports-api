@@ -4,12 +4,12 @@ package models
 type DashboardResponse struct {
 	Success     bool                `json:"success"`
 	Message     string              `json:"message"`
+	ChartData   ChartData           `json:"chartdata"`
 	Branches    []BranchDb          `json:"branches"`
 	Departments []DepartmentDb      `json:"departments"`
 	IPPhones    []IPPhoneDb         `json:"ip_phones"`
 	Programs    []ProgramDb         `json:"programs"`
 	Tasks       []TaskWithDetailsDb `json:"tasks"`
-	ChartData   ChartData           `json:"chartdata"`
 }
 
 // TaskWithDetailsDb model for task with details

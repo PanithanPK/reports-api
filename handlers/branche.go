@@ -31,6 +31,8 @@ func ListBranchesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		branches = append(branches, b)
 	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Applications", "API")
 	// check for errors from iterating over rows
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": branches})
 }
