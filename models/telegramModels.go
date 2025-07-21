@@ -5,8 +5,7 @@ type TelegramRequest struct {
 	Reportmessage  string `json:"reportmessage"`
 	BranchName     string `json:"branchName"`
 	DepartmentName string `json:"departmentName"`
-	Number         string `json:"number"`
-	IPPhoneName    string `json:"ipphoneName"`
+	Program        string `json:"program"`
 	URL            string `json:"url"`
 	// URLTs          string `json:"urlts"`
 }

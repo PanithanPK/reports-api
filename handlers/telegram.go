@@ -34,11 +34,8 @@ func SendTelegramNotificationHandler(w http.ResponseWriter, r *http.Request) {
 	if req.DepartmentName != "" {
 		msg += "แผนก: " + req.DepartmentName + "\n"
 	}
-	if req.Number != "" {
-		msg += "เบอร์: " + req.Number + "\n"
-	}
-	if req.IPPhoneName != "" {
-		msg += "ผู้รับผิดชอบ: " + req.IPPhoneName + "\n"
+	if req.Program != "" {
+		msg += "โปรแกรม: " + req.Program + "\n"
 	}
 	if req.Reportmessage != "" {
 		msg += "รายงานปัญหา: " + req.Reportmessage + "\n"
