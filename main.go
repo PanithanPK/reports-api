@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"reports-api/db"
+	"reports-api/middleware"
 	"reports-api/routes"
 	"runtime"
 	"runtime/debug"
@@ -118,6 +119,10 @@ func main() {
 	// r.Use(loggingMiddleware)
 	// r.Use(middleware.RateLimitMiddleware(60)) // จำกัดการเข้าถึงที่ 60 คำขอต่อวินาที
 	// r.Use(middleware.BasicSecurityHeadersMiddleware)
+	
+	// เพิ่ม HeaderMiddleware เพื่อกำหนด headers ให้กับทุก response
+	r.Use(middleware.HeaderMiddleware)
+	logger.Info.Println("✅ HeaderMiddleware added for common response headers")
 
 	// Setup CORS using rs/cors package
 	c := cors.New(cors.Options{
