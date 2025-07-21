@@ -184,12 +184,12 @@ func GetDashboardDataHandler(w http.ResponseWriter, r *http.Request) {
 	response := models.DashboardResponse{
 		Success:     true,
 		Message:     "Dashboard data retrieved successfully",
+		ChartData:   chartData,
 		Branches:    branches,
 		Departments: departments,
 		IPPhones:    ipPhones,
 		Programs:    programs,
 		Tasks:       tasks,
-		ChartData:   chartData,
 	}
 	json.NewEncoder(w).Encode(response)
 }
