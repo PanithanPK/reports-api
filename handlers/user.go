@@ -10,8 +10,6 @@ import (
 
 // LoginHandler handles user login
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	var credentials models.Credentials
 	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -53,7 +51,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 // RegisterHandler returns a handler for registering a user or admin
 func RegisterHandler(role string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
 		var req models.RegisterUserRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -87,7 +84,6 @@ func RegisterHandler(role string) http.HandlerFunc {
 
 // UpdateUserHandler updates user info
 func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var req models.UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -120,7 +116,6 @@ func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteUserHandler deletes a user
 func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var req models.DeleteUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -142,7 +137,6 @@ func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 
 // LogoutHandler logs out a user
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	// Clear session cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",

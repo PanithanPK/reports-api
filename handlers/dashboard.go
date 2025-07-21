@@ -26,7 +26,6 @@ func GetDashboardDataHandler(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(response)
 		}
 	}()
-	w.Header().Set("Content-Type", "application/json")
 
 	month := r.URL.Query().Get("month")
 	year := r.URL.Query().Get("year")

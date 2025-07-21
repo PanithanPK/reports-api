@@ -95,8 +95,6 @@ func DeleteDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetDepartmentDetailHandler returns detailed information about a specific department
 func GetDepartmentDetailHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
@@ -113,11 +111,11 @@ func GetDepartmentDetailHandler(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN branches b ON d.branch_id = b.id
 		WHERE d.id = ? AND d.deleted_at IS NULL
 	`, id).Scan(
-		&departmentDetail.ID, 
-		&departmentDetail.Name, 
-		&departmentDetail.BranchID, 
-		&departmentDetail.BranchName, 
-		&departmentDetail.CreatedAt, 
+		&departmentDetail.ID,
+		&departmentDetail.Name,
+		&departmentDetail.BranchID,
+		&departmentDetail.BranchName,
+		&departmentDetail.CreatedAt,
 		&departmentDetail.UpdatedAt,
 	)
 

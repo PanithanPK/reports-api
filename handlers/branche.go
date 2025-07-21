@@ -31,8 +31,7 @@ func ListBranchesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		branches = append(branches, b)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Applications", "API")
+
 	// check for errors from iterating over rows
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": branches})
 }
@@ -107,7 +106,6 @@ func DeleteBranchHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetBranchDetailHandler returns detailed information about a specific branch
 func GetBranchDetailHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	// Get the branch ID from the URL
 	idStr := vars["id"]
