@@ -33,6 +33,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("token", "dummy-token") // Set a dummy token header (will be replaced with JWT in future)
+
 	// Set session cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
