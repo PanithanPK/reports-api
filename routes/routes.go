@@ -48,6 +48,11 @@ func RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/api/v1/telegramMessage", handlers.SendTelegramNotificationHandler).Methods("POST")
 
 	r.HandleFunc("/api/v1/updateTaskStatus", handlers.UpdateTaskStatusHandler).Methods("PUT")
+
+	r.HandleFunc("/api/v1/scores/list", handlers.ListScoresHandler).Methods("GET")
+	r.HandleFunc("/api/v1/scores/{id}", handlers.GetScoreDetailHandler).Methods("GET")
+	r.HandleFunc("/api/v1/scores/update/{id}", handlers.UpdateScoreHandler).Methods("PUT")
+	r.HandleFunc("/api/v1/scores/delete/{id}", handlers.DeleteScoreHandler).Methods("DELETE")
 }
 
 // RegisterAuthRoutes registers all authentication-related routes

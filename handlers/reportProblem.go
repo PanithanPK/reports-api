@@ -7,6 +7,7 @@ import (
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -68,6 +69,15 @@ func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := res.LastInsertId()
+
+	// Get department ID from phone
+	var departmentID int
+	err = db.DB.QueryRow("SELECT department_id FROM ip_phones WHERE id = ?", req.PhoneID).Scan(&departmentID)
+	if err == nil && departmentID > 0 {
+		// Update department score
+		updateDepartmentScore(departmentID)
+	}
+
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
 }
 
@@ -156,4 +166,56 @@ func GetTaskDetailHandler(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"data":    task,
 	})
+}
+
+// updateDepartmentScore updates the department score based on problem count
+func updateDepartmentScore(departmentID int) {
+	now := time.Now()
+	year, month := now.Year(), int(now.Month())
+
+	// 1. Check if record exists for this department/month
+	var exists bool
+	err := db.DB.QueryRow(`
+		SELECT EXISTS(SELECT 1 FROM scores WHERE department_id = ? AND year = ? AND month = ?)
+	`, departmentID, year, month).Scan(&exists)
+	if err != nil {
+		log.Printf("Error checking score record: %v", err)
+		return
+	}
+
+	// Insert new record if it doesn't exist
+	if !exists {
+		_, err := db.DB.Exec(`
+			INSERT INTO scores (department_id, year, month, score)
+			VALUES (?, ?, ?, 100)
+		`, departmentID, year, month)
+		if err != nil {
+			log.Printf("Error creating score record: %v", err)
+			return
+		}
+	}
+
+	// 2. Check number of problems in that month
+	var problemCount int
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM tasks t
+		JOIN ip_phones p ON t.phone_id = p.id
+		WHERE p.department_id = ? AND YEAR(t.created_at) = ? AND MONTH(t.created_at) = ?
+	`, departmentID, year, month).Scan(&problemCount)
+	if err != nil {
+		log.Printf("Error counting problems: %v", err)
+		return
+	}
+
+	// 3. If problem count > 3, deduct score
+	if problemCount > 3 {
+		_, err := db.DB.Exec(`
+			UPDATE scores
+			SET score = GREATEST(score - 5, 0)
+			WHERE department_id = ? AND year = ? AND month = ?
+		`, departmentID, year, month)
+		if err != nil {
+			log.Printf("Error updating score: %v", err)
+		}
+	}
 }
