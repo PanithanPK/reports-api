@@ -35,6 +35,7 @@ func ListDepartmentsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		departments = append(departments, d)
 	}
+	log.Printf("Getting departments Success")
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": departments})
 }
 
@@ -51,6 +52,7 @@ func CreateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := res.LastInsertId()
+	log.Printf("Inserted new department: %s", req.Name)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
 }
 
@@ -73,6 +75,7 @@ func UpdateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update department", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Updating department ID: %d with name: %s", id, req.Name)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
@@ -90,6 +93,7 @@ func DeleteDepartmentHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to delete department", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Deleted department ID: %d", id)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
@@ -146,7 +150,7 @@ func GetDepartmentDetailHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error counting tasks: %v", err)
 	}
-
+	log.Printf("Getting department details Success for ID: %d", id)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"data":    departmentDetail,

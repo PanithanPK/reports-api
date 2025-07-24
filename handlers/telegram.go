@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"reports-api/models"
@@ -77,6 +78,6 @@ func SendTelegramNotificationHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(models.TelegramResponse{Success: false, Message: "Telegram API error: " + string(body)})
 		return
 	}
-
+	log.Printf("Telegram message sent successfully")
 	json.NewEncoder(w).Encode(models.TelegramResponse{Success: true, Message: "Notification sent successfully"})
 }

@@ -62,7 +62,7 @@ func UpdateScoreHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	var score models.Score
+	var score models.ScoreUpdateRequest
 	err := json.NewDecoder(r.Body).Decode(&score)
 	if err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -72,13 +72,12 @@ func UpdateScoreHandler(w http.ResponseWriter, r *http.Request) {
 	var query string
 	var args []interface{}
 
-	// ตรวจสอบว่ามีการระบุ year และ month หรือไม่
 	if score.Year > 0 && score.Month > 0 {
-		// ถ้ามีทั้ง year และ month จะอัปเดตเฉพาะข้อมูลที่ตรงกับ department_id, year และ month ที่ระบุ
+
 		query = `UPDATE scores SET score = ? WHERE department_id = ? AND year = ? AND month = ?`
 		args = []interface{}{score.Score, id, score.Year, score.Month}
 	} else {
-		// ถ้าไม่มี year หรือ month หรือทั้งคู่ จะอัปเดตทุกข้อมูลที่มี department_id ตรงกับที่ระบุ
+
 		query = `UPDATE scores SET score = ? WHERE department_id = ?`
 		args = []interface{}{score.Score, id}
 	}
@@ -96,20 +95,18 @@ func DeleteScoreHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	// ตรวจสอบว่ามีการส่ง body มาหรือไม่
 	var score models.Score
 	err := json.NewDecoder(r.Body).Decode(&score)
 
 	var query string
 	var args []interface{}
 
-	// ถ้าสามารถอ่าน body ได้และมีการระบุ year และ month
 	if err == nil && score.Year > 0 && score.Month > 0 {
-		// ถ้ามีทั้ง year และ month จะลบเฉพาะข้อมูลที่ตรงกับ department_id, year และ month ที่ระบุ
+
 		query = `DELETE FROM scores WHERE department_id = ? AND year = ? AND month = ?`
 		args = []interface{}{id, score.Year, score.Month}
 	} else {
-		// ถ้าไม่มี body หรือไม่มี year หรือ month หรือทั้งคู่ จะลบทุกข้อมูลที่มี department_id ตรงกับที่ระบุ
+
 		query = `DELETE FROM scores WHERE department_id = ?`
 		args = []interface{}{id}
 	}
