@@ -96,6 +96,7 @@ type DepartmentDb struct {
 	BranchName *string `json:"branch_name"`
 	CreatedAt  *string `json:"created_at"`
 	UpdatedAt  *string `json:"updated_at"`
+	Scores     int     `json:"scores"`
 }
 
 // ProgramDb model for program database representation

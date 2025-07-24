@@ -30,6 +30,7 @@ func ListProgramsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		programs = append(programs, p)
 	}
+	log.Printf("Getting programs Success")
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": programs})
 }
 
@@ -46,6 +47,7 @@ func CreateProgramHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := res.LastInsertId()
+	log.Printf("Inserted new program: %s", req.Name)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
 }
 
@@ -68,6 +70,7 @@ func UpdateProgramHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update program", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Updating program ID: %d with name: %s", id, req.Name)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
@@ -85,5 +88,6 @@ func DeleteProgramHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to delete program", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Deleted program ID: %d", id)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }

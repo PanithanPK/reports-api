@@ -31,7 +31,7 @@ func ListBranchesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		branches = append(branches, b)
 	}
-
+	log.Printf("Getting branches Success")
 	// check for errors from iterating over rows
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": branches})
 }
@@ -52,6 +52,7 @@ func CreateBranchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// Get the last inserted ID and return it
 	id, _ := res.LastInsertId()
+	log.Printf("Inserted new branch: %s", req.Name)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
 }
 
@@ -81,6 +82,7 @@ func UpdateBranchHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update branch", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Updating branch ID: %d with name: %s", id, req.Name)
 	// Return a success response
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
@@ -101,6 +103,7 @@ func DeleteBranchHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to delete branch", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Deleted branch ID: %d", id)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
@@ -149,7 +152,7 @@ func GetBranchDetailHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error counting IP phones: %v", err)
 		// branchDetail.IPPhonesCount = 0 // Default to 0 if error
 	}
-
+	log.Printf("Getting branch details Success for ID: %d", id)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"data":    branchDetail,

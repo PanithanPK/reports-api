@@ -211,7 +211,7 @@ func updateDepartmentScore(departmentID int) {
 	if problemCount > 3 {
 		_, err := db.DB.Exec(`
 			UPDATE scores
-			SET score = GREATEST(score - 5, 0)
+			SET score = GREATEST(score - 1, 0)
 			WHERE department_id = ? AND year = ? AND month = ?
 		`, departmentID, year, month)
 		if err != nil {

@@ -42,6 +42,7 @@ func ListIPPhonesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		phones = append(phones, p)
 	}
+	log.Printf("Getting IP phones Success")
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": phones})
 }
 
@@ -57,6 +58,7 @@ func CreateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to insert ip_phone", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Inserted new IP phone: %d", req.Number)
 	id, _ := res.LastInsertId()
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
 }
@@ -80,6 +82,7 @@ func UpdateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update ip_phone", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Updating IP phone ID: %d with number: %d", id, req.Number)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
@@ -97,5 +100,6 @@ func DeleteIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to delete ip_phone", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Deleted IP phone ID: %d", id)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }

@@ -83,6 +83,27 @@ func GetDashboardDataHandler(w http.ResponseWriter, r *http.Request) {
 				&d.ID, &d.Name, &d.BranchID, &d.BranchName, &d.CreatedAt, &d.UpdatedAt,
 			)
 			if err == nil {
+				// ดึงข้อมูล scores สำหรับแต่ละ department
+				scores := []models.Score{} // ประกาศเป็น slice ที่ว่าง
+				scoresQuery := `SELECT department_id, year, month, score FROM scores WHERE department_id = ?`
+				scoresRows, err := db.DB.Query(scoresQuery, d.ID)
+				if err == nil {
+					defer scoresRows.Close()
+					for scoresRows.Next() {
+						var s models.Score
+						err := scoresRows.Scan(&s.DepartmentID, &s.Year, &s.Month, &s.Score)
+						if err == nil {
+							scores = append(scores, s)
+						}
+					}
+				}
+
+				// เพิ่ม scores เข้าไปใน department
+				total := 0
+				for _, s := range scores {
+					total += s.Score
+				}
+				d.Scores = total
 				departments = append(departments, d)
 			} else {
 				log.Println("Scan error (departments):", err)
