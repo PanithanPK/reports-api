@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"reports-api/db"
 	"reports-api/models"
@@ -41,7 +42,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		MaxAge:   3600 * 24, // 24 hours
 	})
-
+	log.Printf("User %s logged in successfully", username)
 	json.NewEncoder(w).Encode(models.LoginResponse{
 		Message: "Login successful",
 		Data:    &models.Data{ID: id, Username: username, Role: role},
@@ -77,7 +78,7 @@ func RegisterHandler(role string) http.HandlerFunc {
 			http.Error(w, "Failed to register user", http.StatusInternalServerError)
 			return
 		}
-
+		log.Printf("User %s registered successfully as %s", req.Username, role)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Registered as " + role})
 	}
 }
@@ -110,7 +111,7 @@ func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update user", http.StatusInternalServerError)
 		return
 	}
-
+	log.Printf("Updating user ID: %d with username: %s", req.ID, req.Username)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User updated"})
 }
 
@@ -131,7 +132,7 @@ func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to delete user", http.StatusInternalServerError)
 		return
 	}
-
+	log.Printf("User ID: %d deleted by user ID: %d", req.ID, req.DeletedBy)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User deleted"})
 }
 
@@ -145,5 +146,6 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 	})
+	log.Printf("User logged out successfully")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Logged out"})
 }
