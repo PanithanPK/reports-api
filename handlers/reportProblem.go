@@ -48,7 +48,7 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to read tasks", http.StatusInternalServerError)
 		return
 	}
-
+	log.Printf("Getting tasks Success")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"data":    tasks,
@@ -77,7 +77,7 @@ func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		// Update department score
 		updateDepartmentScore(departmentID)
 	}
-
+	log.Printf("Inserted new task with ID: %d", id)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
 }
 
@@ -100,6 +100,7 @@ func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update task", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Updating task ID: %d with phone ID: %d", id, req.PhoneID)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
@@ -115,6 +116,7 @@ func UpdateTaskStatusHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update task status", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Updating task ID: %d status to: %d", req.ID, req.Status)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
@@ -132,6 +134,7 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to delete task", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Deleted task ID: %d", id)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
@@ -161,7 +164,7 @@ func GetTaskDetailHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Task not found", http.StatusNotFound)
 		return
 	}
-
+	log.Printf("Getting task ID: %d details", id)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"data":    task,
@@ -206,7 +209,7 @@ func updateDepartmentScore(departmentID int) {
 		log.Printf("Error counting problems: %v", err)
 		return
 	}
-
+	log.Printf("Department %d has %d problems in %d/%d", departmentID, problemCount, month, year)
 	// 3. If problem count > 3, deduct score
 	if problemCount > 3 {
 		_, err := db.DB.Exec(`
@@ -217,5 +220,6 @@ func updateDepartmentScore(departmentID int) {
 		if err != nil {
 			log.Printf("Error updating score: %v", err)
 		}
+		log.Printf("Updated department %d score for month %d/%d, problem count: %d", departmentID, month, year, problemCount)
 	}
 }
