@@ -31,7 +31,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
-
+	w.Header().Set("role", role)           // Set user role in response header
 	w.Header().Set("token", "dummy-token") // Set a dummy token header (will be replaced with JWT in future)
 
 	// Set session cookie
