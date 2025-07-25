@@ -119,20 +119,20 @@ func main() {
 	// r.Use(loggingMiddleware)
 	// r.Use(middleware.RateLimitMiddleware(60)) // จำกัดการเข้าถึงที่ 60 คำขอต่อวินาที
 	// r.Use(middleware.BasicSecurityHeadersMiddleware)
-	
+
 	// เพิ่ม HeaderMiddleware เพื่อกำหนด headers ให้กับทุก response
 	r.Use(middleware.HeaderMiddleware)
 	logger.Info.Println("✅ HeaderMiddleware added for common response headers")
 
 	// Setup CORS using rs/cors package
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"}, // Allow all origins
+		AllowedOrigins:   []string{"http://10.0.2.119"}, // Allow all origins
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With"},
 		AllowCredentials: true,
 		MaxAge:           86400, // 24 hours
 	})
-	
+
 	// Use the CORS handler
 	handler := c.Handler(r)
 	logger.Info.Println("🌐 CORS enabled using github.com/rs/cors package")
