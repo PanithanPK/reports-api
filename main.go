@@ -5,11 +5,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"reports-api/backup"
 	"reports-api/db"
 	"reports-api/middleware"
 	"reports-api/routes"
 	"runtime"
 	"runtime/debug"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -156,6 +158,18 @@ func main() {
 	logger.Info.Println("🔐 Registering Authentication routes...")
 	routes.RegisterAuthRoutes(r)
 	logger.Info.Println("✅ Authentication routes registered successfully")
+
+	// Start scheduled backup (daily at 2 AM)
+	bs := backup.NewBackupService()
+	bs.StartScheduledBackup(24 * time.Hour)
+	logger.Info.Println("💾 Scheduled backup started (daily)")
+
+	// Clean old backups on startup
+	go func() {
+		if err := bs.CleanOldBackups(30); err != nil {
+			logger.Error.Printf("Failed to clean old backups: %v", err)
+		}
+	}()
 
 	// Test route for RecoveryMiddleware
 	r.HandleFunc("/test-panic", func(w http.ResponseWriter, r *http.Request) {
