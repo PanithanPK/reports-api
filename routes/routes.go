@@ -53,6 +53,10 @@ func RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/api/v1/scores/{id}", handlers.GetScoreDetailHandler).Methods("GET")
 	r.HandleFunc("/api/v1/scores/update/{id}", handlers.UpdateScoreHandler).Methods("PUT")
 	r.HandleFunc("/api/v1/scores/delete/{id}", handlers.DeleteScoreHandler).Methods("DELETE")
+
+	// Backup routes
+	r.HandleFunc("/api/v1/backup/create", handlers.BackupHandler).Methods("POST")
+	r.HandleFunc("/api/v1/backup/clean", handlers.CleanBackupsHandler).Methods("DELETE")
 }
 
 // RegisterAuthRoutes registers all authentication-related routes
