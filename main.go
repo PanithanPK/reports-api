@@ -128,7 +128,7 @@ func main() {
 
 	// Setup CORS using rs/cors package
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://10.0.2.119"}, // Allow all origins
+		AllowedOrigins:   []string{"http://192.168.0.192", "http://localhost:5001", "http://helpdesk.nopadol.com/", "http://192.168.0.100:5001"}, // Allow all origins
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With"},
 		AllowCredentials: true,
