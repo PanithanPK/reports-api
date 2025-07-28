@@ -1,19 +1,17 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log"
-	"net/http"
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
 	"time"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/gofiber/fiber/v2"
 )
 
 // GetTasksHandler returns a handler for listing all tasks with details
-func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
+func GetTasksHandler(c *fiber.Ctx) error {
 	query := `
 		SELECT t.id, t.phone_id, COALESCE(p.number, 0), COALESCE(p.name, ''), t.system_id, COALESCE(s.name, ''),
 		COALESCE(p.department_id, 0), COALESCE(d.name, ''), COALESCE(d.branch_id, 0), COALESCE(b.name, ''),
@@ -27,8 +25,7 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.DB.Query(query)
 	if err != nil {
 		log.Printf("Error querying tasks with join: %v", err)
-		http.Error(w, "Failed to query tasks", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query tasks"})
 	}
 	defer rows.Close()
 
@@ -45,28 +42,22 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := rows.Err(); err != nil {
 		log.Printf("Row error: %v", err)
-		http.Error(w, "Failed to read tasks", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to read tasks"})
 	}
 	log.Printf("Getting tasks Success")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"data":    tasks,
-	})
+	return c.JSON(fiber.Map{"success": true, "data": tasks})
 }
 
 // CreateTaskHandler เพิ่ม task ใหม่
-func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
+func CreateTaskHandler(c *fiber.Ctx) error {
 	var req models.TaskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
 	res, err := db.DB.Exec(`INSERT INTO tasks (phone_id, system_id, text, status, created_by) VALUES (?, ?, ?, 0, ?)`, req.PhoneID, req.SystemID, req.Text, req.CreatedBy)
 	if err != nil {
-		http.Error(w, "Failed to insert task", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert task"})
 	}
 	id, _ := res.LastInsertId()
 
@@ -78,70 +69,68 @@ func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		updateDepartmentScore(departmentID)
 	}
 	log.Printf("Inserted new task with ID: %d", id)
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
+	return c.JSON(fiber.Map{"success": true, "id": id})
 }
 
 // UpdateTaskHandler แก้ไข task
-func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+func UpdateTaskHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
-		return
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
+
 	var req models.TaskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
+
 	_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.Text, req.Status, req.UpdatedBy, id)
 	if err != nil {
-		http.Error(w, "Failed to update task", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
 	}
+
 	log.Printf("Updating task ID: %d with phone ID: %d", id, req.PhoneID)
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	return c.JSON(fiber.Map{"success": true})
 }
 
-func UpdateTaskStatusHandler(w http.ResponseWriter, r *http.Request) {
+func UpdateTaskStatusHandler(c *fiber.Ctx) error {
 	var req models.TaskStatusUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
 	_, err := db.DB.Exec(`UPDATE tasks SET status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.Status, req.UpdatedBy, req.ID)
 	if err != nil {
-		http.Error(w, "Failed to update task status", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task status"})
 	}
+
 	log.Printf("Updating task ID: %d status to: %d", req.ID, req.Status)
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	return c.JSON(fiber.Map{"success": true})
 }
 
 // DeleteTaskHandler (soft delete)
-func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+func DeleteTaskHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
-		return
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
+
 	_, err = db.DB.Exec(`DELETE FROM tasks WHERE id=?`, id)
 	if err != nil {
-		http.Error(w, "Failed to delete task", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete task"})
 	}
+
 	log.Printf("Deleted task ID: %d", id)
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	return c.JSON(fiber.Map{"success": true})
 }
 
-func GetTaskDetailHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+func GetTaskDetailHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
-		return
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
 
 	var task models.TaskWithDetails
@@ -158,14 +147,11 @@ func GetTaskDetailHandler(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&task.ID, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Status, &task.CreatedAt, &task.UpdatedAt)
 
 	if err != nil {
-		http.Error(w, "Task not found", http.StatusNotFound)
-		return
+		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
 	}
+
 	log.Printf("Getting task ID: %d details", id)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"data":    task,
-	})
+	return c.JSON(fiber.Map{"success": true, "data": task})
 }
 
 // updateDepartmentScore updates the department score based on problem count

@@ -3,11 +3,11 @@ package routes
 import (
 	"reports-api/handlers"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/gofiber/fiber/v2"
 )
 
 // RegisterRoutes registers all API routes
-func RegisterRoutes(r chi.Router) {
+func RegisterRoutes(r *fiber.App) {
 
 	// Problem routes
 	r.Get("/api/v1/problem/list", handlers.GetTasksHandler)
@@ -60,7 +60,7 @@ func RegisterRoutes(r chi.Router) {
 }
 
 // RegisterAuthRoutes registers all authentication-related routes
-func RegisterAuthRoutes(r chi.Router) {
+func RegisterAuthRoutes(r *fiber.App) {
 	// Authentication routes
 	r.Post("/authEntry/login", handlers.LoginHandler)
 	r.Post("/authEntry/registerUser", handlers.RegisterHandler("user"))

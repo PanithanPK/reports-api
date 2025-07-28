@@ -1,20 +1,19 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log"
-	"net/http"
 	"reports-api/db"
 	"reports-api/models"
 	"time"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // LoginHandler handles user login
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
+func LoginHandler(c *fiber.Ctx) error {
 	var credentials models.Credentials
-	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&credentials); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
 	var id int
@@ -22,52 +21,46 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var role string
 	err := db.DB.QueryRow("SELECT id, username, password, role FROM users WHERE username = ? AND deleted_at IS NULL", credentials.Username).Scan(&id, &username, &password, &role)
 	if err != nil {
-		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
-		return
+		return c.Status(401).JSON(fiber.Map{"error": "Invalid username or password"})
 	}
 
-	// Simple password comparison (will be replaced with bcrypt in future)
 	if credentials.Password != password {
-		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
-		return
+		return c.Status(401).JSON(fiber.Map{"error": "Invalid username or password"})
 	}
-	w.Header().Set("role", role)           // Set user role in response header
-	w.Header().Set("token", "dummy-token") // Set a dummy token header (will be replaced with JWT in future)
 
-	// Set session cookie
-	http.SetCookie(w, &http.Cookie{
+	c.Set("role", role)
+	c.Set("token", "dummy-token")
+
+	c.Cookie(&fiber.Cookie{
 		Name:     "session",
-		Value:    username, // Simple session value (will be replaced with secure token in future)
+		Value:    username,
 		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   3600 * 24, // 24 hours
+		HTTPOnly: true,
+		MaxAge:   3600 * 24,
 	})
+
 	log.Printf("User %s logged in successfully", username)
-	json.NewEncoder(w).Encode(models.LoginResponse{
+	return c.JSON(models.LoginResponse{
 		Message: "Login successful",
 		Data:    &models.Data{ID: id, Username: username, Role: role},
 	})
 }
 
 // RegisterHandler returns a handler for registering a user or admin
-func RegisterHandler(role string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func RegisterHandler(role string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
 		var req models.RegisterUserRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 		}
 
-		// Check if username already exists
 		var count int
 		err := db.DB.QueryRow("SELECT COUNT(*) FROM users WHERE username = ?", req.Username).Scan(&count)
 		if err != nil {
-			http.Error(w, "Database error", http.StatusInternalServerError)
-			return
+			return c.Status(500).JSON(fiber.Map{"error": "Database error"})
 		}
 		if count > 0 {
-			http.Error(w, "Username already exists", http.StatusConflict)
-			return
+			return c.Status(409).JSON(fiber.Map{"error": "Username already exists"})
 		}
 
 		_, err = db.DB.Exec(
@@ -75,32 +68,28 @@ func RegisterHandler(role string) http.HandlerFunc {
 			req.Username, req.Password, role, req.CreatedBy, time.Now(),
 		)
 		if err != nil {
-			http.Error(w, "Failed to register user", http.StatusInternalServerError)
-			return
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to register user"})
 		}
+
 		log.Printf("User %s registered successfully as %s", req.Username, role)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Registered as " + role})
+		return c.JSON(fiber.Map{"message": "Registered as " + role})
 	}
 }
 
 // UpdateUserHandler updates user info
-func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
+func UpdateUserHandler(c *fiber.Ctx) error {
 	var req models.UpdateUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	// Check if user exists
 	var count int
 	err := db.DB.QueryRow("SELECT COUNT(*) FROM users WHERE id = ? AND deleted_at IS NULL", req.ID).Scan(&count)
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
 	}
 	if count == 0 {
-		http.Error(w, "User not found", http.StatusNotFound)
-		return
+		return c.Status(404).JSON(fiber.Map{"error": "User not found"})
 	}
 
 	_, err = db.DB.Exec(
@@ -108,44 +97,42 @@ func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 		req.Username, req.Password, req.UpdatedBy, time.Now(), req.ID,
 	)
 	if err != nil {
-		http.Error(w, "Failed to update user", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update user"})
 	}
+
 	log.Printf("Updating user ID: %d with username: %s", req.ID, req.Username)
-	json.NewEncoder(w).Encode(map[string]string{"message": "User updated"})
+	return c.JSON(fiber.Map{"message": "User updated"})
 }
 
 // DeleteUserHandler deletes a user
-func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
+func DeleteUserHandler(c *fiber.Ctx) error {
 	var req models.DeleteUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	// Use soft delete
 	_, err := db.DB.Exec(
 		"UPDATE users SET deleted_at = ?, deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
 		time.Now(), req.DeletedBy, req.ID,
 	)
 	if err != nil {
-		http.Error(w, "Failed to delete user", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete user"})
 	}
+
 	log.Printf("User ID: %d deleted by user ID: %d", req.ID, req.DeletedBy)
-	json.NewEncoder(w).Encode(map[string]string{"message": "User deleted"})
+	return c.JSON(fiber.Map{"message": "User deleted"})
 }
 
 // LogoutHandler logs out a user
-func LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	// Clear session cookie
-	http.SetCookie(w, &http.Cookie{
+func LogoutHandler(c *fiber.Ctx) error {
+	c.Cookie(&fiber.Cookie{
 		Name:     "session",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
-		HttpOnly: true,
+		HTTPOnly: true,
 	})
+
 	log.Printf("User logged out successfully")
-	json.NewEncoder(w).Encode(map[string]string{"message": "Logged out"})
+	return c.JSON(fiber.Map{"message": "Logged out"})
 }

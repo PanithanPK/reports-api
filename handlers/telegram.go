@@ -9,22 +9,15 @@ import (
 	"net/http"
 	"os"
 	"reports-api/models"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // SendTelegramNotificationHandler รับ POST แล้วส่งข้อความไป Telegram
-func SendTelegramNotificationHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(models.TelegramResponse{Success: false, Message: "Method not allowed"})
-		return
-	}
-
+func SendTelegramNotificationHandler(c *fiber.Ctx) error {
 	var req models.TelegramRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil || req.Reportmessage == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(models.TelegramResponse{Success: false, Message: "Invalid request body"})
-		return
+	if err := c.BodyParser(&req); err != nil || req.Reportmessage == "" {
+		return c.Status(400).JSON(models.TelegramResponse{Success: false, Message: "Invalid request body"})
 	}
 
 	// สร้างข้อความรวมข้อมูล
@@ -67,17 +60,15 @@ func SendTelegramNotificationHandler(w http.ResponseWriter, r *http.Request) {
 	payloadBytes, _ := json.Marshal(payload)
 	resp, err := http.Post(telegramAPI, "application/json", bytes.NewBuffer(payloadBytes))
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(models.TelegramResponse{Success: false, Message: "Failed to send telegram message: " + err.Error()})
-		return
+		return c.Status(500).JSON(models.TelegramResponse{Success: false, Message: "Failed to send telegram message: " + err.Error()})
 	}
 	defer resp.Body.Close()
+
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		w.WriteHeader(http.StatusBadGateway)
-		json.NewEncoder(w).Encode(models.TelegramResponse{Success: false, Message: "Telegram API error: " + string(body)})
-		return
+		return c.Status(502).JSON(models.TelegramResponse{Success: false, Message: "Telegram API error: " + string(body)})
 	}
+
 	log.Printf("Telegram message sent successfully")
-	json.NewEncoder(w).Encode(models.TelegramResponse{Success: true, Message: "Notification sent successfully"})
+	return c.JSON(models.TelegramResponse{Success: true, Message: "Notification sent successfully"})
 }

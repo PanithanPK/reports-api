@@ -2,42 +2,38 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
-	"net/http"
 	"reports-api/db"
 	"reports-api/models"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/gofiber/fiber/v2"
 )
 
-func ListScoresHandler(w http.ResponseWriter, r *http.Request) {
+func ListScoresHandler(c *fiber.Ctx) error {
 	query := `SELECT department_id, year, month, score FROM scores`
 	rows, err := db.DB.Query(query)
 	if err != nil {
-		http.Error(w, "Failed to query scores", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query scores"})
 	}
 	defer rows.Close()
+
 	var scores []models.Score
 	for rows.Next() {
 		var score models.Score
 		err := rows.Scan(&score.DepartmentID, &score.Year, &score.Month, &score.Score)
 		if err != nil {
-			http.Error(w, "Failed to scan score", http.StatusInternalServerError)
-			return
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to scan score"})
 		}
 		scores = append(scores, score)
 	}
 	if err := rows.Err(); err != nil {
-		http.Error(w, "Row error", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Row error"})
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"scores": scores})
+
+	return c.JSON(fiber.Map{"scores": scores})
 }
 
-func GetScoreDetailHandler(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+func GetScoreDetailHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
 
 	query := `SELECT department_id, year, month, score FROM scores WHERE department_id = ?`
 	row := db.DB.QueryRow(query, id)
@@ -46,73 +42,64 @@ func GetScoreDetailHandler(w http.ResponseWriter, r *http.Request) {
 	err := row.Scan(&score.DepartmentID, &score.Year, &score.Month, &score.Score)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Score not found", http.StatusNotFound)
+			return c.Status(404).JSON(fiber.Map{"error": "Score not found"})
 		} else {
-			http.Error(w, "Failed to query score", http.StatusInternalServerError)
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to query score"})
 		}
-		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(score)
+	return c.JSON(score)
 }
 
-func UpdateScoreHandler(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+func UpdateScoreHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
 
 	var score models.ScoreUpdateRequest
-	err := json.NewDecoder(r.Body).Decode(&score)
+	err := c.BodyParser(&score)
 	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
 	var query string
 	var args []interface{}
 
 	if score.Year > 0 && score.Month > 0 {
-
 		query = `UPDATE scores SET score = ? WHERE department_id = ? AND year = ? AND month = ?`
 		args = []interface{}{score.Score, id, score.Year, score.Month}
 	} else {
-
 		query = `UPDATE scores SET score = ? WHERE department_id = ?`
 		args = []interface{}{score.Score, id}
 	}
 
 	_, err = db.DB.Exec(query, args...)
 	if err != nil {
-		http.Error(w, "Failed to update score", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update score"})
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	return c.SendStatus(204)
 }
 
-func DeleteScoreHandler(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+func DeleteScoreHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
 
 	var score models.Score
-	err := json.NewDecoder(r.Body).Decode(&score)
+	err := c.BodyParser(&score)
 
 	var query string
 	var args []interface{}
 
 	if err == nil && score.Year > 0 && score.Month > 0 {
-
 		query = `DELETE FROM scores WHERE department_id = ? AND year = ? AND month = ?`
 		args = []interface{}{id, score.Year, score.Month}
 	} else {
-
 		query = `DELETE FROM scores WHERE department_id = ?`
 		args = []interface{}{id}
 	}
 
 	_, err = db.DB.Exec(query, args...)
 	if err != nil {
-		http.Error(w, "Failed to delete score", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete score"})
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	return c.SendStatus(204)
 }
