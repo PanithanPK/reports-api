@@ -1,18 +1,16 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log"
-	"net/http"
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/gofiber/fiber/v2"
 )
 
 // ListIPPhonesHandler returns a handler for listing all IP phones
-func ListIPPhonesHandler(w http.ResponseWriter, r *http.Request) {
+func ListIPPhonesHandler(c *fiber.Ctx) error {
 	rows, err := db.DB.Query(`
    SELECT ip.id, ip.number, ip.name, ip.department_id,
           d.name as department_name, d.branch_id, b.name as branch_name,
@@ -23,8 +21,7 @@ func ListIPPhonesHandler(w http.ResponseWriter, r *http.Request) {
    WHERE ip.deleted_at IS NULL
  `)
 	if err != nil {
-		http.Error(w, "Failed to query ip_phones", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query ip_phones"})
 	}
 	defer rows.Close()
 
@@ -43,61 +40,61 @@ func ListIPPhonesHandler(w http.ResponseWriter, r *http.Request) {
 		phones = append(phones, p)
 	}
 	log.Printf("Getting IP phones Success")
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": phones})
+	return c.JSON(fiber.Map{"success": true, "data": phones})
 }
 
 // CreateIPPhoneHandler returns a handler for creating a new IP phone
-func CreateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
+func CreateIPPhoneHandler(c *fiber.Ctx) error {
 	var req models.IPPhoneRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
+
 	res, err := db.DB.Exec(`INSERT INTO ip_phones (number, name, department_id, created_by) VALUES (?, ?, ?, ?)`, req.Number, req.Name, req.DepartmentID, req.CreatedBy)
 	if err != nil {
-		http.Error(w, "Failed to insert ip_phone", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert ip_phone"})
 	}
+
 	log.Printf("Inserted new IP phone: %d", req.Number)
 	id, _ := res.LastInsertId()
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
+	return c.JSON(fiber.Map{"success": true, "id": id})
 }
 
 // UpdateIPPhoneHandler returns a handler for updating an existing IP phone
-func UpdateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+func UpdateIPPhoneHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
-		return
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
+
 	var req models.IPPhoneRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
+
 	_, err = db.DB.Exec(`UPDATE ip_phones SET number=?, name=?, department_id=?, updated_by=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL`, req.Number, req.Name, req.DepartmentID, req.UpdatedBy, id)
 	if err != nil {
-		http.Error(w, "Failed to update ip_phone", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update ip_phone"})
 	}
+
 	log.Printf("Updating IP phone ID: %d with number: %d", id, req.Number)
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	return c.JSON(fiber.Map{"success": true})
 }
 
 // DeleteIPPhoneHandler returns a handler for deleting an IP phone
-func DeleteIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+func DeleteIPPhoneHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
-		return
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
+
 	_, err = db.DB.Exec(`DELETE FROM ip_phones WHERE id=?`, id)
 	if err != nil {
-		http.Error(w, "Failed to delete ip_phone", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete ip_phone"})
 	}
+
 	log.Printf("Deleted IP phone ID: %d", id)
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	return c.JSON(fiber.Map{"success": true})
 }
