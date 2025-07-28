@@ -43,7 +43,7 @@ func (bs *BackupService) CreateBackup() error {
 	// Get container name from environment or use default
 	containerName := os.Getenv("MYSQL_CONTAINER_NAME")
 	if containerName == "" {
-		containerName = "mysql" // default container name
+		containerName = "mysql-container" // default container name
 	}
 
 	// Execute docker exec mysqldump command
