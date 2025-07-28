@@ -8,7 +8,7 @@ import (
 	"reports-api/models"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 // ListProgramsHandler returns a handler for listing all programs
@@ -53,8 +53,7 @@ func CreateProgramHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdateProgramHandler returns a handler for updating an existing program
 func UpdateProgramHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	idStr := vars["id"]
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
@@ -76,8 +75,7 @@ func UpdateProgramHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteProgramHandler returns a handler for deleting a program (soft delete)
 func DeleteProgramHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	idStr := vars["id"]
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)

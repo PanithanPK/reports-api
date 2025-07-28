@@ -7,7 +7,7 @@ import (
 	"reports-api/db"
 	"reports-api/models"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 func ListScoresHandler(w http.ResponseWriter, r *http.Request) {
@@ -37,8 +37,7 @@ func ListScoresHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetScoreDetailHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := chi.URLParam(r, "id")
 
 	query := `SELECT department_id, year, month, score FROM scores WHERE department_id = ?`
 	row := db.DB.QueryRow(query, id)
@@ -59,8 +58,7 @@ func GetScoreDetailHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateScoreHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := chi.URLParam(r, "id")
 
 	var score models.ScoreUpdateRequest
 	err := json.NewDecoder(r.Body).Decode(&score)
@@ -92,8 +90,7 @@ func UpdateScoreHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteScoreHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := chi.URLParam(r, "id")
 
 	var score models.Score
 	err := json.NewDecoder(r.Body).Decode(&score)

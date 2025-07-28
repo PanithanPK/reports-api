@@ -13,7 +13,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 )
@@ -112,7 +112,7 @@ func main() {
 	}()
 
 	// Create router
-	r := mux.NewRouter()
+	r := chi.NewRouter()
 
 	// mux.CORSMethodMiddleware(r)
 
@@ -140,11 +140,11 @@ func main() {
 	logger.Info.Println("🌐 CORS enabled using github.com/rs/cors package")
 
 	// Serve static files
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./fontend"))))
+	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./fontend"))))
 	logger.Info.Println("📁 Static file server configured")
 
 	// Serve index.html at root
-	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		logger.Info.Printf("📄 Serving index.html to %s", r.RemoteAddr)
 		http.ServeFile(w, r, "./fontend/index.html")
 	})
@@ -172,10 +172,10 @@ func main() {
 	}()
 
 	// Test route for RecoveryMiddleware
-	r.HandleFunc("/test-panic", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/test-panic", func(w http.ResponseWriter, r *http.Request) {
 		logger.Info.Println("🧪 Testing RecoveryMiddleware with a deliberate panic")
 		panic("This is a test panic to verify RecoveryMiddleware is working")
-	}).Methods("GET")
+	})
 	logger.Info.Println("🧪 Test route for RecoveryMiddleware added at /test-panic")
 
 	// Get port from environment variable
