@@ -8,7 +8,7 @@ import (
 	"reports-api/models"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 // ListIPPhonesHandler returns a handler for listing all IP phones
@@ -65,8 +65,7 @@ func CreateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdateIPPhoneHandler returns a handler for updating an existing IP phone
 func UpdateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	idStr := vars["id"]
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
@@ -88,8 +87,7 @@ func UpdateIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteIPPhoneHandler returns a handler for deleting an IP phone
 func DeleteIPPhoneHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	idStr := vars["id"]
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)

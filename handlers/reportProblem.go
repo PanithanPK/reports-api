@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 // GetTasksHandler returns a handler for listing all tasks with details
@@ -83,8 +83,7 @@ func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdateTaskHandler แก้ไข task
 func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	idStr := vars["id"]
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
@@ -122,8 +121,7 @@ func UpdateTaskStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteTaskHandler (soft delete)
 func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	idStr := vars["id"]
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
@@ -139,8 +137,7 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetTaskDetailHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	idStr := vars["id"]
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)

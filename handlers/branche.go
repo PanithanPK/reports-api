@@ -8,7 +8,7 @@ import (
 	"reports-api/models"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 // ListBranchesHandler returns a handler for listing all branches
@@ -58,10 +58,8 @@ func CreateBranchHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdateBranchHandler returns a handler for updating an existing branch
 func UpdateBranchHandler(w http.ResponseWriter, r *http.Request) {
-	// mux.Vars returns a map of route variables
-	vars := mux.Vars(r)
 	// Get the branch ID from the URL
-	idStr := vars["id"]
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	// Check if the ID is a valid integer
 	if err != nil {
@@ -89,9 +87,8 @@ func UpdateBranchHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteBranchHandler returns a handler for deleting a branch
 func DeleteBranchHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
 	// Get the branch ID from the URL
-	idStr := vars["id"]
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
@@ -109,9 +106,8 @@ func DeleteBranchHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetBranchDetailHandler returns detailed information about a specific branch
 func GetBranchDetailHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
 	// Get the branch ID from the URL
-	idStr := vars["id"]
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
