@@ -3,19 +3,18 @@ package main
 import (
 	"flag"
 	"log"
-	"net/http"
 	"os"
 	"reports-api/backup"
 	"reports-api/db"
-	"reports-api/middleware"
+
 	"reports-api/routes"
 	"runtime"
 	"runtime/debug"
 	"time"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
-	"github.com/rs/cors"
 )
 
 // CurrentEnvironment เก็บสภาพแวดล้อมปัจจุบัน (dev, prod, หรือ default)
@@ -111,52 +110,48 @@ func main() {
 		}
 	}()
 
-	// Create router
-	r := chi.NewRouter()
-
-	// mux.CORSMethodMiddleware(r)
-
-	// Add middleware
-	// r.Use(middleware.RecoveryMiddleware) // ต้องใส่เป็นตัวแรกเพื่อจับ panic ในทุก middleware อื่นๆ
-	// r.Use(loggingMiddleware)
-	// r.Use(middleware.RateLimitMiddleware(60)) // จำกัดการเข้าถึงที่ 60 คำขอต่อวินาที
-	// r.Use(middleware.BasicSecurityHeadersMiddleware)
-
-	// เพิ่ม HeaderMiddleware เพื่อกำหนด headers ให้กับทุก response
-	r.Use(middleware.HeaderMiddleware)
-	logger.Info.Println("✅ HeaderMiddleware added for common response headers")
-
-	// Setup CORS using rs/cors package
-	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://192.168.0.192", "http://localhost:3000", "http://localhost:5000", "http://localhost:5001", "http://helpdesk.nopadol.com/", "http://192.168.0.100:5001"}, // Allow all origins
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With"},
-		AllowCredentials: true,
-		MaxAge:           86400, // 24 hours
+	// Create Fiber app
+	app := fiber.New(fiber.Config{
+		AppName: "Reports API",
 	})
 
-	// Use the CORS handler
-	handler := c.Handler(r)
-	logger.Info.Println("🌐 CORS enabled using github.com/rs/cors package")
+	// Add CORS middleware
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "http://10.0.2.119",
+		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS,PATCH",
+		AllowHeaders:     "Content-Type,Authorization,X-Requested-With",
+		AllowCredentials: true,
+	}))
+	logger.Info.Println("🌐 CORS enabled using Fiber built-in middleware")
+
+	// Add custom header middleware
+	app.Use(func(c *fiber.Ctx) error {
+		c.Set("Content-Type", "application/json")
+		c.Set("X-Content-Type-Options", "nosniff")
+		c.Set("X-Frame-Options", "DENY")
+		c.Set("X-XSS-Protection", "1; mode=block")
+		return c.Next()
+	})
+	logger.Info.Println("✅ HeaderMiddleware added for common response headers")
 
 	// Serve static files
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./fontend"))))
+	app.Static("/static", "./fontend")
 	logger.Info.Println("📁 Static file server configured")
 
 	// Serve index.html at root
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		logger.Info.Printf("📄 Serving index.html to %s", r.RemoteAddr)
-		http.ServeFile(w, r, "./fontend/index.html")
+	app.Get("/", func(c *fiber.Ctx) error {
+		logger.Info.Printf("📄 Serving index.html to %s", c.IP())
+		return c.SendFile("./fontend/index.html")
 	})
 
 	// Register API routes
 	logger.Info.Println("🔗 Registering API routes...")
-	routes.RegisterRoutes(r)
+	routes.RegisterRoutes(app)
 	logger.Info.Println("✅ API routes registered successfully")
 
 	// Register Authentication routes
 	logger.Info.Println("🔐 Registering Authentication routes...")
-	routes.RegisterAuthRoutes(r)
+	routes.RegisterAuthRoutes(app)
 	logger.Info.Println("✅ Authentication routes registered successfully")
 
 	// Start scheduled backup (daily at 2 AM)
@@ -172,7 +167,7 @@ func main() {
 	}()
 
 	// Test route for RecoveryMiddleware
-	r.Get("/test-panic", func(w http.ResponseWriter, r *http.Request) {
+	app.Get("/test-panic", func(c *fiber.Ctx) error {
 		logger.Info.Println("🧪 Testing RecoveryMiddleware with a deliberate panic")
 		panic("This is a test panic to verify RecoveryMiddleware is working")
 	})
@@ -195,7 +190,7 @@ func main() {
 	logger.Info.Printf("🚀 Server starting on http://localhost:%s", port)
 	logger.Info.Println("🎯 Server is ready to handle requests!")
 
-	if err := http.ListenAndServe(":"+port, handler); err != nil {
+	if err := app.Listen(":" + port); err != nil {
 		logger.Error.Printf("❌ Server failed to start: %v", err)
 		log.Fatal(err)
 	}

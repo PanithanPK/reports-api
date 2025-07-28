@@ -1,18 +1,16 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log"
-	"net/http"
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/gofiber/fiber/v2"
 )
 
 // ListDepartmentsHandler returns a handler for listing all departments
-func ListDepartmentsHandler(w http.ResponseWriter, r *http.Request) {
+func ListDepartmentsHandler(c *fiber.Ctx) error {
 	rows, err := db.DB.Query(`
    SELECT d.id, d.name, d.branch_id, b.name as branch_name, d.created_at, d.updated_at, d.deleted_at
    FROM departments d
@@ -20,8 +18,7 @@ func ListDepartmentsHandler(w http.ResponseWriter, r *http.Request) {
    WHERE d.deleted_at IS NULL
  `)
 	if err != nil {
-		http.Error(w, "Failed to query departments", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query departments"})
 	}
 	defer rows.Close()
 
@@ -36,75 +33,73 @@ func ListDepartmentsHandler(w http.ResponseWriter, r *http.Request) {
 		departments = append(departments, d)
 	}
 	log.Printf("Getting departments Success")
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": departments})
+	return c.JSON(fiber.Map{"success": true, "data": departments})
 }
 
 // CreateDepartmentHandler returns a handler for creating a new department
-func CreateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
+func CreateDepartmentHandler(c *fiber.Ctx) error {
 	var req models.DepartmentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
+
 	res, err := db.DB.Exec(`INSERT INTO departments (name, branch_id) VALUES (?, ?)`, req.Name, req.BranchID)
 	if err != nil {
-		http.Error(w, "Failed to insert department", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert department"})
 	}
+
 	id, _ := res.LastInsertId()
 	log.Printf("Inserted new department: %s", req.Name)
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": id})
+	return c.JSON(fiber.Map{"success": true, "id": id})
 }
 
 // UpdateDepartmentHandler returns a handler for updating an existing department
-func UpdateDepartmentHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+func UpdateDepartmentHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
-		return
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
+
 	var req models.DepartmentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
+
 	_, err = db.DB.Exec(`UPDATE departments SET name=?, branch_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL`, req.Name, req.BranchID, id)
 	if err != nil {
-		http.Error(w, "Failed to update department", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update department"})
 	}
+
 	log.Printf("Updating department ID: %d with name: %s", id, req.Name)
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	return c.JSON(fiber.Map{"success": true})
 }
 
 // DeleteDepartmentHandler returns a handler for deleting a department
-func DeleteDepartmentHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+func DeleteDepartmentHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
-		return
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
+
 	_, err = db.DB.Exec(`DELETE FROM departments WHERE id=?`, id)
 	if err != nil {
-		http.Error(w, "Failed to delete department", http.StatusInternalServerError)
-		return
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete department"})
 	}
+
 	log.Printf("Deleted department ID: %d", id)
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	return c.JSON(fiber.Map{"success": true})
 }
 
 // GetDepartmentDetailHandler returns detailed information about a specific department
-func GetDepartmentDetailHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+func GetDepartmentDetailHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
-		return
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
 
-	// 1. Get department information
 	var departmentDetail models.DepartmentDetail
 	err = db.DB.QueryRow(`
 		SELECT d.id, d.name, d.branch_id, b.name, d.created_at, d.updated_at 
@@ -122,11 +117,9 @@ func GetDepartmentDetailHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("Error fetching department details: %v", err)
-		http.Error(w, "Department not found", http.StatusNotFound)
-		return
+		return c.Status(404).JSON(fiber.Map{"error": "Department not found"})
 	}
 
-	// 2. Count IP phones in this department
 	err = db.DB.QueryRow(`
 		SELECT COUNT(*) 
 		FROM ip_phones 
@@ -137,7 +130,6 @@ func GetDepartmentDetailHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error counting IP phones: %v", err)
 	}
 
-	// 3. Count tasks related to this department
 	err = db.DB.QueryRow(`
 		SELECT COUNT(*) FROM tasks t
 		JOIN ip_phones ip ON t.phone_id = ip.id
@@ -147,9 +139,7 @@ func GetDepartmentDetailHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error counting tasks: %v", err)
 	}
+
 	log.Printf("Getting department details Success for ID: %d", id)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"data":    departmentDetail,
-	})
+	return c.JSON(fiber.Map{"success": true, "data": departmentDetail})
 }
