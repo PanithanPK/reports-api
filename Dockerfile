@@ -30,13 +30,13 @@ COPY --from=builder /app/.env* .
 # ARG ENV=prod
 
 # Set environment variables
-ENV PORT=5000
+ENV PORT=5001
 ENV GOGC=50
 ENV GOMEMLIMIT=384MiB
 ENV GOMAXPROCS=2
 
 # Expose port
-EXPOSE 5000
+EXPOSE 5001
 
 # Run with memory limits
 # Use environment variable to set the environment flag
