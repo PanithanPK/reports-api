@@ -4,13 +4,11 @@ import (
 	"flag"
 	"log"
 	"os"
-	"reports-api/backup"
 	"reports-api/db"
 
 	"reports-api/routes"
 	"runtime"
 	"runtime/debug"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -154,18 +152,6 @@ func main() {
 	routes.RegisterAuthRoutes(app)
 	logger.Info.Println("✅ Authentication routes registered successfully")
 
-	// Start scheduled backup (daily at 2 AM)
-	bs := backup.NewBackupService()
-	bs.StartScheduledBackup(24 * time.Hour)
-	logger.Info.Println("💾 Scheduled backup started (daily)")
-
-	// Clean old backups on startup
-	go func() {
-		if err := bs.CleanOldBackups(30); err != nil {
-			logger.Error.Printf("Failed to clean old backups: %v", err)
-		}
-	}()
-
 	// Test route for RecoveryMiddleware
 	app.Get("/test-panic", func(c *fiber.Ctx) error {
 		logger.Info.Println("🧪 Testing RecoveryMiddleware with a deliberate panic")
@@ -176,8 +162,8 @@ func main() {
 	// Get port from environment variable
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "5000"
-		logger.Info.Println("🔧 Using default port 5000")
+		port = "5001"
+		logger.Info.Println("🔧 Using default port 5001")
 	} else {
 		logger.Info.Printf("🔧 Using port from environment: %s", port)
 	}
