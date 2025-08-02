@@ -115,7 +115,7 @@ func main() {
 
 	// Add CORS middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000,http://192.168.0.192",
+		AllowOrigins:     "http://localhost:3000,http://192.168.0.192,http://helpdesk.nopadol.com/,",
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS,PATCH",
 		AllowHeaders:     "Content-Type,Authorization,X-Requested-With",
 		AllowCredentials: true,
