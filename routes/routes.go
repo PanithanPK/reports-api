@@ -59,10 +59,10 @@ func RegisterRoutes(r *fiber.App) {
 // RegisterAuthRoutes registers all authentication-related routes
 func RegisterAuthRoutes(r *fiber.App) {
 	// Authentication routes
-	r.Post("/authEntry/login", handlers.LoginHandler)
-	r.Post("/authEntry/registerUser", handlers.RegisterHandler("user"))
-	r.Post("/authEntry/registerAdmin", handlers.RegisterHandler("admin"))
-	r.Put("/authEntry/updateUser", handlers.UpdateUserHandler)
-	r.Delete("/authEntry/deleteUser", handlers.DeleteUserHandler)
-	r.Post("/authEntry/logout", handlers.LogoutHandler)
+	r.Post("/api/authEntry/login", handlers.LoginHandler)
+	r.Post("/api/authEntry/registerUser", handlers.RegisterHandler("user"))
+	r.Post("/api/authEntry/registerAdmin", handlers.RegisterHandler("admin"))
+	r.Put("/api/authEntry/updateUser", handlers.UpdateUserHandler)
+	r.Delete("/api/authEntry/deleteUser", handlers.DeleteUserHandler)
+	r.Post("/api/authEntry/logout", handlers.LogoutHandler)
 }
