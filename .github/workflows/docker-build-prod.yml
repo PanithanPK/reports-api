@@ -1,0 +1,28 @@
+name: Build and Push Dockerfile
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: lovee12345e
+          password: ${{ secrets.DOCKERHUB_TOKEN_PROD }}
+
+      - name: Build Docker image from Dockerfile
+        run: |
+          docker build -f Dockerfile -t lovee12345e/reports-api:prod .
+
+      - name: Push Docker image
+        run: |
+          docker push lovee12345e/reports-api:prod
