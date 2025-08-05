@@ -2,13 +2,17 @@ package models
 
 // TaskRequest model for receiving task data
 type TaskRequest struct {
-	PhoneID   int    `json:"phone_id"`
-	SystemID  int    `json:"system_id"`
-	Text      string `json:"text"`
-	Status    int    `json:"status"`
-	CreatedBy int    `json:"created_by"`
-	UpdatedBy int    `json:"updated_by"`
-	Telegram  bool   `json:"telegram"`
+	PhoneID        *int   `json:"phone_id"`
+	SystemID       int    `json:"system_id"`
+	DepartmentID   int    `json:"department_id"`
+	Text           string `json:"text"`
+	Status         int    `json:"status"`
+	CreatedBy      int    `json:"created_by"`
+	UpdatedBy      int    `json:"updated_by"`
+	Telegram       bool   `json:"telegram"`
+	PhoneNumber    int    `json:"-"`
+	DepartmentName string `json:"-"`
+	BranchName     string `json:"-"`
 }
 
 type TaskStatusUpdateRequest struct {
