@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.2.0](https://github.com/PanithanPK/reports-api/compare/v1.1.0...v1.2.0) (2025-08-05)
+
+
+### Features
+
+* Add telegram function ([b9c8a91](https://github.com/PanithanPK/reports-api/commit/b9c8a91a26fb738667c3a6cd0da0343f3fea8a26))
+* Update dockerignore ([6b72f41](https://github.com/PanithanPK/reports-api/commit/6b72f413edeb5c0d9837ef5f880c68a4072ec9c2))
+
 ## 1.1.0 (2025-08-05)
 
 
