@@ -10,6 +10,7 @@ import (
 	"os"
 	"reports-api/models"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -75,38 +76,33 @@ func SendTelegramNotificationHandler(c *fiber.Ctx) error {
 
 func SendTelegram(req models.TaskRequest) error {
 	botToken := "7852676725:AAHnEZclQ57Wo-klSyhZSmbghCU5w0TXgCk"
-	chatID := "-1002816577414"
-	msg := req.Text
+	chatID := int64(-1002816577414)
 
-	// แสดงสภาพแวดล้อมที่กำลังใช้งาน
-	env := os.Getenv("APP_ENV")
-	if env == "" {
-		env = "default"
-	}
-
-	fmt.Printf("[Telegram][%s], chatID: %s\n", env, chatID)
-
-	telegramAPI := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
-
-	payload := map[string]interface{}{
-		"chat_id":                  chatID,
-		"text":                     msg,
-		"parse_mode":               "Markdown",
-		"disable_web_page_preview": false,
-	}
-	payloadBytes, _ := json.Marshal(payload)
-	resp, err := http.Post(telegramAPI, "application/json", bytes.NewBuffer(payloadBytes))
+	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
+	// สร้างข้อความ
+	msg := ""
+	if req.BranchName != "" {
+		msg += "สาขา: " + req.BranchName + "\n"
+	}
+	if req.DepartmentName != "" {
+		msg += "แผนก: " + req.DepartmentName + "\n"
+	}
+	if req.PhoneNumber > 0 {
+		msg += fmt.Sprintf("เบอร์โทร: %d\n", req.PhoneNumber)
+	}
+	msg += "รายงานปัญหา: " + req.Text
+
+	message := tgbotapi.NewMessage(chatID, msg)
+	message.ParseMode = "Markdown"
+
+	_, err = bot.Send(message)
+	if err != nil {
 		return err
 	}
-
-	log.Println(body)
 
 	log.Printf("Telegram message sent successfully")
 	return nil

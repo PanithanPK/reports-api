@@ -57,22 +57,55 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	res, err := db.DB.Exec(`INSERT INTO tasks (phone_id, system_id, text, status, created_by) VALUES (?, ?, ?, 0, ?)`, req.PhoneID, req.SystemID, req.Text, req.CreatedBy)
+	// Validate department_id or phone_id
+	if req.DepartmentID == 0 {
+		if req.PhoneID == nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Either department_id or phone_id is required"})
+		}
+		// Get department_id from phone_id
+		err := db.DB.QueryRow("SELECT department_id FROM ip_phones WHERE id = ?", *req.PhoneID).Scan(&req.DepartmentID)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid phone_id"})
+		}
+	}
+
+	res, err := db.DB.Exec(`INSERT INTO tasks (phone_id, system_id, department_id, text, status, created_by) VALUES (?, ?, ?, ?, 0, ?)`, req.PhoneID, req.SystemID, req.DepartmentID, req.Text, req.CreatedBy)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert task"})
 	}
 	id, _ := res.LastInsertId()
 
-	// Get department ID from phone
-	var departmentID int
-
-	err = db.DB.QueryRow("SELECT department_id FROM ip_phones WHERE id = ?", req.PhoneID).Scan(&departmentID)
-	if err == nil && departmentID > 0 {
-		// Update department score
-		updateDepartmentScore(departmentID)
-	}
+	// Update department score
+	updateDepartmentScore(req.DepartmentID)
+	
 	log.Printf("Inserted new task with ID: %d", id)
 	if req.Telegram == true {
+		// Get additional data for Telegram
+		var phoneNumber int
+		var departmentName, branchName string
+		
+		if req.PhoneID != nil {
+			// Get data from phone if phone_id exists
+			db.DB.QueryRow(`
+				SELECT p.number, d.name, b.name 
+				FROM ip_phones p 
+				JOIN departments d ON p.department_id = d.id 
+				JOIN branches b ON d.branch_id = b.id 
+				WHERE p.id = ?
+			`, *req.PhoneID).Scan(&phoneNumber, &departmentName, &branchName)
+		} else {
+			// Get data from department_id if no phone_id
+			db.DB.QueryRow(`
+				SELECT d.name, b.name 
+				FROM departments d 
+				JOIN branches b ON d.branch_id = b.id 
+				WHERE d.id = ?
+			`, req.DepartmentID).Scan(&departmentName, &branchName)
+		}
+		
+		req.PhoneNumber = phoneNumber
+		req.DepartmentName = departmentName
+		req.BranchName = branchName
 		_ = SendTelegram(req)
 	}
 	return c.JSON(fiber.Map{"success": true, "id": id})
@@ -91,12 +124,12 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.Text, req.Status, req.UpdatedBy, id)
+	_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Text, req.Status, req.UpdatedBy, id)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
 	}
 
-	log.Printf("Updating task ID: %d with phone ID: %d", id, req.PhoneID)
+	log.Printf("Updating task ID: %d", id)
 	return c.JSON(fiber.Map{"success": true})
 }
 
@@ -191,8 +224,7 @@ func updateDepartmentScore(departmentID int) {
 	var problemCount int
 	err = db.DB.QueryRow(`
 		SELECT COUNT(*) FROM tasks t
-		JOIN ip_phones p ON t.phone_id = p.id
-		WHERE p.department_id = ? AND YEAR(t.created_at) = ? AND MONTH(t.created_at) = ?
+		WHERE t.department_id = ? AND YEAR(t.created_at) = ? AND MONTH(t.created_at) = ?
 	`, departmentID, year, month).Scan(&problemCount)
 	if err != nil {
 		log.Printf("Error counting problems: %v", err)
