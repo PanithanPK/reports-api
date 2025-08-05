@@ -72,3 +72,42 @@ func SendTelegramNotificationHandler(c *fiber.Ctx) error {
 	log.Printf("Telegram message sent successfully")
 	return c.JSON(models.TelegramResponse{Success: true, Message: "Notification sent successfully"})
 }
+
+func SendTelegram(req models.TaskRequest) error {
+	botToken := "7852676725:AAHnEZclQ57Wo-klSyhZSmbghCU5w0TXgCk"
+	chatID := "-1002816577414"
+	msg := req.Text
+
+	// แสดงสภาพแวดล้อมที่กำลังใช้งาน
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "default"
+	}
+
+	fmt.Printf("[Telegram][%s], chatID: %s\n", env, chatID)
+
+	telegramAPI := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
+
+	payload := map[string]interface{}{
+		"chat_id":                  chatID,
+		"text":                     msg,
+		"parse_mode":               "Markdown",
+		"disable_web_page_preview": false,
+	}
+	payloadBytes, _ := json.Marshal(payload)
+	resp, err := http.Post(telegramAPI, "application/json", bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return err
+	}
+
+	log.Println(body)
+
+	log.Printf("Telegram message sent successfully")
+	return nil
+}

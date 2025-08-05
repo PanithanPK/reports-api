@@ -33,6 +33,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	for rows.Next() {
 		var t models.TaskWithDetails
 		err := rows.Scan(&t.ID, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue
@@ -45,6 +46,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to read tasks"})
 	}
 	log.Printf("Getting tasks Success")
+
 	return c.JSON(fiber.Map{"success": true, "data": tasks})
 }
 
@@ -63,12 +65,16 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 
 	// Get department ID from phone
 	var departmentID int
+
 	err = db.DB.QueryRow("SELECT department_id FROM ip_phones WHERE id = ?", req.PhoneID).Scan(&departmentID)
 	if err == nil && departmentID > 0 {
 		// Update department score
 		updateDepartmentScore(departmentID)
 	}
 	log.Printf("Inserted new task with ID: %d", id)
+	if req.Telegram == true {
+		_ = SendTelegram(req)
+	}
 	return c.JSON(fiber.Map{"success": true, "id": id})
 }
 
