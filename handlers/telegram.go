@@ -38,8 +38,8 @@ func SendTelegramNotificationHandler(c *fiber.Ctx) error {
 		msg += "[ดูรายละเอียดเพิ่มเติม](" + req.URL + ")\n"
 	}
 
-	botToken := os.Getenv("botToken")
-	chatID := os.Getenv("chatID")
+	botToken := "7852676725:AAHnEZclQ57Wo-klSyhZSmbghCU5w0TXgCk"
+	chatID := "-1002816577414"
 
 	// แสดงสภาพแวดล้อมที่กำลังใช้งาน
 	env := os.Getenv("APP_ENV")
