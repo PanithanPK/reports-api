@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.2](https://github.com/PanithanPK/reports-api/compare/v1.2.1...v1.2.2) (2025-08-05)
+
+
+### Bug Fixes
+
+* Update task and telegram ([4c4ee6e](https://github.com/PanithanPK/reports-api/commit/4c4ee6e411d764fa252837db0e22025e092eb574))
+
 ### [1.2.1](https://github.com/PanithanPK/reports-api/compare/v1.2.0...v1.2.1) (2025-08-05)
 
 
