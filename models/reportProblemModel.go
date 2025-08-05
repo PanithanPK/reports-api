@@ -8,6 +8,7 @@ type TaskRequest struct {
 	Status    int    `json:"status"`
 	CreatedBy int    `json:"created_by"`
 	UpdatedBy int    `json:"updated_by"`
+	Telegram  bool   `json:"telegram"`
 }
 
 type TaskStatusUpdateRequest struct {
