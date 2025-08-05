@@ -94,8 +94,13 @@ func SendTelegram(req models.TaskRequest) error {
 	if req.PhoneNumber > 0 {
 		msg += fmt.Sprintf("เบอร์โทร: %d\n", req.PhoneNumber)
 	}
+	if req.ProgramName != "" {
+		msg += "โปรแกรม: " + req.ProgramName + "\n"
+	}
 	msg += "รายงานปัญหา: " + req.Text
-
+	if req.Url != "" {
+		msg += "\n[ดูรายละเอียดเพิ่มเติม](" + req.Url + ")"
+	}
 	message := tgbotapi.NewMessage(chatID, msg)
 	message.ParseMode = "Markdown"
 
