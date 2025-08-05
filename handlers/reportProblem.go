@@ -14,11 +14,11 @@ import (
 func GetTasksHandler(c *fiber.Ctx) error {
 	query := `
 		SELECT t.id, t.phone_id, COALESCE(p.number, 0), COALESCE(p.name, ''), t.system_id, COALESCE(s.name, ''),
-		COALESCE(p.department_id, 0), COALESCE(d.name, ''), COALESCE(d.branch_id, 0), COALESCE(b.name, ''),
+		t.department_id, COALESCE(d.name, ''), COALESCE(d.branch_id, 0), COALESCE(b.name, ''),
 		t.text, t.status, t.created_at, t.updated_at
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
-		LEFT JOIN departments d ON p.department_id = d.id
+		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
 	`
@@ -77,13 +77,14 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 
 	// Update department score
 	updateDepartmentScore(req.DepartmentID)
-	
+
 	log.Printf("Inserted new task with ID: %d", id)
 	if req.Telegram == true {
 		// Get additional data for Telegram
 		var phoneNumber int
 		var departmentName, branchName string
-		
+		var programName string
+
 		if req.PhoneID != nil {
 			// Get data from phone if phone_id exists
 			db.DB.QueryRow(`
@@ -102,10 +103,20 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 				WHERE d.id = ?
 			`, req.DepartmentID).Scan(&departmentName, &branchName)
 		}
-		
+
+		if req.SystemID != 0 {
+			db.DB.QueryRow(`
+				SELECT name
+				FROM systems_program
+				WHERE id = ?
+			`, req.SystemID).Scan(&programName)
+		}
+
 		req.PhoneNumber = phoneNumber
 		req.DepartmentName = departmentName
 		req.BranchName = branchName
+		req.ProgramName = programName
+		req.Url = "http://helpdesk.nopadol.com/"
 		_ = SendTelegram(req)
 	}
 	return c.JSON(fiber.Map{"success": true, "id": id})
@@ -175,11 +186,11 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 	var task models.TaskWithDetails
 	err = db.DB.QueryRow(`
 		SELECT t.id, t.phone_id, COALESCE(p.number, 0), COALESCE(p.name, ''), t.system_id, COALESCE(s.name, ''),
-		COALESCE(p.department_id, 0), COALESCE(d.name, ''), COALESCE(d.branch_id, 0), COALESCE(b.name, ''),
+		COALESCE(t.department_id, 0), COALESCE(d.name, ''), COALESCE(d.branch_id, 0), COALESCE(b.name, ''),
 		t.text, t.status, t.created_at, t.updated_at
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
-		LEFT JOIN departments d ON p.department_id = d.id
+		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
 		WHERE t.id = ?
