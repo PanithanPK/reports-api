@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.4.0](https://github.com/PanithanPK/reports-api/compare/v1.3.0...v1.4.0) (2025-08-06)
+
+
+### Features
+
+* Add unit test ([738e1ed](https://github.com/PanithanPK/reports-api/commit/738e1edbeacaf7d14a2307e01178864ddbfeeb83))
+* Add unit test ([9ecbad1](https://github.com/PanithanPK/reports-api/commit/9ecbad169254ac08942839f66c5988768834360a))
+* Update unit test ([4f7cd15](https://github.com/PanithanPK/reports-api/commit/4f7cd15f616c51ee3d3773aed1a314ed9013c9fd))
+
+
+### Bug Fixes
+
+* fix telegram ([0329ebf](https://github.com/PanithanPK/reports-api/commit/0329ebfc90a009b7fd07b9973a655ec70eccaa6d))
+
 ## [1.3.0](https://github.com/PanithanPK/reports-api/compare/v1.2.2...v1.3.0) (2025-08-06)
 
 
