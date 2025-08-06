@@ -2,5 +2,6 @@
 .env
 .env.dev
 .env.prod
+.github/workflows/
 /node_modules
 *.sh
