@@ -4,25 +4,39 @@ import (
 	"log"
 	"reports-api/db"
 	"reports-api/models"
+	"reports-api/utils"
 	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
 
-// GetTasksHandler returns a handler for listing all tasks with details
+// GetTasksHandler returns a handler for listing all tasks with details and pagination
 func GetTasksHandler(c *fiber.Ctx) error {
+	pagination := utils.GetPaginationParams(c)
+	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
+
+	// Get total count
+	var total int
+	err := db.DB.QueryRow(`SELECT COUNT(*) FROM tasks`).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count tasks"})
+	}
+
+	// Get paginated data
 	query := `
-		SELECT t.id, t.phone_id, COALESCE(p.number, 0), COALESCE(p.name, ''), t.system_id, COALESCE(s.name, ''),
-		t.department_id, COALESCE(d.name, ''), COALESCE(d.branch_id, 0), COALESCE(b.name, ''),
+		SELECT t.id, IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number , IFNULL(p.name, '') as phone_name, t.system_id, IFNULL(s.name, '') as system_name,
+		t.department_id, IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
 		t.text, t.status, t.created_at, t.updated_at
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
+		ORDER BY t.id DESC
+		LIMIT ? OFFSET ?
 	`
-	rows, err := db.DB.Query(query)
+	rows, err := db.DB.Query(query, pagination.Limit, offset)
 	if err != nil {
 		log.Printf("Error querying tasks with join: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to query tasks"})
@@ -45,9 +59,18 @@ func GetTasksHandler(c *fiber.Ctx) error {
 		log.Printf("Row error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to read tasks"})
 	}
-	log.Printf("Getting tasks Success")
 
-	return c.JSON(fiber.Map{"success": true, "data": tasks})
+	log.Printf("Getting tasks Success")
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    tasks,
+		Pagination: models.PaginationResponse{
+			Page:       pagination.Page,
+			Limit:      pagination.Limit,
+			Total:      total,
+			TotalPages: utils.CalculateTotalPages(total, pagination.Limit),
+		},
+	})
 }
 
 // CreateTaskHandler เพิ่ม task ใหม่
@@ -135,6 +158,14 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
+	// Get department_id from phone_id if phone_id exists
+	if req.PhoneID != nil {
+		err := db.DB.QueryRow("SELECT department_id FROM ip_phones WHERE id = ?", *req.PhoneID).Scan(&req.DepartmentID)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid phone_id"})
+		}
+	}
+
 	_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Text, req.Status, req.UpdatedBy, id)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
@@ -186,7 +217,7 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 	var task models.TaskWithDetails
 	err = db.DB.QueryRow(`
 		SELECT t.id, t.phone_id, COALESCE(p.number, 0), COALESCE(p.name, ''), t.system_id, COALESCE(s.name, ''),
-		COALESCE(t.department_id, 0), COALESCE(d.name, ''), COALESCE(d.branch_id, 0), COALESCE(b.name, ''),
+		t.department_id, COALESCE(d.name, ''), COALESCE(d.branch_id, 0), COALESCE(b.name, ''),
 		t.text, t.status, t.created_at, t.updated_at
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
