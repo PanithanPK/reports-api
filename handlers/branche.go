@@ -4,14 +4,32 @@ import (
 	"log"
 	"reports-api/db"
 	"reports-api/models"
+	"reports-api/utils"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 )
 
-// ListBranchesHandler returns a handler for listing all branches
+// ListBranchesHandler returns a handler for listing all branches with pagination
 func ListBranchesHandler(c *fiber.Ctx) error {
-	rows, err := db.DB.Query(`SELECT id, name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by FROM branches WHERE deleted_at IS NULL`)
+	pagination := utils.GetPaginationParams(c)
+	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
+
+	// Get total count
+	var total int
+	err := db.DB.QueryRow(`SELECT COUNT(*) FROM branches WHERE deleted_at IS NULL`).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count branches"})
+	}
+
+	// Get paginated data
+	rows, err := db.DB.Query(`
+		SELECT id, name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by 
+		FROM branches 
+		WHERE deleted_at IS NULL 
+		ORDER BY id DESC 
+		LIMIT ? OFFSET ?
+	`, pagination.Limit, offset)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to query branches"})
 	}
@@ -27,8 +45,18 @@ func ListBranchesHandler(c *fiber.Ctx) error {
 		}
 		branches = append(branches, b)
 	}
+
 	log.Printf("Getting branches Success")
-	return c.JSON(fiber.Map{"success": true, "data": branches})
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    branches,
+		Pagination: models.PaginationResponse{
+			Page:       pagination.Page,
+			Limit:      pagination.Limit,
+			Total:      total,
+			TotalPages: utils.CalculateTotalPages(total, pagination.Limit),
+		},
+	})
 }
 
 // CreateBranchHandler returns a handler for creating a new branch

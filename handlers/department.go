@@ -4,19 +4,36 @@ import (
 	"log"
 	"reports-api/db"
 	"reports-api/models"
+	"reports-api/utils"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 )
 
-// ListDepartmentsHandler returns a handler for listing all departments
+// ListDepartmentsHandler returns a handler for listing all departments with pagination
 func ListDepartmentsHandler(c *fiber.Ctx) error {
+	pagination := utils.GetPaginationParams(c)
+	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
+
+	// Get total count
+	var total int
+	err := db.DB.QueryRow(`
+		SELECT COUNT(*) FROM departments d
+		WHERE d.deleted_at IS NULL
+	`).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count departments"})
+	}
+
+	// Get paginated data
 	rows, err := db.DB.Query(`
-   SELECT d.id, d.name, d.branch_id, b.name as branch_name, d.created_at, d.updated_at, d.deleted_at
-   FROM departments d
-   LEFT JOIN branches b ON d.branch_id = b.id
-   WHERE d.deleted_at IS NULL
- `)
+		SELECT d.id, d.name, d.branch_id, b.name as branch_name, d.created_at, d.updated_at, d.deleted_at
+		FROM departments d
+		LEFT JOIN branches b ON d.branch_id = b.id
+		WHERE d.deleted_at IS NULL
+		ORDER BY d.id DESC
+		LIMIT ? OFFSET ?
+	`, pagination.Limit, offset)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to query departments"})
 	}
@@ -32,8 +49,18 @@ func ListDepartmentsHandler(c *fiber.Ctx) error {
 		}
 		departments = append(departments, d)
 	}
+
 	log.Printf("Getting departments Success")
-	return c.JSON(fiber.Map{"success": true, "data": departments})
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    departments,
+		Pagination: models.PaginationResponse{
+			Page:       pagination.Page,
+			Limit:      pagination.Limit,
+			Total:      total,
+			TotalPages: utils.CalculateTotalPages(total, pagination.Limit),
+		},
+	})
 }
 
 // CreateDepartmentHandler returns a handler for creating a new department

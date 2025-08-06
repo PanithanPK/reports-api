@@ -25,7 +25,7 @@ type TaskStatusUpdateRequest struct {
 
 // TaskWithDetailsDb model for task with details in the database
 type TaskWithDetails struct {
-	ID             int     `json:"id"`
+	ID             int     `json:"id" db:"id"`
 	PhoneID        *int    `json:"phone_id"`
 	Number         *int    `json:"number"`
 	PhoneName      *string `json:"phone_name"`

@@ -15,8 +15,8 @@ type DashboardResponse struct {
 // TaskWithDetailsDb model for task with details
 type TaskWithDetailsDb struct {
 	ID             int     `json:"id"`
-	PhoneID        int     `json:"phone_id"`
-	Number         int     `json:"number"`
+	PhoneID        *int    `json:"phone_id"`
+	Number         *int    `json:"number"`
 	PhoneName      *string `json:"phone_name"`
 	SystemID       *int    `json:"system_id"`
 	SystemName     *string `json:"system_name"`
@@ -47,7 +47,7 @@ type ProgramStat struct {
 // IPPhoneStat model for IP phone statistics
 type IPPhoneStat struct {
 	IPPhoneId     *int          `json:"ipphoneId"`
-	IPPhoneName   string        `json:"ipphoneName"`
+	IPPhoneName   *string       `json:"ipphoneName"`
 	TotalProblems int           `json:"total_problems"`
 	Programs      []ProgramStat `json:"programs"`
 }
