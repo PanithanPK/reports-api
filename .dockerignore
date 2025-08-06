@@ -5,3 +5,5 @@ README.md
 .next
 .git
 *.sh
+tests
+/tests

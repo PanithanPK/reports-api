@@ -6,7 +6,9 @@ type TelegramRequest struct {
 	BranchName     string `json:"branchName"`
 	DepartmentName string `json:"departmentName"`
 	Program        string `json:"program"`
+	CreatedA       string `json:"createdA"`
 	URL            string `json:"url"`
+
 	// URLTs          string `json:"urlts"`
 }
 

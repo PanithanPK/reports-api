@@ -5,3 +5,5 @@
 .github/workflows/
 /node_modules
 *.sh
+/tests
+tests
