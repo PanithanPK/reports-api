@@ -84,22 +84,29 @@ func SendTelegram(req models.TaskRequest) error {
 	}
 
 	// สร้างข้อความ
-	msg := ""
+	msg := "🚨 *แจ้งเตือนปัญหาระบบ* 🚨\n"
+
 	if req.BranchName != "" {
-		msg += "สาขา: " + req.BranchName + "\n"
+		msg += "\n🏢 *สาขา* `" + "`\n`" + req.BranchName + "`\n"
 	}
 	if req.DepartmentName != "" {
-		msg += "แผนก: " + req.DepartmentName + "\n"
+		msg += "\n🏢 *แผนก* `" + "`\n`" + req.DepartmentName + "`\n"
 	}
 	if req.PhoneNumber > 0 {
-		msg += fmt.Sprintf("เบอร์โทร: %d\n", req.PhoneNumber)
+		msg += fmt.Sprintf("📞 *เบอร์โทร:* `%d`\n", req.PhoneNumber)
 	}
 	if req.ProgramName != "" {
-		msg += "โปรแกรม: " + req.ProgramName + "\n"
+		msg += "\n💻 *โปรแกรม* `" + "`\n`" + req.ProgramName + "`\n"
 	}
-	msg += "รายงานปัญหา: " + req.Text
+	if req.CreatedAt != "" {
+		msg += "\n📅 *วันที่* `" + "`\n`" + req.CreatedAt + "`\n"
+	}
+
+	msg += "\n⚠️ *รายงานปัญหา:*\n"
+	msg += "```\n" + req.Text + "\n```\n"
+
 	if req.Url != "" {
-		msg += "\n[ดูรายละเอียดเพิ่มเติม](" + req.Url + ")"
+		msg += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")\n"
 	}
 	message := tgbotapi.NewMessage(chatID, msg)
 	message.ParseMode = "Markdown"

@@ -12,8 +12,7 @@ import (
 )
 
 func setupTestApp() *fiber.App {
-	app := fiber.New()
-	return app
+	return SetupApp()
 }
 
 func TestDepartmentHandlers(t *testing.T) {

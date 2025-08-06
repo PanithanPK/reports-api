@@ -2,12 +2,20 @@ package handlers
 
 import (
 	"log"
+	"math/rand"
 	"reports-api/db"
 	"reports-api/models"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
+
+var sessions = map[string]string{}
+
+func generateSessionID() string {
+	return strconv.FormatInt(rand.Int63(), 16)
+}
 
 // LoginHandler handles user login
 func LoginHandler(c *fiber.Ctx) error {
@@ -27,13 +35,15 @@ func LoginHandler(c *fiber.Ctx) error {
 	if credentials.Password != password {
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid username or password"})
 	}
+	sessionID := generateSessionID()
+	sessions[sessionID] = username
 
 	c.Set("role", role)
 	c.Set("token", "dummy-token")
 
 	c.Cookie(&fiber.Cookie{
 		Name:     "session",
-		Value:    username,
+		Value:    sessionID,
 		Path:     "/",
 		HTTPOnly: true,
 		MaxAge:   3600 * 24,

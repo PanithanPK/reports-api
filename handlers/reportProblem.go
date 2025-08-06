@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"reports-api/db"
 	"reports-api/models"
@@ -52,6 +53,27 @@ func GetTasksHandler(c *fiber.Ctx) error {
 			log.Printf("Error scanning task: %v", err)
 			continue
 		}
+
+		// Calculate overdue
+		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
+		if err == nil {
+			createdAt = createdAt.Add(7 * time.Hour)
+			now := time.Now().Add(7 * time.Hour)
+			duration := now.Sub(createdAt)
+			if createdAt.Format("2006-01-02") == now.Format("2006-01-02") {
+				hours := int(duration.Hours())
+				minutes := int(duration.Minutes()) % 60
+				seconds := int(duration.Seconds()) % 60
+				t.Overdue = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+			} else {
+				days := int(duration.Hours() / 24)
+				if days == 0 {
+					days = 1
+				}
+				t.Overdue = days
+			}
+		}
+
 		tasks = append(tasks, t)
 	}
 
@@ -140,6 +162,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		req.BranchName = branchName
 		req.ProgramName = programName
 		req.Url = "http://helpdesk.nopadol.com/"
+		req.CreatedAt = time.Now().Add(7 * time.Hour).Format("2006-01-02 15:04:05")
 		_ = SendTelegram(req)
 	}
 	return c.JSON(fiber.Map{"success": true, "id": id})
