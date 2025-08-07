@@ -14,7 +14,16 @@ import (
 var sessions = map[string]string{}
 
 func generateSessionID() string {
-	return strconv.FormatInt(rand.Int63(), 16)
+	return strconv.FormatInt(rand.Int63(), 20)
+}
+
+func generateDummyToken() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	token := make([]byte, 32)
+	for i := range token {
+		token[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(token)
 }
 
 // LoginHandler handles user login
@@ -39,7 +48,7 @@ func LoginHandler(c *fiber.Ctx) error {
 	sessions[sessionID] = username
 
 	c.Set("role", role)
-	c.Set("token", "dummy-token")
+	c.Set("token", generateDummyToken())
 
 	c.Cookie(&fiber.Cookie{
 		Name:     "session",
@@ -135,6 +144,10 @@ func DeleteUserHandler(c *fiber.Ctx) error {
 
 // LogoutHandler logs out a user
 func LogoutHandler(c *fiber.Ctx) error {
+	sessionID := c.Cookies("session")
+	if sessionID != "" {
+		delete(sessions, sessionID)
+	}
 	c.Cookie(&fiber.Cookie{
 		Name:     "session",
 		Value:    "",
