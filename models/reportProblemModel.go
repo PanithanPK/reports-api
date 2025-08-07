@@ -3,6 +3,7 @@ package models
 // TaskRequest model for receiving task data
 type TaskRequest struct {
 	PhoneID        *int   `json:"phone_id" db:"phone_id"`
+	Ticket         string `json:"ticket_no" db:"ticket_no"`
 	SystemID       int    `json:"system_id"`
 	DepartmentID   int    `json:"department_id"`
 	Text           string `json:"text"`
@@ -27,6 +28,7 @@ type TaskStatusUpdateRequest struct {
 // TaskWithDetailsDb model for task with details in the database
 type TaskWithDetails struct {
 	ID             int         `json:"id" db:"id"`
+	Ticket         string      `json:"ticket_no" db:"ticket_no"`
 	PhoneID        *int        `json:"phone_id"`
 	Number         *int        `json:"number"`
 	PhoneName      *string     `json:"phone_name"`
