@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.5.0](https://github.com/PanithanPK/reports-api/compare/v1.4.0...v1.5.0) (2025-08-07)
+
+
+### Features
+
+* Add ticket_no ([e7db28b](https://github.com/PanithanPK/reports-api/commit/e7db28bc3366dc533634501d3bf3b815ea3852e8))
+
 ## [1.4.0](https://github.com/PanithanPK/reports-api/compare/v1.3.0...v1.4.0) (2025-08-06)
 
 
