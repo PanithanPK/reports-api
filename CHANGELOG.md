@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.6.0](https://github.com/PanithanPK/reports-api/compare/v1.5.0...v1.6.0) (2025-08-08)
+
+
+### Features
+
+* Add assignto ([54eb25a](https://github.com/PanithanPK/reports-api/commit/54eb25a8392cf65ea4b225c1b4ae80651f8a1e7b))
+
 ## [1.5.0](https://github.com/PanithanPK/reports-api/compare/v1.4.0...v1.5.0) (2025-08-07)
 
 
