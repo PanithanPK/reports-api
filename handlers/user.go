@@ -159,3 +159,26 @@ func LogoutHandler(c *fiber.Ctx) error {
 	log.Printf("User logged out successfully")
 	return c.JSON(fiber.Map{"message": "Logged out"})
 }
+
+func GetUsersHandler(c *fiber.Ctx) error {
+	var users []models.User
+	rows, err := db.DB.Query("SELECT id, name FROM responsibilities")
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user models.User
+		err := rows.Scan(&user.ID, &user.Username)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+		}
+		users = append(users, user)
+	}
+
+	return c.JSON(models.UserResponse{
+		Success: true,
+		Data:    users,
+	})
+}

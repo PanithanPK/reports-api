@@ -54,6 +54,7 @@ func RegisterRoutes(r *fiber.App) {
 	r.Put("/api/v1/scores/update/:id", handlers.UpdateScoreHandler)
 	r.Delete("/api/v1/scores/delete/:id", handlers.DeleteScoreHandler)
 
+	r.Get("/api/v1/users", handlers.GetUsersHandler)
 }
 
 // RegisterAuthRoutes registers all authentication-related routes

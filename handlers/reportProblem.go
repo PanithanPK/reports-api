@@ -188,7 +188,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
 
-	var req models.TaskRequest
+	var req models.TaskRequestUpdate
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
@@ -212,7 +212,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Text, req.Status, req.UpdatedBy, id)
+	_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
 	}
