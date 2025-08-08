@@ -19,6 +19,16 @@ type TaskRequest struct {
 	CreatedAt      string `json:"-"`
 }
 
+type TaskRequestUpdate struct {
+	PhoneID      *int    `json:"phone_id" db:"phone_id"`
+	SystemID     int     `json:"system_id"`
+	Assignto     *string `json:"assign_to"`
+	DepartmentID int     `json:"department_id"`
+	Status       int     `json:"status"`
+	Text         string  `json:"text"`
+	UpdatedBy    int     `json:"updated_by"`
+}
+
 type TaskStatusUpdateRequest struct {
 	ID        int `json:"id" db:"id"`
 	Status    int `json:"status"`
