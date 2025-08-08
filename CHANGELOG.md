@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.7.0](https://github.com/PanithanPK/reports-api/compare/v1.6.0...v1.7.0) (2025-08-08)
+
+
+### Features
+
+* Add feature Update telegram and Assign_to ([ae952d7](https://github.com/PanithanPK/reports-api/commit/ae952d73f66ef67f58fc3e3a349bd366beae6759))
+
 ## [1.6.0](https://github.com/PanithanPK/reports-api/compare/v1.5.0...v1.6.0) (2025-08-08)
 
 
