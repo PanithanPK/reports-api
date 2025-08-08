@@ -175,7 +175,16 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		req.ProgramName = programName
 		req.Url = "http://helpdesk.nopadol.com/"
 		req.CreatedAt = time.Now().Add(7 * time.Hour).Format("2006-01-02 15:04:05")
-		_ = SendTelegram(req)
+		req.Status = 0
+
+		messageID, err := SendTelegram(req)
+		if err == nil {
+			// Update task with message_id
+			_, err = db.DB.Exec(`UPDATE tasks SET message_id = ? WHERE id = ?`, messageID, id)
+			if err != nil {
+				log.Printf("Failed to update message_id: %v", err)
+			}
+		}
 	}
 	return c.JSON(fiber.Map{"success": true, "id": id})
 }
@@ -217,6 +226,44 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
 	}
 
+	// Get message_id and update Telegram if exists
+	var messageID int
+	err = db.DB.QueryRow(`SELECT COALESCE(message_id, 0) FROM tasks WHERE id = ?`, id).Scan(&messageID)
+	if err == nil && messageID > 0 {
+		// Create TaskRequest from TaskRequestUpdate for Telegram
+		telegramReq := models.TaskRequest{
+			PhoneID:      req.PhoneID,
+			SystemID:     req.SystemID,
+			DepartmentID: req.DepartmentID,
+			Text:         req.Text,
+			Status:       req.Status,
+
+			MessageID: messageID,
+		}
+
+		// Get additional data for Telegram
+		var phoneNumber int
+		var departmentName, branchName, programName string
+
+		if req.PhoneID != nil {
+			db.DB.QueryRow(`SELECT p.number, d.name, b.name FROM ip_phones p JOIN departments d ON p.department_id = d.id JOIN branches b ON d.branch_id = b.id WHERE p.id = ?`, *req.PhoneID).Scan(&phoneNumber, &departmentName, &branchName)
+		} else {
+			db.DB.QueryRow(`SELECT d.name, b.name FROM departments d JOIN branches b ON d.branch_id = b.id WHERE d.id = ?`, req.DepartmentID).Scan(&departmentName, &branchName)
+		}
+
+		if req.SystemID != 0 {
+			db.DB.QueryRow(`SELECT name FROM systems_program WHERE id = ?`, req.SystemID).Scan(&programName)
+		}
+
+		telegramReq.PhoneNumber = phoneNumber
+		telegramReq.DepartmentName = departmentName
+		telegramReq.BranchName = branchName
+		telegramReq.ProgramName = programName
+		telegramReq.Url = "http://helpdesk.nopadol.com/"
+		telegramReq.CreatedAt = time.Now().Add(7 * time.Hour).Format("2006-01-02 15:04:05")
+
+		_, _ = UpdateTelegram(telegramReq)
+	}
 	log.Printf("Updating task ID: %d", id)
 	return c.JSON(fiber.Map{"success": true})
 }

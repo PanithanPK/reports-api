@@ -39,8 +39,8 @@ func SendTelegramNotificationHandler(c *fiber.Ctx) error {
 		msg += "[ดูรายละเอียดเพิ่มเติม](" + req.URL + ")\n"
 	}
 
-	botToken := "7852676725:AAHnEZclQ57Wo-klSyhZSmbghCU5w0TXgCk"
-	chatID := "-1002816577414"
+	botToken := os.Getenv("BOT_TOKEN")
+	chatID := os.Getenv("CHAT_ID")
 
 	// แสดงสภาพแวดล้อมที่กำลังใช้งาน
 	env := os.Getenv("APP_ENV")
@@ -74,48 +74,129 @@ func SendTelegramNotificationHandler(c *fiber.Ctx) error {
 	return c.JSON(models.TelegramResponse{Success: true, Message: "Notification sent successfully"})
 }
 
-func SendTelegram(req models.TaskRequest) error {
+func SendTelegram(req models.TaskRequest) (int, error) {
+	// botToken := os.Getenv("BOT_TOKEN")
+	// chatIDStr := os.Getenv("CHAT_ID")
+
+	// chatID, _ := strconv.ParseInt(chatIDStr, 10, 64)
+
 	botToken := "7852676725:AAHnEZclQ57Wo-klSyhZSmbghCU5w0TXgCk"
 	chatID := int64(-1002816577414)
 
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	// สร้างข้อความ
-	msg := "🚨 *แจ้งเตือนปัญหาระบบ* 🚨\n"
+	// สร้างข้อความตามสถานะ
+	var statusIcon, statusText, headerColor string
+	switch req.Status {
+	case 0:
+		statusIcon = "🔴"
+		statusText = "รอดำเนินการ"
+		headerColor = "🚨 *แจ้งเตือนปัญหาระบบ* 🚨"
+	case 1:
+		statusIcon = "✅"
+		statusText = "เสร็จสิ้น"
+		headerColor = "✅ *งานเสร็จสิ้นแล้ว* ✅"
+	}
+
+	msg := headerColor + "\n"
+	msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
 
 	if req.BranchName != "" {
-		msg += "\n🏢 *สาขา* `" + "`\n`" + req.BranchName + "`\n"
+		msg += "🏢 *สาขา:* `" + req.BranchName + "`\n"
 	}
 	if req.DepartmentName != "" {
-		msg += "\n🏢 *แผนก* `" + "`\n`" + req.DepartmentName + "`\n"
+		msg += "🏛️ *แผนก:* `" + req.DepartmentName + "`\n"
 	}
 	if req.PhoneNumber > 0 {
 		msg += fmt.Sprintf("📞 *เบอร์โทร:* `%d`\n", req.PhoneNumber)
 	}
 	if req.ProgramName != "" {
-		msg += "\n💻 *โปรแกรม* `" + "`\n`" + req.ProgramName + "`\n"
+		msg += "💻 *โปรแกรม:* `" + req.ProgramName + "`\n"
 	}
 	if req.CreatedAt != "" {
-		msg += "\n📅 *วันที่* `" + "`\n`" + req.CreatedAt + "`\n"
+		msg += "📅 *วันที่:* `" + req.CreatedAt + "`\n"
 	}
 
-	msg += "\n⚠️ *รายงานปัญหา:*\n"
-	msg += "```\n" + req.Text + "\n```\n"
+	msg += "\n" + statusIcon + " *สถานะ:* `" + statusText + "`\n"
+	msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+	msg += "📝 *รายละเอียดปัญหา:*\n"
+	msg += "```\n" + req.Text + "\n```"
 
 	if req.Url != "" {
 		msg += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")\n"
 	}
 	message := tgbotapi.NewMessage(chatID, msg)
 	message.ParseMode = "Markdown"
-
-	_, err = bot.Send(message)
+	log.Printf("%s", message)
+	sentMsg, err := bot.Send(message)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	log.Printf("Telegram message sent successfully")
-	return nil
+	log.Printf("Telegram message sent successfully with ID: %d", sentMsg.MessageID)
+	return sentMsg.MessageID, nil
+}
+
+func UpdateTelegram(req models.TaskRequest) (int, error) {
+	botToken := "7852676725:AAHnEZclQ57Wo-klSyhZSmbghCU5w0TXgCk"
+	chatID := int64(-1002816577414)
+	messageID := req.MessageID
+
+	// สร้างข้อความตามสถานะ
+	var statusIcon, statusText, headerColor string
+	switch req.Status {
+	case 0:
+		statusIcon = "🔴"
+		statusText = "รอดำเนินการ"
+		headerColor = "🚨 *แจ้งเตือนปัญหาระบบ* 🚨"
+	case 1:
+		statusIcon = "✅"
+		statusText = "เสร็จสิ้น"
+		headerColor = "✅ *งานเสร็จสิ้นแล้ว* ✅"
+	}
+
+	newMessage := headerColor + "\n"
+	newMessage += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+
+	if req.BranchName != "" {
+		newMessage += "🏢 *สาขา:* `" + req.BranchName + "`\n"
+	}
+	if req.DepartmentName != "" {
+		newMessage += "🏛️ *แผนก:* `" + req.DepartmentName + "`\n"
+	}
+	if req.PhoneNumber > 0 {
+		newMessage += fmt.Sprintf("📞 *เบอร์โทร:* `%d`\n", req.PhoneNumber)
+	}
+	if req.ProgramName != "" {
+		newMessage += "💻 *โปรแกรม:* `" + req.ProgramName + "`\n"
+	}
+	if req.CreatedAt != "" {
+		newMessage += "📅 *วันที่:* `" + req.CreatedAt + "`\n"
+	}
+
+	newMessage += "\n" + statusIcon + " *สถานะ:* `" + statusText + "`\n"
+	newMessage += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+	newMessage += "📝 *รายละเอียดปัญหา:*\n"
+	newMessage += "```\n" + req.Text + "\n```"
+
+	if req.Url != "" {
+		newMessage += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")\n"
+	}
+	bot, err := tgbotapi.NewBotAPI(botToken)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	editMsg := tgbotapi.NewEditMessageText(chatID, messageID, newMessage)
+	editMsg.ParseMode = "Markdown"
+	_, err = bot.Send(editMsg)
+	if err != nil {
+		log.Printf("Error editing message: %v", err)
+		return 0, err
+	}
+	log.Printf("Message ID %d edited successfully!", messageID)
+	return messageID, nil
 }
