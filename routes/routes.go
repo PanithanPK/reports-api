@@ -11,6 +11,7 @@ func RegisterRoutes(r *fiber.App) {
 
 	// Problem routes
 	r.Get("/api/v1/problem/list", handlers.GetTasksHandler)
+	r.Get("/api/v1/problem/search/:query", handlers.SearchTasksHandler)
 	r.Post("/api/v1/problem/create", handlers.CreateTaskHandler)
 	r.Get("/api/v1/problem/:id", handlers.GetTaskDetailHandler)
 	r.Put("/api/v1/problem/update/:id", handlers.UpdateTaskHandler)
@@ -18,6 +19,8 @@ func RegisterRoutes(r *fiber.App) {
 
 	// Phone routes
 	r.Get("/api/v1/ipphone/list", handlers.ListIPPhonesHandler)
+	r.Get("/api/v1/ipphone/listall", handlers.AllIPPhonesHandler)
+	r.Get("/api/v1/ipphone/search/:query", handlers.SearchIPPhonesHandler)
 	r.Post("/api/v1/ipphone/create", handlers.CreateIPPhoneHandler)
 	r.Put("/api/v1/ipphone/update/:id", handlers.UpdateIPPhoneHandler)
 	r.Delete("/api/v1/ipphone/delete/:id", handlers.DeleteIPPhoneHandler)
@@ -30,6 +33,8 @@ func RegisterRoutes(r *fiber.App) {
 
 	// Department routes
 	r.Get("/api/v1/department/list", handlers.ListDepartmentsHandler)
+	r.Get("/api/v1/department/listall", handlers.AllDepartmentsHandler)
+	r.Get("/api/v1/department/search/:query", handlers.SearchDepartmentsHandler)
 	r.Post("/api/v1/department/create", handlers.CreateDepartmentHandler)
 	r.Get("/api/v1/department/:id", handlers.GetDepartmentDetailHandler)
 	r.Put("/api/v1/department/update/:id", handlers.UpdateDepartmentHandler)
@@ -45,8 +50,6 @@ func RegisterRoutes(r *fiber.App) {
 	//Dashboard routes
 	r.Get("/api/v1/dashboard/data", handlers.GetDashboardDataHandler)
 
-	r.Post("/api/v1/telegramMessage", handlers.SendTelegramNotificationHandler)
-
 	r.Put("/api/v1/updateTaskStatus", handlers.UpdateTaskStatusHandler)
 
 	r.Get("/api/v1/scores/list", handlers.ListScoresHandler)
@@ -54,7 +57,8 @@ func RegisterRoutes(r *fiber.App) {
 	r.Put("/api/v1/scores/update/:id", handlers.UpdateScoreHandler)
 	r.Delete("/api/v1/scores/delete/:id", handlers.DeleteScoreHandler)
 
-	r.Get("/api/v1/users", handlers.GetUsersHandler)
+	r.Get("/api/v1/respons/list", handlers.GetresponsHandler)
+	r.Post("/api/v1/respons/create", handlers.AddresponsHandler)
 }
 
 // RegisterAuthRoutes registers all authentication-related routes

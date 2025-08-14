@@ -51,7 +51,7 @@ func LoginHandler(c *fiber.Ctx) error {
 	c.Set("token", generateDummyToken())
 
 	c.Cookie(&fiber.Cookie{
-		Name:     "session",
+		Name:     "session_cookie",
 		Value:    sessionID,
 		Path:     "/",
 		HTTPOnly: true,
@@ -160,7 +160,7 @@ func LogoutHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Logged out"})
 }
 
-func GetUsersHandler(c *fiber.Ctx) error {
+func GetresponsHandler(c *fiber.Ctx) error {
 	var users []models.User
 	rows, err := db.DB.Query("SELECT id, name FROM responsibilities")
 	if err != nil {
@@ -181,4 +181,22 @@ func GetUsersHandler(c *fiber.Ctx) error {
 		Success: true,
 		Data:    users,
 	})
+}
+
+func AddresponsHandler(c *fiber.Ctx) error {
+	var req models.ResponseR
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	_, err := db.DB.Exec(
+		"INSERT INTO responsibilities (name) VALUES (?)",
+		req.Name,
+	)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to add responsibility"})
+	}
+
+	log.Printf("Responsibility %s added successfully", req.Name)
+	return c.JSON(fiber.Map{"message": "Responsibility added"})
 }
