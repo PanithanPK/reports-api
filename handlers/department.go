@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"net/url"
 	"reports-api/db"
 	"reports-api/models"
 	"reports-api/utils"
@@ -31,7 +32,6 @@ func ListDepartmentsHandler(c *fiber.Ctx) error {
 		FROM departments d
 		LEFT JOIN branches b ON d.branch_id = b.id
 		WHERE d.deleted_at IS NULL
-		ORDER BY d.id DESC
 		LIMIT ? OFFSET ?
 	`, pagination.Limit, offset)
 	if err != nil {
@@ -129,7 +129,7 @@ func GetDepartmentDetailHandler(c *fiber.Ctx) error {
 
 	var departmentDetail models.DepartmentDetail
 	err = db.DB.QueryRow(`
-		SELECT d.id, d.name, d.branch_id, b.name, d.created_at, d.updated_at 
+		SELECT d.id, d.name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name, d.created_at, d.updated_at 
 		FROM departments d
 		LEFT JOIN branches b ON d.branch_id = b.id
 		WHERE d.id = ? AND d.deleted_at IS NULL
@@ -169,4 +169,104 @@ func GetDepartmentDetailHandler(c *fiber.Ctx) error {
 
 	log.Printf("Getting department details Success for ID: %d", id)
 	return c.JSON(fiber.Map{"success": true, "data": departmentDetail})
+}
+
+func AllDepartmentsHandler(c *fiber.Ctx) error {
+	// Get total count
+	var total int
+	err := db.DB.QueryRow(`
+		SELECT COUNT(*) FROM departments d
+		WHERE d.deleted_at IS NULL
+	`).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count departments"})
+	}
+
+	// Get paginated data
+	rows, err := db.DB.Query(`
+		SELECT d.id, d.name, d.branch_id, b.name as branch_name, d.created_at, d.updated_at, d.deleted_at
+		FROM departments d
+		LEFT JOIN branches b ON d.branch_id = b.id
+		WHERE d.deleted_at IS NULL
+		ORDER BY d.id DESC
+	`)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query departments"})
+	}
+	defer rows.Close()
+
+	var departments []models.Department
+	for rows.Next() {
+		var d models.Department
+		err := rows.Scan(&d.ID, &d.Name, &d.BranchID, &d.BranchName, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
+		if err != nil {
+			log.Printf("Error scanning department: %v", err)
+			continue
+		}
+		departments = append(departments, d)
+	}
+
+	log.Printf("Getting departments Success")
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    departments,
+	})
+}
+
+// SearchDepartmentsHandler returns a handler for searching departments
+func SearchDepartmentsHandler(c *fiber.Ctx) error {
+	query := c.Params("query")
+	if query == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Query parameter is required"})
+	}
+
+	// URL decode for Thai language support
+	decodedQuery, err := url.QueryUnescape(query)
+	if err != nil {
+		decodedQuery = query
+	}
+	searchPattern := "%" + decodedQuery + "%"
+
+	// Get total count
+	var total int
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM departments d
+		LEFT JOIN branches b ON d.branch_id = b.id AND b.deleted_at IS NULL
+		WHERE d.deleted_at IS NULL
+		AND (d.name LIKE ? OR b.name LIKE ?)
+	`, searchPattern, searchPattern).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count search results"})
+	}
+
+	// Get search results
+	rows, err := db.DB.Query(`
+		SELECT d.id, d.name, d.branch_id, IFNULL(b.name, '') as branch_name, d.created_at, d.updated_at, d.deleted_at
+		FROM departments d
+		LEFT JOIN branches b ON d.branch_id = b.id AND b.deleted_at IS NULL
+		WHERE d.deleted_at IS NULL
+		AND (d.name LIKE ? OR b.name LIKE ?)
+		ORDER BY d.id DESC
+	`, searchPattern, searchPattern)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to search departments"})
+	}
+	defer rows.Close()
+
+	var departments []models.Department
+	for rows.Next() {
+		var d models.Department
+		err := rows.Scan(&d.ID, &d.Name, &d.BranchID, &d.BranchName, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
+		if err != nil {
+			log.Printf("Error scanning department: %v", err)
+			continue
+		}
+		departments = append(departments, d)
+	}
+
+	log.Printf("Searching departments with query: %s", query)
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    departments,
+	})
 }
