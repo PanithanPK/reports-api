@@ -148,10 +148,10 @@ func GetDashboardDataHandler(c *fiber.Ctx) error {
 
 	// ดึงข้อมูล tasks
 	tasks := []models.TaskWithDetailsDb{}
-	tasksQuery := `SELECT t.id, t.phone_id, ip.number, ip.name, t.system_id, sp.name, ip.department_id, d.name, d.branch_id, b.name, t.text, t.status, t.created_at, t.updated_at
+	tasksQuery := `SELECT t.id, t.phone_id, ip.number, ip.name, t.system_id, sp.name, t.department_id, d.name, d.branch_id, b.name, t.text, t.status, t.created_at, t.updated_at
 	FROM tasks t
 	LEFT JOIN ip_phones ip ON t.phone_id = ip.id
-	LEFT JOIN departments d ON ip.department_id = d.id
+	LEFT JOIN departments d ON t.department_id = d.id
 	LEFT JOIN branches b ON d.branch_id = b.id
 	LEFT JOIN systems_program sp ON t.system_id = sp.id
 	WHERE t.deleted_at IS NULL`

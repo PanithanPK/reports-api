@@ -4,14 +4,31 @@ import (
 	"log"
 	"reports-api/db"
 	"reports-api/models"
+	"reports-api/utils"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 )
 
-// ListProgramsHandler returns a handler for listing all programs
+// ListProgramsHandler returns a handler for listing all programs with pagination
 func ListProgramsHandler(c *fiber.Ctx) error {
-	rows, err := db.DB.Query(`SELECT id, name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by FROM systems_program WHERE deleted_at IS NULL`)
+	pagination := utils.GetPaginationParams(c)
+	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
+
+	// Get total count
+	var total int
+	err := db.DB.QueryRow(`SELECT COUNT(*) FROM systems_program WHERE deleted_at IS NULL`).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count programs"})
+	}
+
+	// Get paginated data
+	rows, err := db.DB.Query(`
+		SELECT id, name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by 
+		FROM systems_program 
+		WHERE deleted_at IS NULL 
+		LIMIT ? OFFSET ?
+	`, pagination.Limit, offset)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to query programs"})
 	}
@@ -27,8 +44,18 @@ func ListProgramsHandler(c *fiber.Ctx) error {
 		}
 		programs = append(programs, p)
 	}
+
 	log.Printf("Getting programs Success")
-	return c.JSON(fiber.Map{"success": true, "data": programs})
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    programs,
+		Pagination: models.PaginationResponse{
+			Page:       pagination.Page,
+			Limit:      pagination.Limit,
+			Total:      total,
+			TotalPages: utils.CalculateTotalPages(total, pagination.Limit),
+		},
+	})
 }
 
 // CreateProgramHandler returns a handler for creating a new program
