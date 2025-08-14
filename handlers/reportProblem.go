@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"reports-api/db"
 	"reports-api/models"
 	"reports-api/utils"
@@ -32,14 +33,14 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	// Get paginated data
 	query := `
 		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number , IFNULL(p.name, '') as phone_name, t.system_id, IFNULL(s.name, '') as system_name,
-		IFNULL(t.department_id, 0), IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
-		t.text, t.status, t.created_at, t.updated_at
+		IFNULL(t.department_id, 0) as department_id, IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
+		t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
-		ORDER BY t.id DESC
+		ORDER BY id DESC
 		LIMIT ? OFFSET ?
 	`
 	rows, err := db.DB.Query(query, pagination.Limit, offset)
@@ -52,7 +53,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	var tasks []models.TaskWithDetails
 	for rows.Next() {
 		var t models.TaskWithDetails
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt)
 
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
@@ -220,6 +221,14 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			return c.Status(400).JSON(fiber.Map{"error": "Task not found"})
 		}
 	}
+	var CreatedAt time.Time
+	err = db.DB.QueryRow(`SELECT created_at FROM tasks WHERE id = ?`, id).Scan(&CreatedAt)
+
+	if err != nil {
+		log.Println("Error fetching created_at:", err)
+	}
+
+	log.Printf("Updating task ID: %s", CreatedAt.Format("2006-01-02 15:04:05"))
 
 	_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
 	if err != nil {
@@ -260,7 +269,8 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		telegramReq.BranchName = branchName
 		telegramReq.ProgramName = programName
 		telegramReq.Url = "http://helpdesk.nopadol.com/"
-		telegramReq.CreatedAt = time.Now().Add(7 * time.Hour).Format("2006-01-02 15:04:05")
+		telegramReq.CreatedAt = CreatedAt.Add(7 * time.Hour).Format("2006-01-02 15:04:05")
+		telegramReq.UpdatedAt = time.Now().Add(7 * time.Hour).Format("2006-01-02 15:04:05")
 
 		_, _ = UpdateTelegram(telegramReq)
 	}
@@ -291,9 +301,21 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
 
+	// Get message_id before deleting
+	var messageID int
+	err = db.DB.QueryRow(`SELECT COALESCE(message_id, 0) FROM tasks WHERE id = ?`, id).Scan(&messageID)
+	if err != nil {
+		log.Printf("Failed to get message_id: %v", err)
+	}
+
 	_, err = db.DB.Exec(`DELETE FROM tasks WHERE id=?`, id)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete task"})
+	}
+
+	// Delete Telegram message if exists
+	if messageID > 0 {
+		_, _ = DeleteTelegram(messageID)
 	}
 
 	log.Printf("Deleted task ID: %d", id)
@@ -383,4 +405,89 @@ func updateDepartmentScore(departmentID int) error {
 	}
 
 	return nil
+}
+
+// SearchTasksHandler returns a handler for searching tasks
+func SearchTasksHandler(c *fiber.Ctx) error {
+	query := c.Params("query")
+	if query == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Query parameter is required"})
+	}
+
+	// URL decode for Thai language support
+	decodedQuery, err := url.QueryUnescape(query)
+	if err != nil {
+		decodedQuery = query
+	}
+	searchPattern := "%" + decodedQuery + "%"
+
+	// Get total count
+	var total int
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM tasks t
+		LEFT JOIN ip_phones p ON t.phone_id = p.id AND p.deleted_at IS NULL
+		LEFT JOIN departments d ON t.department_id = d.id AND d.deleted_at IS NULL
+		LEFT JOIN branches b ON d.branch_id = b.id AND b.deleted_at IS NULL
+		LEFT JOIN systems_program s ON t.system_id = s.id AND s.deleted_at IS NULL
+		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ?)
+	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count search results"})
+	}
+
+	// Get search results
+	rows, err := db.DB.Query(`
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number, IFNULL(p.name, '') as phone_name, t.system_id, IFNULL(s.name, '') as system_name,
+		IFNULL(t.department_id, 0) as department_id, IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
+		t.text, t.status, t.created_at, t.updated_at
+		FROM tasks t
+		LEFT JOIN ip_phones p ON t.phone_id = p.id AND p.deleted_at IS NULL
+		LEFT JOIN departments d ON t.department_id = d.id AND d.deleted_at IS NULL
+		LEFT JOIN branches b ON d.branch_id = b.id AND b.deleted_at IS NULL
+		LEFT JOIN systems_program s ON t.system_id = s.id AND s.deleted_at IS NULL
+		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ?)
+		ORDER BY t.id DESC
+	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to search tasks"})
+	}
+	defer rows.Close()
+
+	var tasks []models.TaskWithDetails
+	for rows.Next() {
+		var t models.TaskWithDetails
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+		if err != nil {
+			log.Printf("Error scanning task: %v", err)
+			continue
+		}
+
+		// Calculate overdue
+		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
+		if err == nil {
+			createdAt = createdAt.Add(7 * time.Hour)
+			now := time.Now().Add(7 * time.Hour)
+			duration := now.Sub(createdAt)
+			if createdAt.Format("2006-01-02") == now.Format("2006-01-02") {
+				hours := int(duration.Hours())
+				minutes := int(duration.Minutes()) % 60
+				seconds := int(duration.Seconds()) % 60
+				t.Overdue = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+			} else {
+				days := int(duration.Hours() / 24)
+				if days == 0 {
+					days = 1
+				}
+				t.Overdue = days
+			}
+		}
+
+		tasks = append(tasks, t)
+	}
+
+	log.Printf("Searching tasks with query: %s", query)
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    tasks,
+	})
 }

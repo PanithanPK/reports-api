@@ -27,7 +27,6 @@ func ListProgramsHandler(c *fiber.Ctx) error {
 		SELECT id, name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by 
 		FROM systems_program 
 		WHERE deleted_at IS NULL 
-		ORDER BY id DESC 
 		LIMIT ? OFFSET ?
 	`, pagination.Limit, offset)
 	if err != nil {

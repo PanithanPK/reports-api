@@ -12,6 +12,7 @@ type TaskRequest struct {
 	UpdatedBy      int    `json:"updated_by"`
 	Telegram       bool   `json:"telegram"`
 	MessageID      int    `json:"message_id"`
+	UpdatedAt      string `json:"updated_at"`
 	PhoneNumber    int    `json:"-"`
 	DepartmentName string `json:"-"`
 	BranchName     string `json:"-"`
@@ -50,6 +51,7 @@ type TaskWithDetails struct {
 	BranchID       int         `json:"branch_id"`
 	BranchName     string      `json:"branch_name"`
 	Text           string      `json:"text"`
+	Assignto       string      `json:"assign_to"`
 	Status         int         `json:"status"`
 	CreatedAt      string      `json:"created_at"`
 	UpdatedAt      string      `json:"updated_at"`

@@ -15,7 +15,7 @@ func GetPaginationParams(c *fiber.Ctx) models.PaginationRequest {
 	if page < 1 {
 		page = 1
 	}
-	if limit < 1 || limit > 100 {
+	if limit < 1 || limit > 500 {
 		limit = 10
 	}
 

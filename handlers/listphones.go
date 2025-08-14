@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"net/url"
 	"reports-api/db"
 	"reports-api/models"
 	"reports-api/utils"
@@ -24,14 +25,13 @@ func ListIPPhonesHandler(c *fiber.Ctx) error {
 
 	// Get paginated data
 	rows, err := db.DB.Query(`
-		SELECT ip.id, ip.number, ip.name, ip.department_id,
-			   d.name as department_name, d.branch_id, b.name as branch_name,
+		SELECT ip.id, ip.number, ip.name, IFNULL(ip.department_id,0) as department_id,
+			   IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
 			   ip.created_at, ip.updated_at, ip.deleted_at, ip.created_by, ip.updated_by, ip.deleted_by
 		FROM ip_phones ip
 		LEFT JOIN departments d ON ip.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		WHERE ip.deleted_at IS NULL
-		ORDER BY ip.id DESC
 		LIMIT ? OFFSET ?
 	`, pagination.Limit, offset)
 	if err != nil {
@@ -121,4 +121,117 @@ func DeleteIPPhoneHandler(c *fiber.Ctx) error {
 
 	log.Printf("Deleted IP phone ID: %d", id)
 	return c.JSON(fiber.Map{"success": true})
+}
+
+func AllIPPhonesHandler(c *fiber.Ctx) error {
+
+	// Get total count
+	var total int
+	err := db.DB.QueryRow(`SELECT COUNT(*) FROM ip_phones WHERE deleted_at IS NULL`).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count ip_phones"})
+	}
+
+	// Get paginated data
+	rows, err := db.DB.Query(`
+		SELECT ip.id, ip.number, ip.name, IFNULL(ip.department_id,0) as department_id,
+			   IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
+			   ip.created_at, ip.updated_at, ip.deleted_at, ip.created_by, ip.updated_by, ip.deleted_by
+		FROM ip_phones ip
+		LEFT JOIN departments d ON ip.department_id = d.id
+		LEFT JOIN branches b ON d.branch_id = b.id
+		WHERE ip.deleted_at IS NULL
+	`)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query ip_phones"})
+	}
+	defer rows.Close()
+
+	var phones []models.IPPhone
+	for rows.Next() {
+		var p models.IPPhone
+		err := rows.Scan(
+			&p.ID, &p.Number, &p.Name, &p.DepartmentID,
+			&p.DepartmentName, &p.BranchID, &p.BranchName,
+			&p.CreatedAt, &p.UpdatedAt, &p.DeletedAt, &p.CreatedBy, &p.UpdatedBy, &p.DeletedBy,
+		)
+		if err != nil {
+			log.Printf("Error scanning ip_phone: %v", err)
+			continue
+		}
+		phones = append(phones, p)
+	}
+
+	log.Printf("Getting IP phones Success")
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    phones,
+	})
+}
+
+// SearchIPPhonesHandler returns a handler for searching IP phones
+func SearchIPPhonesHandler(c *fiber.Ctx) error {
+	query := c.Params("query")
+	if query == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Query parameter is required"})
+	}
+
+	// URL decode for Thai language support
+	decodedQuery, err := url.QueryUnescape(query)
+	if err != nil {
+		decodedQuery = query
+	}
+
+	searchPattern := "%" + decodedQuery + "%"
+
+	// Get total count
+	var total int
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM ip_phones ip
+		LEFT JOIN departments d ON ip.department_id = d.id AND d.deleted_at IS NULL
+		LEFT JOIN branches b ON d.branch_id = b.id AND b.deleted_at IS NULL
+		WHERE ip.deleted_at IS NULL
+		AND (ip.number LIKE ? OR ip.name LIKE ? OR d.name LIKE ? OR b.name LIKE ?)
+	`, searchPattern, searchPattern, searchPattern, searchPattern).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count search results"})
+	}
+
+	// Get paginated search results
+	rows, err := db.DB.Query(`
+		SELECT ip.id, ip.number, ip.name, IFNULL(ip.department_id,0) as department_id,
+			   IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
+			   ip.created_at, ip.updated_at, ip.deleted_at, ip.created_by, ip.updated_by, ip.deleted_by
+		FROM ip_phones ip
+		LEFT JOIN departments d ON ip.department_id = d.id AND d.deleted_at IS NULL
+		LEFT JOIN branches b ON d.branch_id = b.id AND b.deleted_at IS NULL
+		WHERE ip.deleted_at IS NULL
+		AND (ip.number LIKE ? OR ip.name LIKE ? OR d.name LIKE ? OR b.name LIKE ?)
+		ORDER BY ip.id DESC
+	`, searchPattern, searchPattern, searchPattern, searchPattern)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to search ip_phones"})
+	}
+	defer rows.Close()
+
+	var phones []models.IPPhone
+	for rows.Next() {
+		var p models.IPPhone
+		err := rows.Scan(
+			&p.ID, &p.Number, &p.Name, &p.DepartmentID,
+			&p.DepartmentName, &p.BranchID, &p.BranchName,
+			&p.CreatedAt, &p.UpdatedAt, &p.DeletedAt, &p.CreatedBy, &p.UpdatedBy, &p.DeletedBy,
+		)
+		if err != nil {
+			log.Printf("Error scanning ip_phone: %v", err)
+			continue
+		}
+		phones = append(phones, p)
+	}
+
+	log.Printf("Searching IP phones with query: %s", query)
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    phones,
+	})
 }
