@@ -1,17 +1,60 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"net/url"
 	"reports-api/db"
 	"reports-api/models"
 	"reports-api/utils"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
+
+func uploadToMinIO(file *multipart.FileHeader) (string, string, error) {
+	endpoint := "192.168.0.63:9000"
+	accessKeyID := "admin"
+	secretAccessKey := "System#000"
+	useSSL := false
+
+	minioClient, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
+		Secure: useSSL,
+	})
+	if err != nil {
+		return "", "", err
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return "", "", err
+	}
+	defer src.Close()
+
+	objectName := fmt.Sprintf("%d-%s", time.Now().Unix(), file.Filename)
+	bucketName := "it-support"
+
+	_, err = minioClient.PutObject(
+		context.Background(),
+		bucketName,
+		objectName,
+		src,
+		file.Size,
+		minio.PutObjectOptions{ContentType: file.Header.Get("Content-Type")},
+	)
+	if err != nil {
+		return "", "", err
+	}
+
+	return bucketName, objectName, nil
+}
 
 func generateticketno(no int) string {
 	ticket := fmt.Sprintf("ticket-"+"%04d", no)
@@ -104,8 +147,41 @@ func GetTasksHandler(c *fiber.Ctx) error {
 // CreateTaskHandler เพิ่ม task ใหม่
 func CreateTaskHandler(c *fiber.Ctx) error {
 	var req models.TaskRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+	var uploadedFiles []fiber.Map
+	var errors []string
+
+	// Try to parse as multipart form first
+	form, err := c.MultipartForm()
+	if err != nil {
+		// If multipart parsing fails, try regular body parser
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+		}
+	} else {
+		// Parse body from multipart form
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+		}
+
+		// Handle file uploads if present
+		files := form.File["images"]
+		for _, file := range files {
+			bucket, objectName, err := uploadToMinIO(file)
+			if err != nil {
+				log.Printf("Failed to upload %s: %v", file.Filename, err)
+				errors = append(errors, fmt.Sprintf("Failed to upload %s: %v", file.Filename, err))
+				continue
+			}
+
+			fileURL := fmt.Sprintf("http://192.168.0.63:9000/%s/%s", bucket, objectName)
+			uploadedFiles = append(uploadedFiles, fiber.Map{
+				"filename":    file.Filename,
+				"object_name": objectName,
+				"bucket":      bucket,
+				"url":         fileURL,
+				"size":        file.Size,
+			})
+		}
 	}
 
 	// Get department_id from phone_id if phone_id exists
@@ -115,15 +191,18 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid phone_id"})
 		}
 	}
-
 	// Get latest ID and add 1 for ticket number
 	var lastID int
-	err := db.DB.QueryRow("SELECT COALESCE(MAX(id), 0) FROM tasks").Scan(&lastID)
+	err = db.DB.QueryRow("SELECT COALESCE(MAX(id), 0) FROM tasks").Scan(&lastID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to get last ID"})
 	}
 	nextID := lastID + 1
 	ticketno := generateticketno(nextID)
+
+	if len(uploadedFiles) > 0 {
+		log.Printf("Uploaded %d files", len(uploadedFiles))
+	}
 
 	res, err := db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, department_id, text, status, created_by) VALUES (?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.SystemID, req.DepartmentID, req.Text, req.CreatedBy)
 	if err != nil {
@@ -419,6 +498,7 @@ func SearchTasksHandler(c *fiber.Ctx) error {
 	if err != nil {
 		decodedQuery = query
 	}
+	decodedQuery = strings.TrimSpace(decodedQuery)
 	searchPattern := "%" + decodedQuery + "%"
 
 	// Get total count
@@ -489,5 +569,112 @@ func SearchTasksHandler(c *fiber.Ctx) error {
 	return c.JSON(models.PaginatedResponse{
 		Success: true,
 		Data:    tasks,
+	})
+}
+
+// GetTasksWithQueryHandler handles both list all and search functionality
+func GetTasksWithQueryHandler(c *fiber.Ctx) error {
+	query := c.Params("query")
+
+	// If query is empty or "all", return all tasks with pagination
+	if query == "" || query == "all" {
+		return GetTasksHandler(c)
+	}
+
+	// Otherwise, search tasks
+	pagination := utils.GetPaginationParams(c)
+	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
+
+	// URL decode for Thai language support
+	decodedQuery, err := url.QueryUnescape(query)
+	if err != nil {
+		decodedQuery = query
+	}
+
+	// Clean query
+	decodedQuery = strings.TrimSpace(decodedQuery)
+	decodedQuery = strings.ReplaceAll(decodedQuery, "  ", " ")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "%", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "_", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "'", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "\"", "")
+
+	searchPattern := "%" + decodedQuery + "%"
+
+	// Get total count
+	var total int
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM tasks t
+		LEFT JOIN ip_phones p ON t.phone_id = p.id
+		LEFT JOIN departments d ON t.department_id = d.id
+		LEFT JOIN branches b ON d.branch_id = b.id
+		LEFT JOIN systems_program s ON t.system_id = s.id
+		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ?)
+	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count search results"})
+	}
+
+	// Get search results with pagination
+	rows, err := db.DB.Query(`
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number, IFNULL(p.name, '') as phone_name, t.system_id, IFNULL(s.name, '') as system_name,
+		IFNULL(t.department_id, 0) as department_id, IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
+		t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
+		FROM tasks t
+		LEFT JOIN ip_phones p ON t.phone_id = p.id
+		LEFT JOIN departments d ON t.department_id = d.id
+		LEFT JOIN branches b ON d.branch_id = b.id
+		LEFT JOIN systems_program s ON t.system_id = s.id
+		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR t.assignto LIKE ?)
+		ORDER BY t.id DESC
+		LIMIT ? OFFSET ?
+	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, pagination.Limit, offset)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to search tasks"})
+	}
+	defer rows.Close()
+
+	var tasks []models.TaskWithDetails
+	for rows.Next() {
+		var t models.TaskWithDetails
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+		if err != nil {
+			log.Printf("Error scanning task: %v", err)
+			continue
+		}
+
+		// Calculate overdue
+		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
+		if err == nil {
+			createdAt = createdAt.Add(7 * time.Hour)
+			now := time.Now().Add(7 * time.Hour)
+			duration := now.Sub(createdAt)
+			if createdAt.Format("2006-01-02") == now.Format("2006-01-02") {
+				hours := int(duration.Hours())
+				minutes := int(duration.Minutes()) % 60
+				seconds := int(duration.Seconds()) % 60
+				t.Overdue = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+			} else {
+				days := int(duration.Hours() / 24)
+				if days == 0 {
+					days = 1
+				}
+				t.Overdue = days
+			}
+		}
+
+		tasks = append(tasks, t)
+	}
+
+	log.Printf("Searching tasks with query: %s, found %d results", query, len(tasks))
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    tasks,
+		Pagination: models.PaginationResponse{
+			Page:       pagination.Page,
+			Limit:      pagination.Limit,
+			Total:      total,
+			TotalPages: utils.CalculateTotalPages(total, pagination.Limit),
+		},
 	})
 }

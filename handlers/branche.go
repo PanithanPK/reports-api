@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"log"
+	"net/url"
 	"reports-api/db"
 	"reports-api/models"
 	"reports-api/utils"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -156,4 +158,79 @@ func GetBranchDetailHandler(c *fiber.Ctx) error {
 
 	log.Printf("Getting branch details Success for ID: %d", id)
 	return c.JSON(fiber.Map{"success": true, "data": branchDetail})
+}
+
+func ListBranchesQueryHandler(c *fiber.Ctx) error {
+	query := c.Params("query")
+
+	// If query is empty or "all", return all branches with pagination
+	if query == "" || query == "all" {
+		return ListBranchesHandler(c)
+	}
+
+	// Otherwise, search branches
+	pagination := utils.GetPaginationParams(c)
+	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
+
+	// URL decode for Thai language support
+	decodedQuery, err := url.QueryUnescape(query)
+	if err != nil {
+		decodedQuery = query
+	}
+
+	// Clean query
+	decodedQuery = strings.TrimSpace(decodedQuery)
+	decodedQuery = strings.ReplaceAll(decodedQuery, "  ", " ")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "%", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "_", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "'", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "\"", "")
+
+	searchPattern := "%" + decodedQuery + "%"
+
+	// Get total count
+	var total int
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM branches
+		WHERE deleted_at IS NULL AND name LIKE ?
+	`, searchPattern).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count search results"})
+	}
+
+	// Get search results with pagination
+	rows, err := db.DB.Query(`
+		SELECT id, name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by
+		FROM branches
+		WHERE deleted_at IS NULL AND name LIKE ?
+		ORDER BY id DESC
+		LIMIT ? OFFSET ?
+	`, searchPattern, pagination.Limit, offset)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to search branches"})
+	}
+	defer rows.Close()
+
+	var branches []models.Branch
+	for rows.Next() {
+		var b models.Branch
+		err := rows.Scan(&b.ID, &b.Name, &b.CreatedAt, &b.UpdatedAt, &b.DeletedAt, &b.CreatedBy, &b.UpdatedBy, &b.DeletedBy)
+		if err != nil {
+			log.Printf("Error scanning branch: %v", err)
+			continue
+		}
+		branches = append(branches, b)
+	}
+
+	log.Printf("Searching branches with query: %s, found %d results", query, len(branches))
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    branches,
+		Pagination: models.PaginationResponse{
+			Page:       pagination.Page,
+			Limit:      pagination.Limit,
+			Total:      total,
+			TotalPages: utils.CalculateTotalPages(total, pagination.Limit),
+		},
+	})
 }

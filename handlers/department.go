@@ -7,6 +7,7 @@ import (
 	"reports-api/models"
 	"reports-api/utils"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -210,6 +211,85 @@ func AllDepartmentsHandler(c *fiber.Ctx) error {
 	return c.JSON(models.PaginatedResponse{
 		Success: true,
 		Data:    departments,
+	})
+}
+
+func ListDepartmentsQueryHandler(c *fiber.Ctx) error {
+	query := c.Params("query")
+
+	// If query is empty or "all", return all departments with pagination
+	if query == "" || query == "all" {
+		return ListDepartmentsHandler(c)
+	}
+
+	// Otherwise, search departments
+	pagination := utils.GetPaginationParams(c)
+	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
+
+	// URL decode for Thai language support
+	decodedQuery, err := url.QueryUnescape(query)
+	if err != nil {
+		decodedQuery = query
+	}
+
+	// Clean query
+	decodedQuery = strings.TrimSpace(decodedQuery)
+	decodedQuery = strings.ReplaceAll(decodedQuery, "  ", " ")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "%", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "_", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "'", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "\"", "")
+
+	searchPattern := "%" + decodedQuery + "%"
+
+	// Get total count
+	var total int
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM departments d
+		LEFT JOIN branches b ON d.branch_id = b.id AND b.deleted_at IS NULL
+		WHERE d.deleted_at IS NULL
+		AND (d.name LIKE ? OR b.name LIKE ?)
+	`, searchPattern, searchPattern).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count search results"})
+	}
+
+	// Get search results with pagination
+	rows, err := db.DB.Query(`
+		SELECT d.id, d.name, d.branch_id, IFNULL(b.name, '') as branch_name, d.created_at, d.updated_at, d.deleted_at
+		FROM departments d
+		LEFT JOIN branches b ON d.branch_id = b.id AND b.deleted_at IS NULL
+		WHERE d.deleted_at IS NULL
+		AND (d.name LIKE ? OR b.name LIKE ?)
+		ORDER BY d.id DESC
+		LIMIT ? OFFSET ?
+	`, searchPattern, searchPattern, pagination.Limit, offset)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to search departments"})
+	}
+	defer rows.Close()
+
+	var departments []models.Department
+	for rows.Next() {
+		var d models.Department
+		err := rows.Scan(&d.ID, &d.Name, &d.BranchID, &d.BranchName, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
+		if err != nil {
+			log.Printf("Error scanning department: %v", err)
+			continue
+		}
+		departments = append(departments, d)
+	}
+
+	log.Printf("Searching departments with query: %s, found %d results", query, len(departments))
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    departments,
+		Pagination: models.PaginationResponse{
+			Page:       pagination.Page,
+			Limit:      pagination.Limit,
+			Total:      total,
+			TotalPages: utils.CalculateTotalPages(total, pagination.Limit),
+		},
 	})
 }
 
