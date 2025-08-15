@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"log"
+	"net/url"
 	"reports-api/db"
 	"reports-api/models"
 	"reports-api/utils"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -112,4 +114,79 @@ func DeleteProgramHandler(c *fiber.Ctx) error {
 
 	log.Printf("Deleted program ID: %d", id)
 	return c.JSON(fiber.Map{"success": true})
+}
+
+func ListProgramsQueryHandler(c *fiber.Ctx) error {
+	query := c.Params("query")
+
+	// If query is empty or "all", return all programs with pagination
+	if query == "" || query == "all" {
+		return ListProgramsHandler(c)
+	}
+
+	// Otherwise, search programs
+	pagination := utils.GetPaginationParams(c)
+	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
+
+	// URL decode for Thai language support
+	decodedQuery, err := url.QueryUnescape(query)
+	if err != nil {
+		decodedQuery = query
+	}
+
+	// Clean query
+	decodedQuery = strings.TrimSpace(decodedQuery)
+	decodedQuery = strings.ReplaceAll(decodedQuery, "  ", " ")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "%", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "_", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "'", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "\"", "")
+
+	searchPattern := "%" + decodedQuery + "%"
+
+	// Get total count
+	var total int
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM systems_program
+		WHERE deleted_at IS NULL AND name LIKE ?
+	`, searchPattern).Scan(&total)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count search results"})
+	}
+
+	// Get search results with pagination
+	rows, err := db.DB.Query(`
+		SELECT id, name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by
+		FROM systems_program
+		WHERE deleted_at IS NULL AND name LIKE ?
+		ORDER BY id DESC
+		LIMIT ? OFFSET ?
+	`, searchPattern, pagination.Limit, offset)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to search programs"})
+	}
+	defer rows.Close()
+
+	var programs []models.Program
+	for rows.Next() {
+		var p models.Program
+		err := rows.Scan(&p.ID, &p.Name, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt, &p.CreatedBy, &p.UpdatedBy, &p.DeletedBy)
+		if err != nil {
+			log.Printf("Error scanning program: %v", err)
+			continue
+		}
+		programs = append(programs, p)
+	}
+
+	log.Printf("Searching programs with query: %s, found %d results", query, len(programs))
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    programs,
+		Pagination: models.PaginationResponse{
+			Page:       pagination.Page,
+			Limit:      pagination.Limit,
+			Total:      total,
+			TotalPages: utils.CalculateTotalPages(total, pagination.Limit),
+		},
+	})
 }
