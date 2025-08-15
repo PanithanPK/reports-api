@@ -11,6 +11,7 @@ func RegisterRoutes(r *fiber.App) {
 
 	// Problem routes
 	r.Get("/api/v1/problem/list", handlers.GetTasksHandler)
+	r.Get("/api/v1/problem/list/:query", handlers.GetTasksWithQueryHandler)
 	r.Get("/api/v1/problem/search/:query", handlers.SearchTasksHandler)
 	r.Post("/api/v1/problem/create", handlers.CreateTaskHandler)
 	r.Get("/api/v1/problem/:id", handlers.GetTaskDetailHandler)
@@ -19,6 +20,7 @@ func RegisterRoutes(r *fiber.App) {
 
 	// Phone routes
 	r.Get("/api/v1/ipphone/list", handlers.ListIPPhonesHandler)
+	r.Get("/api/v1/ipphone/list/:query", handlers.ListIPPhonesQueryHandler)
 	r.Get("/api/v1/ipphone/listall", handlers.AllIPPhonesHandler)
 	r.Get("/api/v1/ipphone/search/:query", handlers.SearchIPPhonesHandler)
 	r.Post("/api/v1/ipphone/create", handlers.CreateIPPhoneHandler)
@@ -27,12 +29,14 @@ func RegisterRoutes(r *fiber.App) {
 
 	// Program routes
 	r.Get("/api/v1/program/list", handlers.ListProgramsHandler)
+	r.Get("/api/v1/program/list/:query", handlers.ListProgramsQueryHandler)
 	r.Post("/api/v1/program/create", handlers.CreateProgramHandler)
 	r.Put("/api/v1/program/update/:id", handlers.UpdateProgramHandler)
 	r.Delete("/api/v1/program/delete/:id", handlers.DeleteProgramHandler)
 
 	// Department routes
 	r.Get("/api/v1/department/list", handlers.ListDepartmentsHandler)
+	r.Get("/api/v1/department/list/:query", handlers.ListDepartmentsQueryHandler)
 	r.Get("/api/v1/department/listall", handlers.AllDepartmentsHandler)
 	r.Get("/api/v1/department/search/:query", handlers.SearchDepartmentsHandler)
 	r.Post("/api/v1/department/create", handlers.CreateDepartmentHandler)
@@ -42,6 +46,7 @@ func RegisterRoutes(r *fiber.App) {
 
 	// branch routes
 	r.Get("/api/v1/branch/list", handlers.ListBranchesHandler)
+	r.Get("/api/v1/branch/list/:query", handlers.ListBranchesQueryHandler)
 	r.Post("/api/v1/branch/create", handlers.CreateBranchHandler)
 	r.Get("/api/v1/branch/:id", handlers.GetBranchDetailHandler)
 	r.Put("/api/v1/branch/update/:id", handlers.UpdateBranchHandler)
