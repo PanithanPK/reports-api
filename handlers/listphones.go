@@ -257,6 +257,38 @@ func ListIPPhonesQueryHandler(c *fiber.Ctx) error {
 	})
 }
 
+func GetIPPhonesDetailHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
+	}
+
+	var ipPhone models.IPPhone
+	err = db.DB.QueryRow(`
+		SELECT ip.id, ip.number, ip.name, IFNULL(ip.department_id,0) as department_id,
+			   IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
+			   ip.created_at, ip.updated_at, ip.deleted_at, ip.created_by, ip.updated_by, ip.deleted_by
+		FROM ip_phones ip
+		LEFT JOIN departments d ON ip.department_id = d.id
+		LEFT JOIN branches b ON d.branch_id = b.id
+		WHERE ip.id = ? AND ip.deleted_at IS NULL
+	`, id).Scan(
+		&ipPhone.ID, &ipPhone.Number, &ipPhone.Name, &ipPhone.DepartmentID,
+		&ipPhone.DepartmentName, &ipPhone.BranchID, &ipPhone.BranchName,
+		&ipPhone.CreatedAt, &ipPhone.UpdatedAt, &ipPhone.DeletedAt, 
+		&ipPhone.CreatedBy, &ipPhone.UpdatedBy, &ipPhone.DeletedBy,
+	)
+
+	if err != nil {
+		log.Printf("Error fetching IP phone details: %v", err)
+		return c.Status(404).JSON(fiber.Map{"error": "IP phone not found"})
+	}
+
+	log.Printf("Getting IP phone details Success for ID: %d", id)
+	return c.JSON(fiber.Map{"success": true, "data": ipPhone})
+}
+
 // SearchIPPhonesHandler returns a handler for searching IP phones
 func SearchIPPhonesHandler(c *fiber.Ctx) error {
 	query := c.Params("query")
