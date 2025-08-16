@@ -21,6 +21,7 @@ func RegisterRoutes(r *fiber.App) {
 	// Phone routes
 	r.Get("/api/v1/ipphone/list", handlers.ListIPPhonesHandler)
 	r.Get("/api/v1/ipphone/list/:query", handlers.ListIPPhonesQueryHandler)
+	r.Get("/api/v1/ipphone/:id", handlers.GetIPPhonesDetailHandler)
 	r.Get("/api/v1/ipphone/listall", handlers.AllIPPhonesHandler)
 	r.Get("/api/v1/ipphone/search/:query", handlers.SearchIPPhonesHandler)
 	r.Post("/api/v1/ipphone/create", handlers.CreateIPPhoneHandler)
@@ -31,6 +32,7 @@ func RegisterRoutes(r *fiber.App) {
 	r.Get("/api/v1/program/list", handlers.ListProgramsHandler)
 	r.Get("/api/v1/program/list/:query", handlers.ListProgramsQueryHandler)
 	r.Post("/api/v1/program/create", handlers.CreateProgramHandler)
+	r.Get("/api/v1/program/:id", handlers.GetProgramDetailHandler)
 	r.Put("/api/v1/program/update/:id", handlers.UpdateProgramHandler)
 	r.Delete("/api/v1/program/delete/:id", handlers.DeleteProgramHandler)
 

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"reports-api/db"
+	"time"
 
 	"reports-api/routes"
 	"runtime"
@@ -110,12 +111,15 @@ func main() {
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
-		AppName: "Reports API",
+		AppName:      "Reports API",
+		BodyLimit:    100 * 1024 * 1024, // 50MB limit for file uploads
+		ReadTimeout:  time.Second * 30,
+		WriteTimeout: time.Second * 30,
 	})
 
 	// Add CORS middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000,http://helpdesk.nopadol.com,http://helpdesk-dev.nopadol.com:",
+		AllowOrigins:     "http://localhost:3000,http://helpdesk.nopadol.com,http://helpdesk-dev.nopadol.com,http://10.0.2.94:3000",
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS,PATCH",
 		AllowHeaders:     "Content-Type,Authorization,X-Requested-With",
 		AllowCredentials: true,

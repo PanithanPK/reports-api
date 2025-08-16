@@ -190,3 +190,29 @@ func ListProgramsQueryHandler(c *fiber.Ctx) error {
 		},
 	})
 }
+
+func GetProgramDetailHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
+	}
+
+	var program models.Program
+	err = db.DB.QueryRow(`
+		SELECT id, name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by
+		FROM systems_program
+		WHERE id = ? AND deleted_at IS NULL
+	`, id).Scan(
+		&program.ID, &program.Name, &program.CreatedAt, &program.UpdatedAt,
+		&program.DeletedAt, &program.CreatedBy, &program.UpdatedBy, &program.DeletedBy,
+	)
+
+	if err != nil {
+		log.Printf("Error fetching program details: %v", err)
+		return c.Status(404).JSON(fiber.Map{"error": "Program not found"})
+	}
+
+	log.Printf("Getting program details Success for ID: %d", id)
+	return c.JSON(fiber.Map{"success": true, "data": program})
+}

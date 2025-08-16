@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"mime/multipart"
 	"net/url"
+	"os"
 	"reports-api/db"
 	"reports-api/models"
 	"reports-api/utils"
@@ -14,51 +17,74 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-func uploadToMinIO(file *multipart.FileHeader) (string, string, error) {
-	endpoint := "192.168.0.63:9000"
-	accessKeyID := "admin"
-	secretAccessKey := "System#000"
+func generateticketno(no int) string {
+	ticket := fmt.Sprintf("ticket-"+"%04d", no)
+	return ticket
+}
+
+func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.Map, []string) {
+	var uploadedFiles []fiber.Map
+	var errors []string
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("Warning: Error loading .env file: %v", err)
+	}
+	// MinIO configuration
+	endpoint := os.Getenv("End_POINT")
+	accessKeyID := os.Getenv("ACCESS_KEY")
+	secretAccessKey := os.Getenv("SECRET_ACCESSKEY")
 	useSSL := false
+	bucketName := os.Getenv("BUCKET_NAME")
 
 	minioClient, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
 		Secure: useSSL,
 	})
 	if err != nil {
-		return "", "", err
+		log.Printf("Failed to create MinIO client: %v", err)
+		return uploadedFiles, []string{"Failed to initialize storage client"}
 	}
 
-	src, err := file.Open()
-	if err != nil {
-		return "", "", err
+	for i, file := range files {
+		src, err := file.Open()
+		if err != nil {
+			log.Printf("Failed to open %s: %v", file.Filename, err)
+			errors = append(errors, fmt.Sprintf("Failed to open %s: %v", file.Filename, err))
+			continue
+		}
+
+		dateStr := time.Now().Add(7 * time.Hour).Format("01022006")
+		objectName := fmt.Sprintf("%s-%02d-%s-%s", ticketno, i+1, dateStr, file.Filename)
+
+		_, err = minioClient.PutObject(
+			context.Background(),
+			bucketName,
+			objectName,
+			src,
+			file.Size,
+			minio.PutObjectOptions{ContentType: file.Header.Get("Content-Type")},
+		)
+		src.Close()
+
+		if err != nil {
+			log.Printf("Failed to upload %s: %v", file.Filename, err)
+			errors = append(errors, fmt.Sprintf("Failed to upload %s: %v", file.Filename, err))
+			continue
+		}
+
+		fileURL := fmt.Sprintf("https://minio.sys9.co/api/v1/buckets/%s/objects/download?preview=true&prefix=%s", bucketName, objectName)
+		uploadedFiles = append(uploadedFiles, fiber.Map{
+			"url": fileURL,
+		})
 	}
-	defer src.Close()
 
-	objectName := fmt.Sprintf("%d-%s", time.Now().Unix(), file.Filename)
-	bucketName := "it-support"
-
-	_, err = minioClient.PutObject(
-		context.Background(),
-		bucketName,
-		objectName,
-		src,
-		file.Size,
-		minio.PutObjectOptions{ContentType: file.Header.Get("Content-Type")},
-	)
-	if err != nil {
-		return "", "", err
-	}
-
-	return bucketName, objectName, nil
-}
-
-func generateticketno(no int) string {
-	ticket := fmt.Sprintf("ticket-"+"%04d", no)
-	return ticket
+	return uploadedFiles, errors
 }
 
 // GetTasksHandler returns a handler for listing all tasks with details and pagination
@@ -77,7 +103,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	query := `
 		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number , IFNULL(p.name, '') as phone_name, t.system_id, IFNULL(s.name, '') as system_name,
 		IFNULL(t.department_id, 0) as department_id, IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
-		t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
+		t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]') as file_paths
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
@@ -96,12 +122,27 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	var tasks []models.TaskWithDetails
 	for rows.Next() {
 		var t models.TaskWithDetails
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+		var filePathsJSON string
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
 
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue
 		}
+
+		// Parse file_paths JSON
+		fileURLs := make([]string, 0)
+		if filePathsJSON != "" && filePathsJSON != "[]" {
+			var filePaths []fiber.Map
+			if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
+				for _, fp := range filePaths {
+					if url, ok := fp["url"].(string); ok {
+						fileURLs = append(fileURLs, url)
+					}
+				}
+			}
+		}
+		t.FilePaths = fileURLs
 
 		// Calculate overdue
 		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
@@ -148,9 +189,16 @@ func GetTasksHandler(c *fiber.Ctx) error {
 func CreateTaskHandler(c *fiber.Ctx) error {
 	var req models.TaskRequest
 	var uploadedFiles []fiber.Map
-	var errors []string
+	// Get latest ID and add 1 for ticket number
+	var lastID int
+	err := db.DB.QueryRow("SELECT COALESCE(MAX(id), 0) FROM tasks").Scan(&lastID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to get last ID"})
+	}
 
-	// Try to parse as multipart form first
+	nextID := lastID + 1
+	ticketno := generateticketno(nextID)
+
 	form, err := c.MultipartForm()
 	if err != nil {
 		// If multipart parsing fails, try regular body parser
@@ -163,48 +211,41 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 		}
 
-		// Handle file uploads if present
-		files := form.File["images"]
-		for _, file := range files {
-			bucket, objectName, err := uploadToMinIO(file)
-			if err != nil {
-				log.Printf("Failed to upload %s: %v", file.Filename, err)
-				errors = append(errors, fmt.Sprintf("Failed to upload %s: %v", file.Filename, err))
-				continue
-			}
+		// Handle file uploads if present (support image_{index} format)
+		var allFiles []*multipart.FileHeader
 
-			fileURL := fmt.Sprintf("http://192.168.0.63:9000/%s/%s", bucket, objectName)
-			uploadedFiles = append(uploadedFiles, fiber.Map{
-				"filename":    file.Filename,
-				"object_name": objectName,
-				"bucket":      bucket,
-				"url":         fileURL,
-				"size":        file.Size,
-			})
+		// Check for indexed files (image_0, image_1, image_2, etc.)
+		for key, files := range form.File {
+			if strings.HasPrefix(key, "image_") || key == "image" {
+				allFiles = append(allFiles, files...)
+			}
 		}
+
+		uploadedFiles, _ = handleFileUploads(allFiles, ticketno)
 	}
 
-	// Get department_id from phone_id if phone_id exists
-	if req.PhoneID != nil {
+	// Get department_id from ip_phones if phone_id is provided
+	if req.PhoneID != nil && *req.PhoneID > 0 {
 		err := db.DB.QueryRow("SELECT department_id FROM ip_phones WHERE id = ?", *req.PhoneID).Scan(&req.DepartmentID)
 		if err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid phone_id"})
+			log.Printf("Warning: Could not get department_id from phone_id %d: %v", *req.PhoneID, err)
 		}
 	}
-	// Get latest ID and add 1 for ticket number
-	var lastID int
-	err = db.DB.QueryRow("SELECT COALESCE(MAX(id), 0) FROM tasks").Scan(&lastID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to get last ID"})
-	}
-	nextID := lastID + 1
-	ticketno := generateticketno(nextID)
+
+	// log.Printf("Request data: PhoneID=%v, SystemID=%d, DepartmentID=%d, Text=%s, CreatedBy=%d", req.PhoneID, req.SystemID, req.DepartmentID, req.Text, req.CreatedBy)
 
 	if len(uploadedFiles) > 0 {
 		log.Printf("Uploaded %d files", len(uploadedFiles))
 	}
 
-	res, err := db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, department_id, text, status, created_by) VALUES (?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.SystemID, req.DepartmentID, req.Text, req.CreatedBy)
+	var res sql.Result
+	if len(uploadedFiles) > 0 {
+		filePathsBytes, _ := json.Marshal(uploadedFiles)
+		log.Printf("Saving file_paths: %s", string(filePathsBytes))
+		res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, department_id, text, status, created_by, file_paths) VALUES (?, ?, ?, ?, ?, 0, ?, ?)`, req.PhoneID, ticketno, req.SystemID, req.DepartmentID, req.Text, req.CreatedBy, string(filePathsBytes))
+	} else {
+		res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, department_id, text, status, created_by) VALUES (?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.SystemID, req.DepartmentID, req.Text, req.CreatedBy)
+	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert task"})
 	}
@@ -273,6 +314,8 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 func UpdateTaskHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
+	var ticketno string
+	var uploadedFiles []fiber.Map
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
@@ -285,6 +328,39 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	// Handle phone_id = 0 as null
 	if req.PhoneID != nil && *req.PhoneID == 0 {
 		req.PhoneID = nil
+	}
+
+	log.Printf("Looking for task with ID: %d", id)
+	err = db.DB.QueryRow("SELECT ticket_no FROM tasks WHERE id = ?", id).Scan(&ticketno)
+	if err != nil {
+		log.Printf("Task not found error: %v", err)
+		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
+	}
+	log.Printf("Found task with ticket_no: %s", ticketno)
+
+	form, err := c.MultipartForm()
+	if err != nil {
+		// If multipart parsing fails, try regular body parser
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+		}
+	} else {
+		// Parse body from multipart form
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+		}
+
+		// Handle file uploads if present (support image_{index} format)
+		var allFiles []*multipart.FileHeader
+
+		// Check for indexed files (image_0, image_1, image_2, etc.)
+		for key, files := range form.File {
+			if strings.HasPrefix(key, "image_") || key == "image" {
+				allFiles = append(allFiles, files...)
+			}
+		}
+
+		uploadedFiles, _ = handleFileUploads(allFiles, ticketno)
 	}
 
 	// Get department_id from phone_id if phone_id exists and is valid
@@ -309,7 +385,16 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 
 	log.Printf("Updating task ID: %s", CreatedAt.Format("2006-01-02 15:04:05"))
 
-	_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
+	// Handle file uploads
+	if len(uploadedFiles) > 0 {
+		// Get existing file_paths
+		filePathsBytes, _ := json.Marshal(uploadedFiles)
+		log.Printf("Updating file_paths: %s", string(filePathsBytes))
+
+		_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+	} else {
+		_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
+	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
 	}
@@ -407,23 +492,36 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
-
+	var filePathsJSON string
 	var task models.TaskWithDetails
 	err = db.DB.QueryRow(`
-		SELECT t.id, t.phone_id, COALESCE(p.number, 0), COALESCE(p.name, ''), t.system_id, COALESCE(s.name, ''),
-		t.department_id, COALESCE(d.name, ''), COALESCE(d.branch_id, 0), COALESCE(b.name, ''),
-		t.text, t.status, t.created_at, t.updated_at
+		SELECT t.id, t.phone_id, IFNULL(p.number, 0), IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''),
+		t.department_id, IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''),
+		t.text, t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
 		WHERE t.id = ?
-	`, id).Scan(&task.ID, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Status, &task.CreatedAt, &task.UpdatedAt)
+	`, id).Scan(&task.ID, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
 
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
 	}
+
+	fileURLs := make([]string, 0)
+	if filePathsJSON != "" && filePathsJSON != "[]" {
+		var filePaths []fiber.Map
+		if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
+			for _, fp := range filePaths {
+				if url, ok := fp["url"].(string); ok {
+					fileURLs = append(fileURLs, url)
+				}
+			}
+		}
+	}
+	task.FilePaths = fileURLs
 
 	log.Printf("Getting task ID: %d details", id)
 	return c.JSON(fiber.Map{"success": true, "data": task})

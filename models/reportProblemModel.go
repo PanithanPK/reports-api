@@ -53,6 +53,7 @@ type TaskWithDetails struct {
 	Text           string      `json:"text"`
 	Assignto       string      `json:"assign_to"`
 	Status         int         `json:"status"`
+	FilePaths      []string    `json:"file_paths"`
 	CreatedAt      string      `json:"created_at"`
 	UpdatedAt      string      `json:"updated_at"`
 	Overdue        interface{} `json:"overdue"`
