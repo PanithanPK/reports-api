@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.8.0](https://github.com/PanithanPK/reports-api/compare/v1.7.0...v1.8.0) (2025-08-18)
+
+
+### Features
+
+* Add assignto ([17148e6](https://github.com/PanithanPK/reports-api/commit/17148e6de0a1b9090ca7b6d0c0ef2510bd42c208))
+* Add list to search and upload images ([bfb7ee8](https://github.com/PanithanPK/reports-api/commit/bfb7ee823e902681389565aff8ffd8e3e324813a))
+* Add upload images fix bug ([812d172](https://github.com/PanithanPK/reports-api/commit/812d17273c0b2082241d6a479288cc7d71f11644))
+* reported and type system ([e84792f](https://github.com/PanithanPK/reports-api/commit/e84792f4affce71010dda5e3512b875adc1af3e9))
+
 ## [1.7.0](https://github.com/PanithanPK/reports-api/compare/v1.6.0...v1.7.0) (2025-08-08)
 
 
