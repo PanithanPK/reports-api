@@ -51,6 +51,9 @@ func SendTelegram(req models.TaskRequest) (int, error) {
 	msg := headerColor + "\n"
 	msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
 
+	if req.Ticket != "" {
+		msg += "🎫 *Ticket No:* `" + req.Ticket + "`\n"
+	}
 	if req.BranchName != "" {
 		msg += "🏢 *สาขา:* `" + req.BranchName + "`\n"
 	}
@@ -62,6 +65,9 @@ func SendTelegram(req models.TaskRequest) (int, error) {
 	}
 	if req.ProgramName != "" {
 		msg += "💻 *โปรแกรม:* `" + req.ProgramName + "`\n"
+	}
+	if req.ReportedBy != "" {
+		msg += "👤 *ผู้แจ้ง:* `" + req.ReportedBy + "`\n"
 	}
 	msg += "📅 *วันที่แจ้งปัญหา:* `" + req.CreatedAt + "`\n"
 
@@ -119,6 +125,9 @@ func UpdateTelegram(req models.TaskRequest) (int, error) {
 	newMessage := headerColor + "\n"
 	newMessage += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
 
+	if req.Ticket != "" {
+		newMessage += "🎫 *Ticket No:* `" + req.Ticket + "`\n"
+	}
 	if req.BranchName != "" {
 		newMessage += "🏢 *สาขา:* `" + req.BranchName + "`\n"
 	}
@@ -130,6 +139,9 @@ func UpdateTelegram(req models.TaskRequest) (int, error) {
 	}
 	if req.ProgramName != "" {
 		newMessage += "💻 *โปรแกรม:* `" + req.ProgramName + "`\n"
+	}
+	if req.ReportedBy != "" {
+		newMessage += "👤 *ผู้แจ้ง:* `" + req.ReportedBy + "`\n"
 	}
 
 	newMessage += "📅 *วันที่แจ้งปัญหา:* `" + req.CreatedAt + "`\n"

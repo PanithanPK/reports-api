@@ -13,8 +13,8 @@ type Department struct {
 
 // Department Request model for creating or updating a department
 type DepartmentRequest struct {
-	Name     *string `json:"name"`
-	BranchID *int    `json:"branch_id"`
+	Name     string `json:"name"`
+	BranchID *int   `json:"branch_id"`
 }
 
 // Department Detail model for detailed view of a department
