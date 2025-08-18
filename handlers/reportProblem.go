@@ -27,6 +27,36 @@ func generateticketno(no int) string {
 	return ticket
 }
 
+func deleteImage(objectName string) error {
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("Warning: Error loading .env file: %v", err)
+	}
+
+	endpoint := os.Getenv("End_POINT")
+	accessKeyID := os.Getenv("ACCESS_KEY")
+	secretAccessKey := os.Getenv("SECRET_ACCESSKEY")
+	useSSL := false
+	bucketName := os.Getenv("BUCKET_NAME")
+
+	minioClient, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
+		Secure: useSSL,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = minioClient.RemoveObject(context.Background(), bucketName, objectName, minio.RemoveObjectOptions{})
+	if err != nil {
+		log.Printf("Failed to delete %s: %v", objectName, err)
+		return err
+	}
+
+	log.Printf("Successfully deleted %s", objectName)
+	return nil
+}
+
 func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.Map, []string) {
 	var uploadedFiles []fiber.Map
 	var errors []string
@@ -101,14 +131,15 @@ func GetTasksHandler(c *fiber.Ctx) error {
 
 	// Get paginated data
 	query := `
-		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number , IFNULL(p.name, '') as phone_name, t.system_id, IFNULL(s.name, '') as system_name,
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number , IFNULL(p.name, '') as phone_name, t.system_id, IFNULL(s.name, '') as system_name, IFNULL(it.name, '') as system_type,
 		IFNULL(t.department_id, 0) as department_id, IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
-		t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]') as file_paths
+		t.text, IFNULL(t.assignto, ''), IFNULL(t.reported_by, '') as reported_by, t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]') as file_paths
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
+		LEFT JOIN issue_types it ON s.type = it.id
 		ORDER BY id DESC
 		LIMIT ? OFFSET ?
 	`
@@ -123,7 +154,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	for rows.Next() {
 		var t models.TaskWithDetails
 		var filePathsJSON string
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.SystemType, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
 
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
@@ -131,18 +162,19 @@ func GetTasksHandler(c *fiber.Ctx) error {
 		}
 
 		// Parse file_paths JSON
-		fileURLs := make([]string, 0)
+		fileMap := make(map[string]string)
 		if filePathsJSON != "" && filePathsJSON != "[]" {
 			var filePaths []fiber.Map
 			if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
-				for _, fp := range filePaths {
+				for i, fp := range filePaths {
 					if url, ok := fp["url"].(string); ok {
-						fileURLs = append(fileURLs, url)
+						fileMap[fmt.Sprintf("image_%d", i)] = url
 					}
 				}
 			}
 		}
-		t.FilePaths = fileURLs
+		// Set FilePaths as map instead of array
+		t.FilePaths = fileMap
 
 		// Calculate overdue
 		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
@@ -222,6 +254,29 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		}
 
 		uploadedFiles, _ = handleFileUploads(allFiles, ticketno)
+
+		// Convert string form values to int for multipart data
+		if phoneIDStr := c.FormValue("phone_id"); phoneIDStr != "" && phoneIDStr != "0" {
+			if phoneID, err := strconv.Atoi(phoneIDStr); err == nil {
+				req.PhoneID = &phoneID
+			}
+		}
+		if systemIDStr := c.FormValue("system_id"); systemIDStr != "" {
+			req.SystemID, _ = strconv.Atoi(systemIDStr)
+		}
+		if departmentIDStr := c.FormValue("department_id"); departmentIDStr != "" {
+			req.DepartmentID, _ = strconv.Atoi(departmentIDStr)
+		}
+		if createdByStr := c.FormValue("created_by"); createdByStr != "" {
+			req.CreatedBy, _ = strconv.Atoi(createdByStr)
+		}
+		if telegramStr := c.FormValue("telegram"); telegramStr != "" {
+			req.Telegram = telegramStr == "true"
+		}
+		if textStr := c.FormValue("text"); textStr != "" {
+			req.Text = textStr
+		}
+
 	}
 
 	// Get department_id from ip_phones if phone_id is provided
@@ -242,9 +297,9 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 	if len(uploadedFiles) > 0 {
 		filePathsBytes, _ := json.Marshal(uploadedFiles)
 		log.Printf("Saving file_paths: %s", string(filePathsBytes))
-		res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, department_id, text, status, created_by, file_paths) VALUES (?, ?, ?, ?, ?, 0, ?, ?)`, req.PhoneID, ticketno, req.SystemID, req.DepartmentID, req.Text, req.CreatedBy, string(filePathsBytes))
+		res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, department_id, text, reported_by, status, created_by, file_paths) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`, req.PhoneID, ticketno, req.SystemID, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy, string(filePathsBytes))
 	} else {
-		res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, department_id, text, status, created_by) VALUES (?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.SystemID, req.DepartmentID, req.Text, req.CreatedBy)
+		res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, department_id, text, reported_by, status, created_by) VALUES (?, ?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.SystemID, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy)
 	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert task"})
@@ -292,6 +347,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 
 		req.PhoneNumber = phoneNumber
 		req.DepartmentName = departmentName
+		req.Ticket = ticketno
 		req.BranchName = branchName
 		req.ProgramName = programName
 		req.Url = "http://helpdesk.nopadol.com/"
@@ -363,6 +419,25 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		uploadedFiles, _ = handleFileUploads(allFiles, ticketno)
 	}
 
+	// Convert string form values to int for multipart data
+	if phoneIDStr := c.FormValue("phone_id"); phoneIDStr != "" && phoneIDStr != "0" {
+		if phoneID, err := strconv.Atoi(phoneIDStr); err == nil {
+			req.PhoneID = &phoneID
+		}
+	}
+	if systemIDStr := c.FormValue("system_id"); systemIDStr != "" {
+		req.SystemID, _ = strconv.Atoi(systemIDStr)
+	}
+	if departmentIDStr := c.FormValue("department_id"); departmentIDStr != "" {
+		req.DepartmentID, _ = strconv.Atoi(departmentIDStr)
+	}
+	if textStr := c.FormValue("text"); textStr != "" {
+		req.Text = textStr
+	}
+	if reportedByStr := c.FormValue("reported_by"); reportedByStr != "" {
+		req.ReportedBy = &reportedByStr
+	}
+
 	// Get department_id from phone_id if phone_id exists and is valid
 	if req.PhoneID != nil {
 		err := db.DB.QueryRow("SELECT department_id FROM ip_phones WHERE id = ?", *req.PhoneID).Scan(&req.DepartmentID)
@@ -387,13 +462,43 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 
 	// Handle file uploads
 	if len(uploadedFiles) > 0 {
-		// Get existing file_paths
+		// Delete existing files first
+		var existingFilePathsJSON string
+		db.DB.QueryRow(`SELECT IFNULL(file_paths, '[]') FROM tasks WHERE id = ?`, id).Scan(&existingFilePathsJSON)
+
+		if existingFilePathsJSON != "" && existingFilePathsJSON != "[]" {
+			var existingFiles []fiber.Map
+			if err := json.Unmarshal([]byte(existingFilePathsJSON), &existingFiles); err == nil {
+				for _, fp := range existingFiles {
+					if url, ok := fp["url"].(string); ok {
+						// Extract object name from URL
+						if strings.Contains(url, "prefix=") {
+							parts := strings.Split(url, "prefix=")
+							if len(parts) > 1 {
+								objectName := parts[1]
+								deleteImage(objectName)
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Upload new files
 		filePathsBytes, _ := json.Marshal(uploadedFiles)
 		log.Printf("Updating file_paths: %s", string(filePathsBytes))
 
-		_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+		if req.ReportedBy != nil {
+			_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+		} else {
+			_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+		}
 	} else {
-		_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
+		if req.ReportedBy != nil {
+			_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
+		} else {
+			_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
+		}
 	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
@@ -401,7 +506,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 
 	// Get message_id and update Telegram if exists
 	var messageID int
-	err = db.DB.QueryRow(`SELECT COALESCE(message_id, 0) FROM tasks WHERE id = ?`, id).Scan(&messageID)
+	err = db.DB.QueryRow(`SELECT IFNULL(ticket_no, ''),IFNULL(message_id, 0) FROM tasks WHERE id = ?`, id).Scan(&ticketno, &messageID)
 	if err == nil && messageID > 0 {
 		// Create TaskRequest from TaskRequestUpdate for Telegram
 		telegramReq := models.TaskRequest{
@@ -410,8 +515,10 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			DepartmentID: req.DepartmentID,
 			Text:         req.Text,
 			Status:       req.Status,
+			ReportedBy:   "",
+			MessageID:    messageID,
 
-			MessageID: messageID,
+			Ticket: ticketno,
 		}
 
 		// Get additional data for Telegram
@@ -435,25 +542,14 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		telegramReq.Url = "http://helpdesk.nopadol.com/"
 		telegramReq.CreatedAt = CreatedAt.Add(7 * time.Hour).Format("2006-01-02 15:04:05")
 		telegramReq.UpdatedAt = time.Now().Add(7 * time.Hour).Format("2006-01-02 15:04:05")
+		telegramReq.Ticket = ticketno
+		if req.ReportedBy != nil {
+			telegramReq.ReportedBy = *req.ReportedBy
+		}
 
 		_, _ = UpdateTelegram(telegramReq)
 	}
 	log.Printf("Updating task ID: %d", id)
-	return c.JSON(fiber.Map{"success": true})
-}
-
-func UpdateTaskStatusHandler(c *fiber.Ctx) error {
-	var req models.TaskStatusUpdateRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
-	}
-
-	_, err := db.DB.Exec(`UPDATE tasks SET status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.Status, req.UpdatedBy, req.ID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task status"})
-	}
-
-	log.Printf("Updating task ID: %d status to: %d", req.ID, req.Status)
 	return c.JSON(fiber.Map{"success": true})
 }
 
@@ -465,11 +561,30 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
 	}
 
-	// Get message_id before deleting
+	// Get message_id and file_paths before deleting
 	var messageID int
-	err = db.DB.QueryRow(`SELECT COALESCE(message_id, 0) FROM tasks WHERE id = ?`, id).Scan(&messageID)
+	var filePathsJSON string
+	err = db.DB.QueryRow(`SELECT IFNULL(message_id, 0), IFNULL(file_paths, '[]') FROM tasks WHERE id = ?`, id).Scan(&messageID, &filePathsJSON)
 	if err != nil {
-		log.Printf("Failed to get message_id: %v", err)
+		log.Printf("Failed to get task data: %v", err)
+	}
+
+	// Delete files from MinIO if they exist
+	if filePathsJSON != "" && filePathsJSON != "[]" {
+		var filePaths []fiber.Map
+		if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
+			for _, fp := range filePaths {
+				if url, ok := fp["url"].(string); ok {
+					if strings.Contains(url, "prefix=") {
+						parts := strings.Split(url, "prefix=")
+						if len(parts) > 1 {
+							objectName := parts[1]
+							deleteImage(objectName)
+						}
+					}
+				}
+			}
+		}
 	}
 
 	_, err = db.DB.Exec(`DELETE FROM tasks WHERE id=?`, id)
@@ -495,33 +610,35 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 	var filePathsJSON string
 	var task models.TaskWithDetails
 	err = db.DB.QueryRow(`
-		SELECT t.id, t.phone_id, IFNULL(p.number, 0), IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''),
-		t.department_id, IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''),
-		t.text, t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')
+		SELECT t.id, IFNULL(t.ticket_no, '') as ticket_to, IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number, IFNULL(p.name, '') as phone_name, IFNULL(t.system_id, 0) as system_id, IFNULL(s.name, '') as system_name,
+		IFNULL(t.department_id, 0) as department_id, IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
+		IFNULL(t.text, '') as text, IFNULL(t.status, 0) as status, IFNULL(t.created_at, '') as created_at, IFNULL(t.updated_at, '') as updated_at, IFNULL(t.file_paths, '[]') as file_paths
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
 		WHERE t.id = ?
-	`, id).Scan(&task.ID, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
+	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
 
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
 	}
 
-	fileURLs := make([]string, 0)
+	// Parse file_paths JSON and convert to image_{index} format
+	fileMap := make(map[string]string)
 	if filePathsJSON != "" && filePathsJSON != "[]" {
 		var filePaths []fiber.Map
 		if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
-			for _, fp := range filePaths {
+			for i, fp := range filePaths {
 				if url, ok := fp["url"].(string); ok {
-					fileURLs = append(fileURLs, url)
+					fileMap[fmt.Sprintf("image_%d", i)] = url
 				}
 			}
 		}
 	}
-	task.FilePaths = fileURLs
+	// Set FilePaths as map instead of array
+	task.FilePaths = fileMap
 
 	log.Printf("Getting task ID: %d details", id)
 	return c.JSON(fiber.Map{"success": true, "data": task})

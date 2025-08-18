@@ -74,7 +74,6 @@ func CreateBranchHandler(c *fiber.Ctx) error {
 	}
 
 	id, _ := res.LastInsertId()
-	log.Printf("Inserted new branch: %s", req.Name)
 	return c.JSON(fiber.Map{"success": true, "id": id})
 }
 
@@ -96,7 +95,6 @@ func UpdateBranchHandler(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update branch"})
 	}
 
-	log.Printf("Updating branch ID: %d with name: %s", id, req.Name)
 	return c.JSON(fiber.Map{"success": true})
 }
 

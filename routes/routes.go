@@ -32,6 +32,11 @@ func RegisterRoutes(r *fiber.App) {
 	r.Get("/api/v1/program/list", handlers.ListProgramsHandler)
 	r.Get("/api/v1/program/list/:query", handlers.ListProgramsQueryHandler)
 	r.Post("/api/v1/program/create", handlers.CreateProgramHandler)
+	r.Get("/api/v1/program/type/list", handlers.GETTypeProgramHandler)
+	r.Get("/api/v1/program/type/list/:query", handlers.GetTypeWithQueryHandler)
+	r.Post("/api/v1/program/type/create", handlers.AddTypeProgramHandler)
+	r.Post("/api/v1/program/type/update", handlers.UpdateTypeProgramHandler)
+	r.Delete("/api/v1/program/type/delete/:id", handlers.DeleteTypeHandler)
 	r.Get("/api/v1/program/:id", handlers.GetProgramDetailHandler)
 	r.Put("/api/v1/program/update/:id", handlers.UpdateProgramHandler)
 	r.Delete("/api/v1/program/delete/:id", handlers.DeleteProgramHandler)
@@ -56,8 +61,6 @@ func RegisterRoutes(r *fiber.App) {
 
 	//Dashboard routes
 	r.Get("/api/v1/dashboard/data", handlers.GetDashboardDataHandler)
-
-	r.Put("/api/v1/updateTaskStatus", handlers.UpdateTaskStatusHandler)
 
 	r.Get("/api/v1/scores/list", handlers.ListScoresHandler)
 	r.Get("/api/v1/scores/:id", handlers.GetScoreDetailHandler)
