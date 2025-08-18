@@ -8,6 +8,7 @@ type TaskRequest struct {
 	DepartmentID   int    `json:"department_id"`
 	Text           string `json:"text"`
 	ReportedBy     string `json:"reported_by"`
+	Assignto       string `json:"assign_to"`
 	Status         int    `json:"status"`
 	CreatedBy      int    `json:"created_by"`
 	UpdatedBy      int    `json:"updated_by"`

@@ -12,7 +12,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func SendTelegram(req models.TaskRequest) (int, error) {
+func SendTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	// botToken := os.Getenv("BOT_TOKEN")
 	// chatIDStr := os.Getenv("CHAT_ID")
 
@@ -70,7 +70,7 @@ func SendTelegram(req models.TaskRequest) (int, error) {
 		msg += "👤 *ผู้แจ้ง:* `" + req.ReportedBy + "`\n"
 	}
 	msg += "📅 *วันที่แจ้งปัญหา:* `" + req.CreatedAt + "`\n"
-
+	msg += "━━━━━━━━━━━━━━━━━━━━━━━━"
 	msg += "\n" + statusIcon + " *สถานะ:* `" + statusText + "`\n"
 	if req.Status == 1 {
 		msg += "📅 *วันที่แก้ไขเสร็จ:* `" + req.UpdatedAt + "`\n"
@@ -83,9 +83,21 @@ func SendTelegram(req models.TaskRequest) (int, error) {
 	if req.Url != "" {
 		msg += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")\n"
 	}
+
+	// Always send text message first
 	message := tgbotapi.NewMessage(chatID, msg)
 	message.ParseMode = "Markdown"
 	sentMsg, err := bot.Send(message)
+	if err != nil {
+		return 0, err
+	}
+
+	// Send photo separately if photoURL is provided
+	if len(photoURL) > 0 && photoURL[0] != "" {
+		photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileURL(photoURL[0]))
+		_, _ = bot.Send(photoMsg)
+	}
+
 	if err != nil {
 		return 0, err
 	}
@@ -94,7 +106,7 @@ func SendTelegram(req models.TaskRequest) (int, error) {
 	return sentMsg.MessageID, nil
 }
 
-func UpdateTelegram(req models.TaskRequest) (int, error) {
+func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Printf("Warning: Error loading .env file: %v", err)
@@ -126,7 +138,7 @@ func UpdateTelegram(req models.TaskRequest) (int, error) {
 	newMessage += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
 
 	if req.Ticket != "" {
-		newMessage += "🎫 *Ticket No:* `" + req.Ticket + "`\n"
+		newMessage += "\n🎫 *Ticket No:* `" + req.Ticket + "`\n"
 	}
 	if req.BranchName != "" {
 		newMessage += "🏢 *สาขา:* `" + req.BranchName + "`\n"
@@ -145,7 +157,10 @@ func UpdateTelegram(req models.TaskRequest) (int, error) {
 	}
 
 	newMessage += "📅 *วันที่แจ้งปัญหา:* `" + req.CreatedAt + "`\n"
-
+	newMessage += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+	if req.Assignto != "" {
+		newMessage += "\n👤 *ผู้รับผิดชอบ:* `" + req.Assignto + "`"
+	}
 	newMessage += "\n" + statusIcon + " *สถานะ:* `" + statusText + "`\n"
 	if req.Status == 1 {
 		newMessage += "📅 *วันที่แก้ไขเสร็จ:* `" + req.UpdatedAt + "`\n"
@@ -158,14 +173,24 @@ func UpdateTelegram(req models.TaskRequest) (int, error) {
 	if req.Url != "" {
 		newMessage += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")\n"
 	}
+
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
 		log.Panic(err)
 	}
 
+	// Try editing text message first, if it fails try editing caption
 	editMsg := tgbotapi.NewEditMessageText(chatID, messageID, newMessage)
 	editMsg.ParseMode = "Markdown"
 	_, err = bot.Send(editMsg)
+
+	// If editing text fails, try editing caption (for photo messages)
+	if err != nil {
+		editCaption := tgbotapi.NewEditMessageCaption(chatID, messageID, newMessage)
+		editCaption.ParseMode = "Markdown"
+		_, err = bot.Send(editCaption)
+	}
+
 	if err != nil {
 		log.Printf("Error editing message: %v", err)
 		return 0, err
@@ -193,12 +218,17 @@ func DeleteTelegram(messageID int) (bool, error) {
 		return false, err
 	}
 
+	// Delete main message
 	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
 	_, err = bot.Send(deleteMsg)
 	if err != nil {
 		log.Printf("Error deleting message: %v", err)
 		return false, err
 	}
+
+	// Try to delete photo message (next message ID)
+	deletePhotoMsg := tgbotapi.NewDeleteMessage(chatID, messageID+1)
+	_, _ = bot.Send(deletePhotoMsg) // Ignore error if photo doesn't exist
 
 	log.Printf("Message ID %d deleted successfully!", messageID)
 	return true, nil

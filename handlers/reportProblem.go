@@ -354,7 +354,19 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		req.CreatedAt = time.Now().Add(7 * time.Hour).Format("2006-01-02 15:04:05")
 		req.Status = 0
 
-		messageID, err := SendTelegram(req)
+		var messageID int
+		// Send with photo if files were uploaded
+		if len(uploadedFiles) > 0 {
+			// Get first image URL
+			if firstFile, ok := uploadedFiles[0]["url"].(string); ok {
+				messageID, err = SendTelegram(req, firstFile)
+			} else {
+				messageID, err = SendTelegram(req)
+			}
+		} else {
+			messageID, err = SendTelegram(req)
+		}
+
 		if err == nil {
 			// Update task with message_id
 			_, err = db.DB.Exec(`UPDATE tasks SET message_id = ? WHERE id = ?`, messageID, id)
@@ -506,7 +518,9 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 
 	// Get message_id and update Telegram if exists
 	var messageID int
-	err = db.DB.QueryRow(`SELECT IFNULL(ticket_no, ''),IFNULL(message_id, 0) FROM tasks WHERE id = ?`, id).Scan(&ticketno, &messageID)
+	var reported string
+	var existingFilePathsJSON string
+	err = db.DB.QueryRow(`SELECT IFNULL(ticket_no, ''),IFNULL(message_id, 0), IFNULL(reported_by, ''), IFNULL(file_paths, '[]') FROM tasks WHERE id = ?`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON)
 	if err == nil && messageID > 0 {
 		// Create TaskRequest from TaskRequestUpdate for Telegram
 		telegramReq := models.TaskRequest{
@@ -515,7 +529,8 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			DepartmentID: req.DepartmentID,
 			Text:         req.Text,
 			Status:       req.Status,
-			ReportedBy:   "",
+			ReportedBy:   reported,
+			Assignto:     "",
 			MessageID:    messageID,
 
 			Ticket: ticketno,
@@ -543,11 +558,28 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		telegramReq.CreatedAt = CreatedAt.Add(7 * time.Hour).Format("2006-01-02 15:04:05")
 		telegramReq.UpdatedAt = time.Now().Add(7 * time.Hour).Format("2006-01-02 15:04:05")
 		telegramReq.Ticket = ticketno
-		if req.ReportedBy != nil {
-			telegramReq.ReportedBy = *req.ReportedBy
+		telegramReq.ReportedBy = reported
+		if req.Assignto != nil {
+			telegramReq.Assignto = *req.Assignto
 		}
 
-		_, _ = UpdateTelegram(telegramReq)
+		// Get first image URL from existing files for Telegram
+		var firstImageURL string
+		if existingFilePathsJSON != "" && existingFilePathsJSON != "[]" {
+			var existingFiles []fiber.Map
+			if err := json.Unmarshal([]byte(existingFilePathsJSON), &existingFiles); err == nil && len(existingFiles) > 0 {
+				if url, ok := existingFiles[0]["url"].(string); ok {
+					firstImageURL = url
+				}
+			}
+		}
+
+		// Send update to Telegram with photo if available
+		if firstImageURL != "" {
+			_, _ = UpdateTelegram(telegramReq, firstImageURL)
+		} else {
+			_, _ = UpdateTelegram(telegramReq)
+		}
 	}
 	log.Printf("Updating task ID: %d", id)
 	return c.JSON(fiber.Map{"success": true})
@@ -610,16 +642,17 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 	var filePathsJSON string
 	var task models.TaskWithDetails
 	err = db.DB.QueryRow(`
-		SELECT t.id, IFNULL(t.ticket_no, '') as ticket_to, IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number, IFNULL(p.name, '') as phone_name, IFNULL(t.system_id, 0) as system_id, IFNULL(s.name, '') as system_name,
+		SELECT t.id, IFNULL(t.ticket_no, '') as ticket_to, IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number, IFNULL(p.name, '') as phone_name, IFNULL(t.system_id, 0) as system_id, IFNULL(s.name, '') as system_name, IFNULL(it.name, '') as system_type,
 		IFNULL(t.department_id, 0) as department_id, IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
-		IFNULL(t.text, '') as text, IFNULL(t.status, 0) as status, IFNULL(t.created_at, '') as created_at, IFNULL(t.updated_at, '') as updated_at, IFNULL(t.file_paths, '[]') as file_paths
+		IFNULL(t.text, '') as text, IFNULL(t.assignto, ''), IFNULL(t.reported_by, '') as reported_by, IFNULL(t.status, 0) as status, IFNULL(t.created_at, '') as created_at, IFNULL(t.updated_at, '') as updated_at, IFNULL(t.file_paths, '[]') as file_paths
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
+		LEFT JOIN issue_types it ON s.type = it.id
 		WHERE t.id = ?
-	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
+	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.SystemType, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Assignto, &task.ReportedBy, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
 
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
