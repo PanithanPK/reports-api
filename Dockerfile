@@ -24,10 +24,8 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/main .
+COPY --from=builder /app/.env.prod .env
 COPY --from=builder /app/package.json .
-
-# Copy .env.prod if it exists, otherwise skip
-COPY --from=builder /app/.env.prod* ./
 
 # Set default environment
 # ARG ENV=prod
@@ -43,5 +41,5 @@ EXPOSE 5001
 
 # Run with memory limits
 # Use environment variable to set the environment flag
-# Default to production (-p) for prod image
-CMD ["./main", "-p"]
+# Default to production (-p) if no environment is specified
+CMD if [ "${APP_ENV}" = "prod" ]; then ./main -p; else ./main -d; fi
