@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
 	"os"
@@ -140,15 +141,26 @@ func main() {
 	app.Static("/static", "./fontend")
 	logger.Info.Println("📁 Static file server configured")
 
-	// Serve index.html at root
+	// Health Check endpoint
 	app.Get("/", func(c *fiber.Ctx) error {
-		logger.Info.Printf("📄 Serving index.html to %s", c.IP())
-		return c.SendFile("./fontend/index.html")
+		version := "unknown"
+		if data, err := os.ReadFile("package.json"); err == nil {
+			var pkg map[string]interface{}
+			if json.Unmarshal(data, &pkg) == nil {
+				if v, ok := pkg["version"].(string); ok {
+					version = v
+				}
+			}
+		}
+		return c.JSON(fiber.Map{
+			"status":  "OK",
+			"version": version,
+		})
 	})
 
 	// Register API routes
 	logger.Info.Println("🔗 Registering API routes...")
-	routes.RegisterRoutes(app)
+	routes.MainRoutes(app)
 	logger.Info.Println("✅ API routes registered successfully")
 
 	// Register Authentication routes

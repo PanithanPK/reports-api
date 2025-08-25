@@ -270,6 +270,9 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		if createdByStr := c.FormValue("created_by"); createdByStr != "" {
 			req.CreatedBy, _ = strconv.Atoi(createdByStr)
 		}
+		if reportedByStr := c.FormValue("reported_by"); reportedByStr != "" {
+			req.ReportedBy = reportedByStr
+		}
 		if telegramStr := c.FormValue("telegram"); telegramStr != "" {
 			req.Telegram = telegramStr == "true"
 		}
@@ -351,7 +354,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		req.BranchName = branchName
 		req.ProgramName = programName
 		req.Url = "http://helpdesk.nopadol.com/"
-		req.CreatedAt = time.Now().Add(7 * time.Hour).Format("2006-01-02 15:04:05")
+		req.CreatedAt = time.Now().Add(7 * time.Hour).Format("02/01/2006 15:04:05")
 		req.Status = 0
 
 		var messageID int
@@ -555,8 +558,8 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		telegramReq.BranchName = branchName
 		telegramReq.ProgramName = programName
 		telegramReq.Url = "http://helpdesk.nopadol.com/"
-		telegramReq.CreatedAt = CreatedAt.Add(7 * time.Hour).Format("2006-01-02 15:04:05")
-		telegramReq.UpdatedAt = time.Now().Add(7 * time.Hour).Format("2006-01-02 15:04:05")
+		telegramReq.CreatedAt = CreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
+		telegramReq.UpdatedAt = time.Now().Add(7 * time.Hour).Format("02/01/2006 15:04:05")
 		telegramReq.Ticket = ticketno
 		telegramReq.ReportedBy = reported
 		if req.Assignto != nil {

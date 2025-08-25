@@ -49,7 +49,7 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	}
 
 	msg := headerColor + "\n"
-	msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+	msg += "━━━━━━━━━━━━━━\n"
 
 	if req.Ticket != "" {
 		msg += "🎫 *Ticket No:* `" + req.Ticket + "`\n"
@@ -70,13 +70,13 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		msg += "👤 *ผู้แจ้ง:* `" + req.ReportedBy + "`\n"
 	}
 	msg += "📅 *วันที่แจ้งปัญหา:* `" + req.CreatedAt + "`\n"
-	msg += "━━━━━━━━━━━━━━━━━━━━━━━━"
+	msg += "━━━━━━━━━━━━━━"
 	msg += "\n" + statusIcon + " *สถานะ:* `" + statusText + "`\n"
 	if req.Status == 1 {
 		msg += "📅 *วันที่แก้ไขเสร็จ:* `" + req.UpdatedAt + "`\n"
 	}
 
-	msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+	msg += "━━━━━━━━━━━━━━\n"
 	msg += "📝 *รายละเอียดปัญหา:*\n"
 	msg += "```\n" + req.Text + "\n```"
 
@@ -84,18 +84,17 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		msg += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")\n"
 	}
 
-	// Always send text message first
-	message := tgbotapi.NewMessage(chatID, msg)
-	message.ParseMode = "Markdown"
-	sentMsg, err := bot.Send(message)
-	if err != nil {
-		return 0, err
-	}
-
-	// Send photo separately if photoURL is provided
+	var sentMsg tgbotapi.Message
+	// Send photo if photoURL is provided, otherwise send text message
 	if len(photoURL) > 0 && photoURL[0] != "" {
 		photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileURL(photoURL[0]))
-		_, _ = bot.Send(photoMsg)
+		photoMsg.Caption = msg
+		photoMsg.ParseMode = "Markdown"
+		sentMsg, err = bot.Send(photoMsg)
+	} else {
+		message := tgbotapi.NewMessage(chatID, msg)
+		message.ParseMode = "Markdown"
+		sentMsg, err = bot.Send(message)
 	}
 
 	if err != nil {
@@ -135,7 +134,7 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	}
 
 	newMessage := headerColor + "\n"
-	newMessage += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+	newMessage += "━━━━━━━━━━━━━━\n"
 
 	if req.Ticket != "" {
 		newMessage += "\n🎫 *Ticket No:* `" + req.Ticket + "`\n"
@@ -157,7 +156,7 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	}
 
 	newMessage += "📅 *วันที่แจ้งปัญหา:* `" + req.CreatedAt + "`\n"
-	newMessage += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+	newMessage += "━━━━━━━━━━━━━━\n"
 	if req.Assignto != "" {
 		newMessage += "\n👤 *ผู้รับผิดชอบ:* `" + req.Assignto + "`"
 	}
@@ -166,7 +165,7 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		newMessage += "📅 *วันที่แก้ไขเสร็จ:* `" + req.UpdatedAt + "`\n"
 	}
 
-	newMessage += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+	newMessage += "━━━━━━━━━━━━━━\n"
 	newMessage += "📝 *รายละเอียดปัญหา:*\n"
 	newMessage += "```\n" + req.Text + "\n```"
 
@@ -179,16 +178,15 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		log.Panic(err)
 	}
 
-	// Try editing text message first, if it fails try editing caption
-	editMsg := tgbotapi.NewEditMessageText(chatID, messageID, newMessage)
-	editMsg.ParseMode = "Markdown"
-	_, err = bot.Send(editMsg)
-
-	// If editing text fails, try editing caption (for photo messages)
-	if err != nil {
-		editCaption := tgbotapi.NewEditMessageCaption(chatID, messageID, newMessage)
-		editCaption.ParseMode = "Markdown"
-		_, err = bot.Send(editCaption)
+	// Edit photo caption if photoURL is provided, otherwise edit text message
+	if len(photoURL) > 0 && photoURL[0] != "" {
+		editMsg := tgbotapi.NewEditMessageCaption(chatID, messageID, newMessage)
+		editMsg.ParseMode = "Markdown"
+		_, err = bot.Send(editMsg)
+	} else {
+		editMsg := tgbotapi.NewEditMessageText(chatID, messageID, newMessage)
+		editMsg.ParseMode = "Markdown"
+		_, err = bot.Send(editMsg)
 	}
 
 	if err != nil {
@@ -218,17 +216,12 @@ func DeleteTelegram(messageID int) (bool, error) {
 		return false, err
 	}
 
-	// Delete main message
 	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
 	_, err = bot.Send(deleteMsg)
 	if err != nil {
 		log.Printf("Error deleting message: %v", err)
 		return false, err
 	}
-
-	// Try to delete photo message (next message ID)
-	deletePhotoMsg := tgbotapi.NewDeleteMessage(chatID, messageID+1)
-	_, _ = bot.Send(deletePhotoMsg) // Ignore error if photo doesn't exist
 
 	log.Printf("Message ID %d deleted successfully!", messageID)
 	return true, nil

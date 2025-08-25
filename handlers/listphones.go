@@ -33,6 +33,7 @@ func ListIPPhonesHandler(c *fiber.Ctx) error {
 		LEFT JOIN departments d ON ip.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		WHERE ip.deleted_at IS NULL
+		ORDER BY ip.id DESC
 		LIMIT ? OFFSET ?
 	`, pagination.Limit, offset)
 	if err != nil {
@@ -276,7 +277,7 @@ func GetIPPhonesDetailHandler(c *fiber.Ctx) error {
 	`, id).Scan(
 		&ipPhone.ID, &ipPhone.Number, &ipPhone.Name, &ipPhone.DepartmentID,
 		&ipPhone.DepartmentName, &ipPhone.BranchID, &ipPhone.BranchName,
-		&ipPhone.CreatedAt, &ipPhone.UpdatedAt, &ipPhone.DeletedAt, 
+		&ipPhone.CreatedAt, &ipPhone.UpdatedAt, &ipPhone.DeletedAt,
 		&ipPhone.CreatedBy, &ipPhone.UpdatedBy, &ipPhone.DeletedBy,
 	)
 

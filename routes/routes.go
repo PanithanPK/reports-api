@@ -6,8 +6,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// RegisterRoutes registers all API routes
-func RegisterRoutes(r *fiber.App) {
+// MainRoutes registers all API routes
+func MainRoutes(r *fiber.App) {
 
 	// Problem routes
 	r.Get("/api/v1/problem/list", handlers.GetTasksHandler)
@@ -35,7 +35,7 @@ func RegisterRoutes(r *fiber.App) {
 	r.Get("/api/v1/program/type/list", handlers.GETTypeProgramHandler)
 	r.Get("/api/v1/program/type/list/:query", handlers.GetTypeWithQueryHandler)
 	r.Post("/api/v1/program/type/create", handlers.AddTypeProgramHandler)
-	r.Post("/api/v1/program/type/update", handlers.UpdateTypeProgramHandler)
+	r.Post("/api/v1/program/type/update/:id", handlers.UpdateTypeProgramHandler)
 	r.Delete("/api/v1/program/type/delete/:id", handlers.DeleteTypeHandler)
 	r.Get("/api/v1/program/:id", handlers.GetProgramDetailHandler)
 	r.Put("/api/v1/program/update/:id", handlers.UpdateProgramHandler)

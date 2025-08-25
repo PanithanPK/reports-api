@@ -17,6 +17,7 @@ type Program struct {
 // ProgramRequest model for receiving program data
 type ProgramRequest struct {
 	Name      *string `json:"name"`
+	Priority  *int    `json:"priority"`
 	TypeID    *int    `json:"type_id"`
 	CreatedBy *int    `json:"created_by"`
 	UpdatedBy *int    `json:"updated_by"`
