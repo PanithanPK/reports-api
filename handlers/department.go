@@ -33,6 +33,7 @@ func ListDepartmentsHandler(c *fiber.Ctx) error {
 		FROM departments d
 		LEFT JOIN branches b ON d.branch_id = b.id
 		WHERE d.deleted_at IS NULL
+		ORDER BY d.id DESC
 		LIMIT ? OFFSET ?
 	`, pagination.Limit, offset)
 	if err != nil {

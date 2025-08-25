@@ -26,10 +26,11 @@ func ListProgramsHandler(c *fiber.Ctx) error {
 
 	// Get paginated data
 	rows, err := db.DB.Query(`
-		SELECT sp.id, sp.name, IFNULL(sp.type, 0), IFNULL(it.name, ''), sp.created_at, sp.updated_at, sp.deleted_at, sp.created_by, sp.updated_by, sp.deleted_by 
+		SELECT sp.id, sp.name, IFNULL(sp.type, 0) as type_id, IFNULL(it.name, '') as type_name, sp.created_at, sp.updated_at, sp.deleted_at, sp.created_by, sp.updated_by, sp.deleted_by 
 		FROM systems_program sp
 		LEFT JOIN issue_types it ON sp.type = it.id
-		WHERE deleted_at IS NULL 
+		WHERE deleted_at IS NULL
+		ORDER BY sp.id DESC
 		LIMIT ? OFFSET ?
 	`, pagination.Limit, offset)
 	if err != nil {
@@ -68,7 +69,12 @@ func CreateProgramHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	res, err := db.DB.Exec(`INSERT INTO systems_program (name, type, created_by) VALUES (?, ?, ?)`, req.Name, req.TypeID, req.CreatedBy)
+	if req.Priority == nil || *req.Priority == 0 {
+		priority := 2
+		req.Priority = &priority
+	}
+
+	res, err := db.DB.Exec(`INSERT INTO systems_program (name, priority, type, created_by) VALUES (?, ?, ?, ?)`, req.Name, req.Priority, req.TypeID, req.CreatedBy)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert program"})
 	}
