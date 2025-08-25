@@ -1,0 +1,32 @@
+stages:
+  - build
+
+variables:
+  DOCKER_USERNAME: "lovee12345e"
+  IMAGE_NAME: "reports-api"
+
+services:
+  - docker:dind
+
+build_dev:
+  stage: build
+  image: docker:latest
+  only:
+    - develop
+  script:
+    - docker build -t $DOCKER_USERNAME/$IMAGE_NAME:dev -f Dockerfile.dev .
+    - echo $DOCKER_TOKEN_DEV | docker login -u $DOCKER_USERNAME --password-stdin
+    - docker push $DOCKER_USERNAME/$IMAGE_NAME:dev
+    - docker logout
+
+build_prod:
+  stage: build
+  image: docker:latest
+  only:
+    - main
+  script:
+    - docker build -t $DOCKER_USERNAME/$IMAGE_NAME:prod -f Dockerfile .
+    - echo $DOCKER_TOKEN_PROD | docker login -u $DOCKER_USERNAME --password-stdin
+    - docker push $DOCKER_USERNAME/$IMAGE_NAME:prod
+    - docker logout
+  when: manual
