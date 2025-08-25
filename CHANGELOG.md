@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.9.0](https://github.com/PanithanPK/reports-api/compare/v1.8.0...v1.9.0) (2025-08-25)
+
+
+### Features
+
+* Update telegram show images ([c383b22](https://github.com/PanithanPK/reports-api/commit/c383b22a6dba01a426067c9fa628a6a425cf851c))
+
+
+### Bug Fixes
+
+* bug telegram massage ([7ab0e5e](https://github.com/PanithanPK/reports-api/commit/7ab0e5edbcf39e524adb4a2fdc66ae80d9bfa9c9))
+
 ## [1.8.0](https://github.com/PanithanPK/reports-api/compare/v1.7.0...v1.8.0) (2025-08-18)
 
 
