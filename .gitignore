@@ -11,3 +11,5 @@
 *.sh
 /tests
 tests
+
+PROJECT_OVERVIEW.md
