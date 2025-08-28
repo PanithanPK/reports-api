@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.10.0](https://github.com/PanithanPK/reports-api/compare/v1.7.0...v1.10.0) (2025-08-28)
+
+
+### Features
+
+* Add assignto ([db5658c](https://github.com/PanithanPK/reports-api/commit/db5658cd84568c02898456ad201ab4fef74fa7ba))
+* Add list to search and upload images ([a011eec](https://github.com/PanithanPK/reports-api/commit/a011eec3779e7fb6a240414a43ba7b22c97a633d))
+* Add upload images fix bug ([154969b](https://github.com/PanithanPK/reports-api/commit/154969b6d2d452c83f114402fa9e1f9ba8f418c5))
+* Git workflow ([ce04fea](https://github.com/PanithanPK/reports-api/commit/ce04fea38ff4a72a71f632229f08cff28dc51149))
+* Git workflow ([8c6c8ff](https://github.com/PanithanPK/reports-api/commit/8c6c8ff3ea2f8fc76bd1aae471f5958fdf6b6fde))
+* gitlab CI/CD ([da1c5f0](https://github.com/PanithanPK/reports-api/commit/da1c5f02baa3962f5653fd739c424560b1fe59e7))
+* reported and type system ([8355e93](https://github.com/PanithanPK/reports-api/commit/8355e9326175e351f7435c5e24428309189b123c))
+* Update telegram show images ([271d3c5](https://github.com/PanithanPK/reports-api/commit/271d3c575aab72b009e4a3286ffe9e31e10ab3a3))
+
+
+### Bug Fixes
+
+* bug telegram massage ([b4e0ea1](https://github.com/PanithanPK/reports-api/commit/b4e0ea13f5239e45aeded67a2af8185c02cadb73))
+* fix Dockerfile ([9d65167](https://github.com/PanithanPK/reports-api/commit/9d6516795117b1d3b6608eba1094835c99b24798))
+* fix gitlab ([8abd80e](https://github.com/PanithanPK/reports-api/commit/8abd80e700b21432b7020ffbe150f6395672928b))
+* fix gitlab ([86111f4](https://github.com/PanithanPK/reports-api/commit/86111f4d9ca9e3d71b24108fa65654d997f505b8))
+* fix gitlab ([57c32d8](https://github.com/PanithanPK/reports-api/commit/57c32d8755efeb23803d7886ebd7728fdcd2be74))
+* fix gitlab ([52a6604](https://github.com/PanithanPK/reports-api/commit/52a66045a715a7cf55d27e71e03130e2dfcf8284))
+* fix up ([43d3e9d](https://github.com/PanithanPK/reports-api/commit/43d3e9d2aed20439954e6b818ffa72ddbb7d2f37))
+* fix up ([4d1b692](https://github.com/PanithanPK/reports-api/commit/4d1b6921d70df14c063ab06af06e0076df4caa18))
+
 ## [1.9.0](https://github.com/PanithanPK/reports-api/compare/v1.8.0...v1.9.0) (2025-08-25)
 
 
