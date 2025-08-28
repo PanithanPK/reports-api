@@ -184,7 +184,7 @@ func GetresponsHandler(c *fiber.Ctx) error {
 }
 
 func AddresponsHandler(c *fiber.Ctx) error {
-	var req models.ResponseR
+	var req models.ResponseRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
@@ -199,4 +199,40 @@ func AddresponsHandler(c *fiber.Ctx) error {
 
 	log.Printf("Responsibility %s added successfully", req.Name)
 	return c.JSON(fiber.Map{"message": "Responsibility added"})
+}
+
+func UpdateResponsHandler(c *fiber.Ctx) error {
+	var req models.ResponseRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	_, err := db.DB.Exec(
+		"UPDATE responsibilities SET name = ? WHERE id = ?",
+		req.Name, req.ID,
+	)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update responsibility"})
+	}
+
+	log.Printf("Responsibility ID: %d updated successfully", req.ID)
+	return c.JSON(fiber.Map{"message": "Responsibility updated"})
+}
+
+func DeleteResponsHandler(c *fiber.Ctx) error {
+	var req models.ResponseRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	_, err := db.DB.Exec(
+		"DELETE FROM responsibilities WHERE id = ?",
+		req.ID,
+	)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete responsibility"})
+	}
+
+	log.Printf("Responsibility ID: %d deleted successfully", req.ID)
+	return c.JSON(fiber.Map{"message": "Responsibility deleted"})
 }

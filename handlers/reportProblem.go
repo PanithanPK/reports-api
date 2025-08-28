@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reports-api/db"
 	"reports-api/models"
 	"reports-api/utils"
@@ -22,8 +23,22 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-func generateticketno(no int) string {
-	ticket := fmt.Sprintf("ticket-"+"%04d", no)
+func generateticketno() string {
+	// สร้าง ticket เป็น TK-วันเดือนปี-no โดยใช้เลขล่าสุดของเดือนนั้น ๆ + 1
+	now := time.Now().Add(7 * time.Hour)
+	dateStr := now.Format("02012006") // วันเดือนปี
+	year := now.Year()
+	month := int(now.Month())
+
+	// ดึงเลข ticket ล่าสุดของเดือน/ปีนี้
+	var lastNo int
+	err := db.DB.QueryRow(`SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_no, LENGTH(ticket_no)-4, 5) AS UNSIGNED)), 0) FROM tasks WHERE YEAR(created_at) = ? AND MONTH(created_at) = ?`, year, month).Scan(&lastNo)
+	if err != nil {
+		log.Printf("Error getting last ticket no for month/year: %v", err)
+		lastNo = 0
+	}
+	ticketNo := lastNo + 1
+	ticket := fmt.Sprintf("TK-%s-%05d", dateStr, ticketNo)
 	return ticket
 }
 
@@ -83,6 +98,10 @@ func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 
 	for i, file := range files {
 		src, err := file.Open()
+		contentType := "image/jpeg"
+		if filepath.Ext(file.Filename) == ".png" {
+			contentType = "image/png"
+		}
 		if err != nil {
 			log.Printf("Failed to open %s: %v", file.Filename, err)
 			errors = append(errors, fmt.Sprintf("Failed to open %s: %v", file.Filename, err))
@@ -90,7 +109,8 @@ func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 		}
 
 		dateStr := time.Now().Add(7 * time.Hour).Format("01022006")
-		objectName := fmt.Sprintf("%s-%02d-%s-%s", ticketno, i+1, dateStr, file.Filename)
+		filenameSafe := strings.ReplaceAll(file.Filename, " ", "-")
+		objectName := fmt.Sprintf("%s-%02d-%s-%s", ticketno, i+1, dateStr, filenameSafe)
 
 		_, err = minioClient.PutObject(
 			context.Background(),
@@ -98,7 +118,7 @@ func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 			objectName,
 			src,
 			file.Size,
-			minio.PutObjectOptions{ContentType: file.Header.Get("Content-Type")},
+			minio.PutObjectOptions{ContentType: contentType},
 		)
 		src.Close()
 
@@ -131,15 +151,13 @@ func GetTasksHandler(c *fiber.Ctx) error {
 
 	// Get paginated data
 	query := `
-		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number , IFNULL(p.name, '') as phone_name, t.system_id, IFNULL(s.name, '') as system_name, IFNULL(it.name, '') as system_type,
-		IFNULL(t.department_id, 0) as department_id, IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
-		t.text, IFNULL(t.assignto, ''), IFNULL(t.reported_by, '') as reported_by, t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]') as file_paths
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
-		LEFT JOIN issue_types it ON s.type = it.id
+		LEFT JOIN issue_types it ON t.issue_type = it.id
 		ORDER BY id DESC
 		LIMIT ? OFFSET ?
 	`
@@ -153,12 +171,19 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	var tasks []models.TaskWithDetails
 	for rows.Next() {
 		var t models.TaskWithDetails
+		var issueTypeName string
 		var filePathsJSON string
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.SystemType, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
 
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue
+		}
+
+		if t.SystemID > 0 {
+			t.SystemType = issueTypeName
+		} else {
+			t.SystemType = issueTypeName
 		}
 
 		// Parse file_paths JSON
@@ -222,14 +247,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 	var req models.TaskRequest
 	var uploadedFiles []fiber.Map
 	// Get latest ID and add 1 for ticket number
-	var lastID int
-	err := db.DB.QueryRow("SELECT COALESCE(MAX(id), 0) FROM tasks").Scan(&lastID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to get last ID"})
-	}
-
-	nextID := lastID + 1
-	ticketno := generateticketno(nextID)
+	ticketno := generateticketno()
 
 	form, err := c.MultipartForm()
 	if err != nil {
@@ -267,14 +285,23 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		if departmentIDStr := c.FormValue("department_id"); departmentIDStr != "" {
 			req.DepartmentID, _ = strconv.Atoi(departmentIDStr)
 		}
+		if issueTypeIDStr := c.FormValue("issue_type"); issueTypeIDStr != "" {
+			req.IssueTypeID, _ = strconv.Atoi(issueTypeIDStr)
+		}
 		if createdByStr := c.FormValue("created_by"); createdByStr != "" {
 			req.CreatedBy, _ = strconv.Atoi(createdByStr)
 		}
 		if reportedByStr := c.FormValue("reported_by"); reportedByStr != "" {
 			req.ReportedBy = reportedByStr
 		}
+		if issueElseStr := c.FormValue("issue_else"); issueElseStr != "" {
+			req.IssueElse = issueElseStr
+		}
 		if telegramStr := c.FormValue("telegram"); telegramStr != "" {
 			req.Telegram = telegramStr == "true"
+			log.Printf("📥 Parsed telegram field from form: '%s' -> %t", telegramStr, req.Telegram)
+		} else {
+			log.Printf("📥 No telegram field found in form, defaulting to false")
 		}
 		if textStr := c.FormValue("text"); textStr != "" {
 			req.Text = textStr
@@ -300,9 +327,32 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 	if len(uploadedFiles) > 0 {
 		filePathsBytes, _ := json.Marshal(uploadedFiles)
 		log.Printf("Saving file_paths: %s", string(filePathsBytes))
-		res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, department_id, text, reported_by, status, created_by, file_paths) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`, req.PhoneID, ticketno, req.SystemID, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy, string(filePathsBytes))
+		if req.SystemID > 0 {
+			// ดึง typeid จาก systems_program
+			var typeid int
+			db.DB.QueryRow(`SELECT type FROM systems_program WHERE id = ?`, req.SystemID).Scan(&typeid)
+			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, issue_type, department_id, text, reported_by, status, created_by, file_paths) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`, req.PhoneID, ticketno, req.SystemID, typeid, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy, string(filePathsBytes))
+		} else {
+			// กรณีไม่มีระบบ ให้เก็บ issue_type และ issue_else
+			if req.IssueTypeID == 0 || req.IssueElse == "" {
+				return c.Status(400).JSON(fiber.Map{"error": "issue_type and issue_else must be provided when system_id is 0"})
+			}
+			// รับค่า issue_type จาก frontend โดยตรง
+			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, issue_type, issue_else, department_id, text, reported_by, status, created_by, file_paths) VALUES (?, ?, 0, ?, ?, ?, ?, ?, 0, ?, ?)`, req.PhoneID, ticketno, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy, string(filePathsBytes))
+		}
 	} else {
-		res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, department_id, text, reported_by, status, created_by) VALUES (?, ?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.SystemID, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy)
+		if req.SystemID > 0 {
+			var typeid int
+			db.DB.QueryRow(`SELECT type FROM systems_program WHERE id = ?`, req.SystemID).Scan(&typeid)
+			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, issue_type, department_id, text, reported_by, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.SystemID, typeid, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy)
+		} else {
+			// กรณีไม่มีระบบ ให้เก็บ issue_type และ issue_else
+			if req.IssueTypeID == 0 || req.IssueElse == "" {
+				return c.Status(400).JSON(fiber.Map{"error": "issue_type and issue_else must be provided when system_id is 0"})
+			}
+			// รับค่า issue_type จาก frontend โดยตรง
+			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, issue_type, issue_else, department_id, text, reported_by, status, created_by) VALUES (?, ?, 0, ?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy)
+		}
 	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert task"})
@@ -315,7 +365,17 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 	}
 
 	log.Printf("Inserted new task with ID: %d", id)
-	if req.Telegram == true {
+	var Urlenv string
+	env := os.Getenv("env")
+
+	if env == "dev" {
+		Urlenv = "http://helpdesk-dev.nopadol.com/tasks/show/" + strconv.Itoa(int(id))
+	} else {
+		Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + strconv.Itoa(int(id))
+	}
+	log.Printf("🔔 Telegram flag: %t", req.Telegram)
+	if req.Telegram {
+		log.Printf("🚀 Preparing to send Telegram notification for task ID: %d", id)
 		// Get additional data for Telegram
 		var phoneNumber int
 		var departmentName, branchName string
@@ -353,38 +413,55 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		req.Ticket = ticketno
 		req.BranchName = branchName
 		req.ProgramName = programName
-		req.Url = "http://helpdesk.nopadol.com/"
+		req.Url = Urlenv
 		req.CreatedAt = time.Now().Add(7 * time.Hour).Format("02/01/2006 15:04:05")
 		req.Status = 0
 
 		var messageID int
+		var messageName string
 		// Send with photo if files were uploaded
 		if len(uploadedFiles) > 0 {
 			// Get first image URL
 			if firstFile, ok := uploadedFiles[0]["url"].(string); ok {
-				messageID, err = SendTelegram(req, firstFile)
+				messageID, messageName, err = SendTelegram(req, firstFile)
 			} else {
-				messageID, err = SendTelegram(req)
+				messageID, messageName, err = SendTelegram(req)
 			}
 		} else {
-			messageID, err = SendTelegram(req)
+			messageID, messageName, err = SendTelegram(req)
 		}
 
 		if err == nil {
+			log.Printf("✅ Telegram sent successfully, updating message_id: %d for task: %d", messageID, id)
 			// Update task with message_id
-			_, err = db.DB.Exec(`UPDATE tasks SET message_id = ? WHERE id = ?`, messageID, id)
-			if err != nil {
-				log.Printf("Failed to update message_id: %v", err)
+			chatID, _ := strconv.Atoi(os.Getenv("CHAT_ID"))
+			resTG, errTG := db.DB.Exec(`INSERT INTO telegram_chat (chat_id, chat_name, report_id) VALUES (?, ?, ?)`, chatID, messageName, messageID)
+			var telegramChatID int64
+			if errTG != nil {
+				log.Printf("❌ Failed to Chat telegram: %v", errTG)
+			} else {
+				telegramChatID, _ = resTG.LastInsertId()
+				log.Printf("✅ Message ID Chat telegram successfully in database, telegram_chat.id: %d", telegramChatID)
 			}
+			_, err = db.DB.Exec(`UPDATE tasks SET telegram_id = ? WHERE id = ?`, telegramChatID, id)
+			if err != nil {
+				log.Printf("❌ Failed to update telegram_id: %v", err)
+			} else {
+				log.Printf("✅ Telegram ID updated successfully in database")
+			}
+		} else {
+			log.Printf("❌ Failed to send Telegram notification: %v", err)
 		}
+	} else {
+		log.Printf("⚠️ Telegram notification skipped - Telegram flag is false")
 	}
 	return c.JSON(fiber.Map{"success": true, "id": id})
 }
 
 // UpdateTaskHandler แก้ไข task
 func UpdateTaskHandler(c *fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := strconv.Atoi(idStr)
+	id := c.Params("id")
+	var err error
 	var ticketno string
 	var uploadedFiles []fiber.Map
 	if err != nil {
@@ -446,6 +523,12 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	if departmentIDStr := c.FormValue("department_id"); departmentIDStr != "" {
 		req.DepartmentID, _ = strconv.Atoi(departmentIDStr)
 	}
+	if issueTypeIDStr := c.FormValue("issue_type"); issueTypeIDStr != "" {
+		req.IssueTypeID, _ = strconv.Atoi(issueTypeIDStr)
+	}
+	if issueElseStr := c.FormValue("issue_else"); issueElseStr != "" {
+		req.IssueElse = issueElseStr
+	}
 	if textStr := c.FormValue("text"); textStr != "" {
 		req.Text = textStr
 	}
@@ -503,27 +586,63 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		filePathsBytes, _ := json.Marshal(uploadedFiles)
 		log.Printf("Updating file_paths: %s", string(filePathsBytes))
 
-		if req.ReportedBy != nil {
-			_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+		if req.SystemID > 0 {
+			var typeid int
+			db.DB.QueryRow(`SELECT type FROM systems_program WHERE id = ?`, req.SystemID).Scan(&typeid)
+			if req.ReportedBy != nil {
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+			} else {
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+			}
 		} else {
-			_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+			if req.ReportedBy != nil {
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+			} else {
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+			}
 		}
 	} else {
-		if req.ReportedBy != nil {
-			_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
+		if req.SystemID > 0 {
+			var typeid int
+			db.DB.QueryRow(`SELECT type FROM systems_program WHERE id = ?`, req.SystemID).Scan(&typeid)
+			if req.ReportedBy != nil {
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
+			} else {
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
+			}
 		} else {
-			_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
+			if req.ReportedBy != nil {
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
+			} else {
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
+			}
 		}
 	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
 	}
-
+	err = godotenv.Load()
+	if err != nil {
+		log.Printf("Warning: Error loading .env file: %v", err)
+	}
+	var Urlenv string
+	env := os.Getenv("env")
+	if env == "dev" {
+		Urlenv = "http://helpdesk-dev.nopadol.com/tasks/show/" + id
+	} else {
+		Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + id
+	}
 	// Get message_id and update Telegram if exists
 	var messageID int
 	var reported string
 	var existingFilePathsJSON string
-	err = db.DB.QueryRow(`SELECT IFNULL(ticket_no, ''),IFNULL(message_id, 0), IFNULL(reported_by, ''), IFNULL(file_paths, '[]') FROM tasks WHERE id = ?`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON)
+	err = db.DB.QueryRow(`
+		SELECT IFNULL(t.ticket_no, ''),IFNULL(tc.report_id, 0), IFNULL(t.reported_by, ''), 
+		IFNULL(t.file_paths, '[]') FROM tasks t
+		LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
+		WHERE t.id = ?
+		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON)
+
 	if err == nil && messageID > 0 {
 		// Create TaskRequest from TaskRequestUpdate for Telegram
 		telegramReq := models.TaskRequest{
@@ -557,7 +676,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		telegramReq.DepartmentName = departmentName
 		telegramReq.BranchName = branchName
 		telegramReq.ProgramName = programName
-		telegramReq.Url = "http://helpdesk.nopadol.com/"
+		telegramReq.Url = Urlenv
 		telegramReq.CreatedAt = CreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
 		telegramReq.UpdatedAt = time.Now().Add(7 * time.Hour).Format("02/01/2006 15:04:05")
 		telegramReq.Ticket = ticketno
@@ -599,7 +718,11 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 	// Get message_id and file_paths before deleting
 	var messageID int
 	var filePathsJSON string
-	err = db.DB.QueryRow(`SELECT IFNULL(message_id, 0), IFNULL(file_paths, '[]') FROM tasks WHERE id = ?`, id).Scan(&messageID, &filePathsJSON)
+	err = db.DB.QueryRow(`
+		SELECT IFNULL(tc.report_id, 0), IFNULL(t.file_paths, '[]') FROM tasks t
+		LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
+		WHERE t.id = ?
+		`, id).Scan(&messageID, &filePathsJSON)
 	if err != nil {
 		log.Printf("Failed to get task data: %v", err)
 	}
@@ -621,7 +744,19 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
+	var telegramid int
+	if id != 0 {
+		db.DB.QueryRow(`
+			SELECT telegram_id
+			FROM tasks
+			WHERE id = ?
+		`, id).Scan(&telegramid)
+	}
 
+	_, err = db.DB.Exec(`DELETE FROM telegram_chat WHERE id=?`, telegramid)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete telegram chat"})
+	}
 	_, err = db.DB.Exec(`DELETE FROM tasks WHERE id=?`, id)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete task"})
@@ -644,18 +779,23 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 	}
 	var filePathsJSON string
 	var task models.TaskWithDetails
+	var issueTypeName string
 	err = db.DB.QueryRow(`
-		SELECT t.id, IFNULL(t.ticket_no, '') as ticket_to, IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number, IFNULL(p.name, '') as phone_name, IFNULL(t.system_id, 0) as system_id, IFNULL(s.name, '') as system_name, IFNULL(it.name, '') as system_type,
-		IFNULL(t.department_id, 0) as department_id, IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
-		IFNULL(t.text, '') as text, IFNULL(t.assignto, ''), IFNULL(t.reported_by, '') as reported_by, IFNULL(t.status, 0) as status, IFNULL(t.created_at, '') as created_at, IFNULL(t.updated_at, '') as updated_at, IFNULL(t.file_paths, '[]') as file_paths
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), IFNULL(t.system_id, 0), IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), IFNULL(t.text, ''), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), IFNULL(t.status, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, ''), IFNULL(t.file_paths, '[]')
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
-		LEFT JOIN issue_types it ON s.type = it.id
+		LEFT JOIN issue_types it ON t.issue_type = it.id
 		WHERE t.id = ?
-	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.SystemType, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Assignto, &task.ReportedBy, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
+	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.IssueTypeID, &task.IssueElse, &issueTypeName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Assignto, &task.ReportedBy, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
+
+	if task.SystemID > 0 {
+		task.SystemType = issueTypeName
+	} else {
+		task.SystemType = issueTypeName
+	}
 
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
@@ -856,30 +996,30 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 	var total int
 	err = db.DB.QueryRow(`
 		SELECT COUNT(*) FROM tasks t
+		LEFT JOIN issue_types it ON t.issue_type = it.id
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
-		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ?)
-	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).Scan(&total)
+		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR it.name LIKE ?)
+	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).Scan(&total)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to count search results"})
 	}
 
 	// Get search results with pagination
 	rows, err := db.DB.Query(`
-		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0) as phone_id, IFNULL(p.number, 0) as number, IFNULL(p.name, '') as phone_name, t.system_id, IFNULL(s.name, '') as system_name,
-		IFNULL(t.department_id, 0) as department_id, IFNULL(d.name, '') as department_name, IFNULL(d.branch_id, 0) as branch_id, IFNULL(b.name, '') as branch_name,
-		t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0) as number, IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
-		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR t.assignto LIKE ?)
+		LEFT JOIN issue_types it ON t.issue_type = it.id
+		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR it.name LIKE ? OR t.assignto LIKE ?)
 		ORDER BY t.id DESC
 		LIMIT ? OFFSET ?
-	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, pagination.Limit, offset)
+	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, pagination.Limit, offset)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to search tasks"})
 	}
@@ -888,12 +1028,17 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 	var tasks []models.TaskWithDetails
 	for rows.Next() {
 		var t models.TaskWithDetails
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+		var issueTypeName string
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt)
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue
 		}
-
+		if t.SystemID > 0 {
+			t.SystemType = issueTypeName
+		} else {
+			t.SystemType = issueTypeName
+		}
 		// Calculate overdue
 		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
 		if err == nil {
@@ -913,7 +1058,6 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 				t.Overdue = days
 			}
 		}
-
 		tasks = append(tasks, t)
 	}
 
@@ -928,4 +1072,103 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 			TotalPages: utils.CalculateTotalPages(total, pagination.Limit),
 		},
 	})
+}
+
+// UpdateAssignedTo updates the assigned person for a task
+func UpdateAssignedTo(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Task ID is required"})
+	}
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("Warning: Error loading .env file: %v", err)
+	}
+	var Urlenv string
+	env := os.Getenv("env")
+
+	var req struct {
+		Assignto       string `json:"assign_to"`
+		UpdatedBy      int    `json:"updated_by"`
+		UpdateTelegram bool   `json:"update_telegram"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	_, err = db.DB.Exec(`UPDATE tasks SET assignto = ?, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.Assignto, req.UpdatedBy, id)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("Failed to update assigned person %v", req.UpdateTelegram)})
+	}
+	// เฉพาะกรณีที่ต้องการอัพเดต Telegram
+	if req.UpdateTelegram {
+
+		// ดึงข้อมูล task สำหรับอัพเดต Telegram
+		var ticket, text, issueElse, reportedBy, assignto, createdAt, updatedAt, branchName, departmentName, programName string
+		var phoneID, systemID, departmentID, status, messageID, phoneNumber, branchID int
+		var filePathsJSON string
+		// Fix SQL: JOINs before WHERE, select tc.report_id as messageID
+		err := db.DB.QueryRow(`
+			SELECT IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(t.system_id, 0), IFNULL(t.issue_else, ''), IFNULL(t.department_id, 0),
+			IFNULL(t.text, ''), IFNULL(t.status, 0), IFNULL(t.reported_by, ''), IFNULL(t.assignto, ''),
+			IFNULL(tc.report_id, 0), IFNULL(t.file_paths, '[]'), IFNULL(d.branch_id, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, '')
+			FROM tasks t
+			LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
+			LEFT JOIN departments d ON t.department_id = d.id
+			LEFT JOIN branches b ON d.branch_id = b.id
+			LEFT JOIN systems_program s ON t.system_id = s.id
+			WHERE t.id = ?
+		`, id).Scan(&ticket, &phoneID, &systemID, &issueElse, &departmentID, &text, &status, &reportedBy, &assignto, &messageID, &filePathsJSON, &branchID, &createdAt, &updatedAt)
+		// Query extra info for Telegram
+		db.DB.QueryRow(`SELECT name FROM branches WHERE id = ?`, branchID).Scan(&branchName)
+		db.DB.QueryRow(`SELECT name FROM departments WHERE id = ?`, departmentID).Scan(&departmentName)
+		db.DB.QueryRow(`SELECT name FROM systems_program WHERE id = ?`, systemID).Scan(&programName)
+		db.DB.QueryRow(`SELECT number FROM ip_phones WHERE id = ?`, phoneID).Scan(&phoneNumber)
+
+		if env == "dev" {
+			Urlenv = "http://helpdesk-dev.nopadol.com/tasks/show/" + id
+		} else {
+			Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + id
+		}
+
+		if err == nil {
+			// Parse file_paths JSON
+			var firstImageURL string
+			if filePathsJSON != "" && filePathsJSON != "[]" {
+				var filePaths []fiber.Map
+				if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil && len(filePaths) > 0 {
+					if url, ok := filePaths[0]["url"].(string); ok {
+						firstImageURL = url
+					}
+				}
+			}
+			telegramReq := models.TaskRequest{
+				PhoneID:        &phoneID,
+				SystemID:       systemID,
+				IssueElse:      issueElse,
+				DepartmentID:   departmentID,
+				Text:           text,
+				Status:         status,
+				ReportedBy:     reportedBy,
+				Assignto:       assignto,
+				MessageID:      messageID,
+				Ticket:         ticket,
+				BranchName:     branchName,
+				DepartmentName: departmentName,
+				PhoneNumber:    phoneNumber,
+				ProgramName:    programName,
+				Url:            Urlenv,
+				CreatedAt:      createdAt,
+				UpdatedAt:      updatedAt,
+			}
+			if firstImageURL != "" {
+				_, _ = UpdateTelegram(telegramReq, firstImageURL)
+			} else {
+				_, _ = UpdateTelegram(telegramReq)
+			}
+		}
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Assigned person updated successfully"})
 }

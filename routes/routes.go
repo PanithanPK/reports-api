@@ -17,6 +17,7 @@ func MainRoutes(r *fiber.App) {
 	r.Get("/api/v1/problem/:id", handlers.GetTaskDetailHandler)
 	r.Put("/api/v1/problem/update/:id", handlers.UpdateTaskHandler)
 	r.Delete("/api/v1/problem/delete/:id", handlers.DeleteTaskHandler)
+	r.Put("/api/v1/problem/update/assignto/:id", handlers.UpdateAssignedTo)
 
 	// Phone routes
 	r.Get("/api/v1/ipphone/list", handlers.ListIPPhonesHandler)
@@ -69,6 +70,8 @@ func MainRoutes(r *fiber.App) {
 
 	r.Get("/api/v1/respons/list", handlers.GetresponsHandler)
 	r.Post("/api/v1/respons/create", handlers.AddresponsHandler)
+	r.Put("/api/v1/respons/update/:id", handlers.UpdateResponsHandler)
+	r.Delete("/api/v1/respons/delete/:id", handlers.DeleteResponsHandler)
 }
 
 // RegisterAuthRoutes registers all authentication-related routes

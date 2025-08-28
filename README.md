@@ -90,6 +90,12 @@ For detailed API usage and installation instructions, please refer to:
 - [Installation Guide](./docs/INSTALLATION.md) - Installation instructions
 - [Deployment Guide](./docs/DEPLOYMENT.md) - Deployment guide
 
+## API Documentation
+Swagger UI is available when the server is running at:
+```
+http://localhost:5001/docs
+```
+
 ## Health Check
 When the server is running, you can check its status at:
 ```

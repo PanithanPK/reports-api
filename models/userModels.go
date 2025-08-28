@@ -41,6 +41,7 @@ type DeleteUserRequest struct {
 	DeletedBy int `json:"deleted_by"`
 }
 
-type ResponseR struct {
+type ResponseRequest struct {
+	ID   int    `json:"id"`
 	Name string `json:"name"`
 }

@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"reports-api/models"
 	"strconv"
@@ -12,7 +15,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func SendTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
+func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, error) {
 	// botToken := os.Getenv("BOT_TOKEN")
 	// chatIDStr := os.Getenv("CHAT_ID")
 
@@ -32,9 +35,16 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
-		return 0, err
+		return 0, "", err
+	}
+	var Program string
+	if req.SystemID > 0 {
+		Program = req.ProgramName
+	} else {
+		Program = req.IssueElse
 	}
 
+	bot.Debug = true
 	// สร้างข้อความตามสถานะ
 	var statusIcon, statusText, headerColor string
 	switch req.Status {
@@ -63,8 +73,8 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	if req.PhoneNumber > 0 {
 		msg += fmt.Sprintf("📞 *เบอร์โทร:* `%d`\n", req.PhoneNumber)
 	}
-	if req.ProgramName != "" {
-		msg += "💻 *โปรแกรม:* `" + req.ProgramName + "`\n"
+	if Program != "" {
+		msg += "💻 *โปรแกรม:* `" + Program + "`\n"
 	}
 	if req.ReportedBy != "" {
 		msg += "👤 *ผู้แจ้ง:* `" + req.ReportedBy + "`\n"
@@ -80,29 +90,71 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	msg += "📝 *รายละเอียดปัญหา:*\n"
 	msg += "```\n" + req.Text + "\n```"
 
+	// แสดงลิงก์ดูรูปรายงานปัญหา
+	if len(photoURL) > 0 {
+		for i, url := range photoURL {
+			if url != "" {
+				msg += fmt.Sprintf("\n🖼️ [ดูรูปรายงานปัญหา %d](%s)", i+1, url)
+			}
+		}
+	}
 	if req.Url != "" {
 		msg += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")\n"
 	}
 
 	var sentMsg tgbotapi.Message
-	// Send photo if photoURL is provided, otherwise send text message
 	if len(photoURL) > 0 && photoURL[0] != "" {
-		photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileURL(photoURL[0]))
-		photoMsg.Caption = msg
-		photoMsg.ParseMode = "Markdown"
-		sentMsg, err = bot.Send(photoMsg)
+		resp, err := http.Get(photoURL[0])
+		if err != nil {
+			log.Printf("Error fetching photo: %v", err)
+			message := tgbotapi.NewMessage(chatID, msg)
+			message.ParseMode = "Markdown"
+			sentMsg, err = bot.Send(message)
+			if err != nil {
+				return 0, "", err
+			}
+		} else {
+			defer resp.Body.Close()
+			var buf bytes.Buffer
+			_, err = io.Copy(&buf, resp.Body)
+			if err != nil {
+				message := tgbotapi.NewMessage(chatID, msg)
+				message.ParseMode = "Markdown"
+				sentMsg, err = bot.Send(message)
+				if err != nil {
+					return 0, "", err
+				}
+			} else {
+				log.Printf("URL Images: %s", photoURL[0])
+				photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileReader{
+					Name:   photoURL[0],
+					Reader: &buf,
+				})
+				photoMsg.Caption = msg
+				photoMsg.ParseMode = "Markdown"
+				sentMsg, err = bot.Send(photoMsg)
+				if err != nil {
+					log.Printf("❌ ส่งภาพไม่สำเร็จ ส่งเป็นข้อความแทน: %v", err)
+					message := tgbotapi.NewMessage(chatID, msg)
+					message.ParseMode = "Markdown"
+					sentMsg, err = bot.Send(message)
+					if err != nil {
+						return 0, "", err
+					}
+				}
+			}
+		}
 	} else {
 		message := tgbotapi.NewMessage(chatID, msg)
 		message.ParseMode = "Markdown"
 		sentMsg, err = bot.Send(message)
-	}
-
-	if err != nil {
-		return 0, err
+		if err != nil {
+			return 0, "", err
+		}
 	}
 
 	log.Printf("Telegram message sent successfully with ID: %d", sentMsg.MessageID)
-	return sentMsg.MessageID, nil
+	return sentMsg.MessageID, sentMsg.From.UserName, nil
 }
 
 func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
@@ -120,6 +172,12 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	}
 	messageID := req.MessageID
 
+	var Program string
+	if req.SystemID > 0 {
+		Program = req.ProgramName
+	} else {
+		Program = req.IssueElse
+	}
 	// สร้างข้อความตามสถานะ
 	var statusIcon, statusText, headerColor string
 	switch req.Status {
@@ -137,7 +195,7 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	newMessage += "━━━━━━━━━━━━━━\n"
 
 	if req.Ticket != "" {
-		newMessage += "\n🎫 *Ticket No:* `" + req.Ticket + "`\n"
+		newMessage += "🎫 *Ticket No:* `" + req.Ticket + "`\n"
 	}
 	if req.BranchName != "" {
 		newMessage += "🏢 *สาขา:* `" + req.BranchName + "`\n"
@@ -148,17 +206,17 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	if req.PhoneNumber > 0 {
 		newMessage += fmt.Sprintf("📞 *เบอร์โทร:* `%d`\n", req.PhoneNumber)
 	}
-	if req.ProgramName != "" {
-		newMessage += "💻 *โปรแกรม:* `" + req.ProgramName + "`\n"
+	if Program != "" {
+		newMessage += "💻 *โปรแกรม:* `" + Program + "`\n"
 	}
 	if req.ReportedBy != "" {
-		newMessage += "👤 *ผู้แจ้ง:* `" + req.ReportedBy + "`\n"
+		newMessage += "\n👤 *ผู้แจ้ง:* `" + req.ReportedBy + "`\n"
 	}
 
 	newMessage += "📅 *วันที่แจ้งปัญหา:* `" + req.CreatedAt + "`\n"
-	newMessage += "━━━━━━━━━━━━━━\n"
+	newMessage += "━━━━━━━━━━━━━━"
 	if req.Assignto != "" {
-		newMessage += "\n👤 *ผู้รับผิดชอบ:* `" + req.Assignto + "`"
+		newMessage += "👤 *ผู้รับผิดชอบ:* `" + req.Assignto + "`"
 	}
 	newMessage += "\n" + statusIcon + " *สถานะ:* `" + statusText + "`\n"
 	if req.Status == 1 {
@@ -177,7 +235,7 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	if err != nil {
 		log.Panic(err)
 	}
-
+	bot.Debug = true
 	// Edit photo caption if photoURL is provided, otherwise edit text message
 	if len(photoURL) > 0 && photoURL[0] != "" {
 		editMsg := tgbotapi.NewEditMessageCaption(chatID, messageID, newMessage)

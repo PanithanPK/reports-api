@@ -15,6 +15,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
+	fiberSwagger "github.com/swaggo/fiber-swagger"
 )
 
 // CurrentEnvironment เก็บสภาพแวดล้อมปัจจุบัน (dev, prod, หรือ default)
@@ -183,6 +184,10 @@ func main() {
 	} else {
 		logger.Info.Printf("🔧 Using port from environment: %s", port)
 	}
+
+	// Swagger UI route
+	app.Get("/api/v1/swagger/*", fiberSwagger.WrapHandler)
+	logger.Info.Println("📚 Swagger UI available at /api/v1/swagger/index.html")
 
 	// Log system information
 	logger.Info.Printf("💻 System Info - CPU Cores: %d, Memory Limit: 384MB", runtime.NumCPU())
