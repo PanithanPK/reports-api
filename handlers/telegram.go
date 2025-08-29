@@ -89,7 +89,7 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 	msg += "━━━━━━━━━━━━━━\n"
 	msg += "📝 *รายละเอียดปัญหา:*\n"
 	msg += "```\n" + req.Text + "\n```"
-
+	msg += "━━━━━━━━━━━━━━"
 	// แสดงลิงก์ดูรูปรายงานปัญหา
 	if len(photoURL) > 0 {
 		for i, url := range photoURL {
@@ -98,6 +98,7 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 			}
 		}
 	}
+	msg += "━━━━━━━━━━━━━━"
 	if req.Url != "" {
 		msg += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")\n"
 	}
@@ -226,7 +227,15 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	newMessage += "━━━━━━━━━━━━━━\n"
 	newMessage += "📝 *รายละเอียดปัญหา:*\n"
 	newMessage += "```\n" + req.Text + "\n```"
-
+	newMessage += "━━━━━━━━━━━━━━"
+	if len(photoURL) > 0 {
+		for i, url := range photoURL {
+			if url != "" {
+				newMessage += fmt.Sprintf("\n🖼️ [ดูรูปรายงานปัญหา %d](%s)", i+1, url)
+			}
+		}
+	}
+	newMessage += "━━━━━━━━━━━━━━"
 	if req.Url != "" {
 		newMessage += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")\n"
 	}

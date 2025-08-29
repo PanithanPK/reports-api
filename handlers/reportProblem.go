@@ -421,14 +421,22 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		var messageName string
 		// Send with photo if files were uploaded
 		if len(uploadedFiles) > 0 {
-			// Get first image URL
-			if firstFile, ok := uploadedFiles[0]["url"].(string); ok {
-				messageID, messageName, err = SendTelegram(req, firstFile)
-			} else {
-				messageID, messageName, err = SendTelegram(req)
+			// Get all image URLs
+			var photoURLs []string
+			for _, file := range uploadedFiles {
+				if url, ok := file["url"].(string); ok {
+					photoURLs = append(photoURLs, url)
+				}
+			}
+			messageID, messageName, err = SendTelegram(req, photoURLs...)
+			if err != nil {
+				log.Printf("❌ Error sending Telegram: %v", err)
 			}
 		} else {
 			messageID, messageName, err = SendTelegram(req)
+			if err != nil {
+				log.Printf("❌ Error sending Telegram: %v", err)
+			}
 		}
 
 		if err == nil {
@@ -686,19 +694,21 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		}
 
 		// Get first image URL from existing files for Telegram
-		var firstImageURL string
+		var photoURLs []string
 		if existingFilePathsJSON != "" && existingFilePathsJSON != "[]" {
 			var existingFiles []fiber.Map
 			if err := json.Unmarshal([]byte(existingFilePathsJSON), &existingFiles); err == nil && len(existingFiles) > 0 {
-				if url, ok := existingFiles[0]["url"].(string); ok {
-					firstImageURL = url
+				for _, file := range existingFiles {
+					if url, ok := file["url"].(string); ok {
+						photoURLs = append(photoURLs, url)
+					}
 				}
 			}
 		}
 
-		// Send update to Telegram with photo if available
-		if firstImageURL != "" {
-			_, _ = UpdateTelegram(telegramReq, firstImageURL)
+		// ส่งหลายไฟล์
+		if len(photoURLs) > 0 {
+			_, _ = UpdateTelegram(telegramReq, photoURLs...)
 		} else {
 			_, _ = UpdateTelegram(telegramReq)
 		}
@@ -1135,12 +1145,14 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 
 		if err == nil {
 			// Parse file_paths JSON
-			var firstImageURL string
+			var photoURLs []string
 			if filePathsJSON != "" && filePathsJSON != "[]" {
 				var filePaths []fiber.Map
 				if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil && len(filePaths) > 0 {
-					if url, ok := filePaths[0]["url"].(string); ok {
-						firstImageURL = url
+					for _, file := range filePaths {
+						if url, ok := file["url"].(string); ok {
+							photoURLs = append(photoURLs, url)
+						}
 					}
 				}
 			}
@@ -1163,8 +1175,8 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 				CreatedAt:      createdAt,
 				UpdatedAt:      updatedAt,
 			}
-			if firstImageURL != "" {
-				_, _ = UpdateTelegram(telegramReq, firstImageURL)
+			if len(photoURLs) > 0 {
+				_, _ = UpdateTelegram(telegramReq, photoURLs...)
 			} else {
 				_, _ = UpdateTelegram(telegramReq)
 			}
