@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.11.0](https://github.com/PanithanPK/reports-api/compare/v1.10.0...v1.11.0) (2025-08-30)
+
+
+### Features
+
+* Add Upload images and add type issue ([c5a4b06](https://github.com/PanithanPK/reports-api/commit/c5a4b06457ec1b73e7fb9b2bf948c6a8113c7a0b))
+* New feater Assignedto and notify and New feater resolution ([36ec9c5](https://github.com/PanithanPK/reports-api/commit/36ec9c532e5ca927cfba97bdae5e296f849c810e))
+
 ## [1.10.0](https://github.com/PanithanPK/reports-api/compare/v1.7.0...v1.10.0) (2025-08-28)
 
 
