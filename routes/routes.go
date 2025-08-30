@@ -12,12 +12,16 @@ func MainRoutes(r *fiber.App) {
 	// Problem routes
 	r.Get("/api/v1/problem/list", handlers.GetTasksHandler)
 	r.Get("/api/v1/problem/list/:query", handlers.GetTasksWithQueryHandler)
+	r.Get("/api/v1/problem/list/:column/:query", handlers.GetTasksWithColumnQueryHandler)
 	r.Get("/api/v1/problem/search/:query", handlers.SearchTasksHandler)
 	r.Post("/api/v1/problem/create", handlers.CreateTaskHandler)
 	r.Get("/api/v1/problem/:id", handlers.GetTaskDetailHandler)
 	r.Put("/api/v1/problem/update/:id", handlers.UpdateTaskHandler)
 	r.Delete("/api/v1/problem/delete/:id", handlers.DeleteTaskHandler)
 	r.Put("/api/v1/problem/update/assignto/:id", handlers.UpdateAssignedTo)
+
+	// resolution routes
+	r.Post("/api/v1/resolution/create/:id", handlers.CreateResolutionHandler)
 
 	// Phone routes
 	r.Get("/api/v1/ipphone/list", handlers.ListIPPhonesHandler)
@@ -69,6 +73,7 @@ func MainRoutes(r *fiber.App) {
 	r.Delete("/api/v1/scores/delete/:id", handlers.DeleteScoreHandler)
 
 	r.Get("/api/v1/respons/list", handlers.GetresponsHandler)
+	r.Get("/api/v1/respons/:id", handlers.GetResponsDetailHandler)
 	r.Post("/api/v1/respons/create", handlers.AddresponsHandler)
 	r.Put("/api/v1/respons/update/:id", handlers.UpdateResponsHandler)
 	r.Delete("/api/v1/respons/delete/:id", handlers.DeleteResponsHandler)

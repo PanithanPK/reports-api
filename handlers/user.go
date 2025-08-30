@@ -161,25 +161,24 @@ func LogoutHandler(c *fiber.Ctx) error {
 }
 
 func GetresponsHandler(c *fiber.Ctx) error {
-	var users []models.User
-	rows, err := db.DB.Query("SELECT id, name FROM responsibilities")
+	rows, err := db.DB.Query("SELECT id, IFNULL(telegram_username, '') as telegram_username, COALESCE(name, '') as name FROM responsibilities")
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
 	}
 	defer rows.Close()
 
+	var responsibilities []models.ResponseRequest
 	for rows.Next() {
-		var user models.User
-		err := rows.Scan(&user.ID, &user.Username)
-		if err != nil {
+		var resp models.ResponseRequest
+		if err := rows.Scan(&resp.ID, &resp.TelegramUsername, &resp.Name); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Database error"})
 		}
-		users = append(users, user)
+		responsibilities = append(responsibilities, resp)
 	}
 
-	return c.JSON(models.UserResponse{
-		Success: true,
-		Data:    users,
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    responsibilities,
 	})
 }
 
@@ -190,8 +189,8 @@ func AddresponsHandler(c *fiber.Ctx) error {
 	}
 
 	_, err := db.DB.Exec(
-		"INSERT INTO responsibilities (name) VALUES (?)",
-		req.Name,
+		"INSERT INTO responsibilities (name, telegram_username) VALUES (?, ?)",
+		req.Name, req.TelegramUsername,
 	)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to add responsibility"})
@@ -202,24 +201,26 @@ func AddresponsHandler(c *fiber.Ctx) error {
 }
 
 func UpdateResponsHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
 	var req models.ResponseRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
 	_, err := db.DB.Exec(
-		"UPDATE responsibilities SET name = ? WHERE id = ?",
-		req.Name, req.ID,
+		"UPDATE responsibilities SET telegram_username = ?, name = ? WHERE id = ?",
+		req.TelegramUsername, req.Name, id,
 	)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update responsibility"})
 	}
 
-	log.Printf("Responsibility ID: %d updated successfully", req.ID)
+	log.Printf("Responsibility ID: %d updated successfully", id)
 	return c.JSON(fiber.Map{"message": "Responsibility updated"})
 }
 
 func DeleteResponsHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
 	var req models.ResponseRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
@@ -227,12 +228,26 @@ func DeleteResponsHandler(c *fiber.Ctx) error {
 
 	_, err := db.DB.Exec(
 		"DELETE FROM responsibilities WHERE id = ?",
-		req.ID,
+		id,
 	)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete responsibility"})
 	}
 
-	log.Printf("Responsibility ID: %d deleted successfully", req.ID)
+	log.Printf("Responsibility ID: %d deleted successfully", id)
 	return c.JSON(fiber.Map{"message": "Responsibility deleted"})
+}
+
+func GetResponsDetailHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
+	var user models.ResponseRequest
+	err := db.DB.QueryRow("SELECT id, IFNULL(telegram_username, '') as telegram_username, IFNULL(name, '') as name FROM responsibilities WHERE id = ?", id).Scan(&user.ID, &user.TelegramUsername, &user.Name)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    []models.ResponseRequest{user},
+	})
 }

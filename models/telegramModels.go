@@ -14,6 +14,15 @@ type TelegramRequest struct {
 
 // TelegramResponse model for receiving Telegram responses
 type TelegramResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+	Ok     bool `json:"ok"`
+	Result struct {
+		MessageID int `json:"message_id"`
+	} `json:"result"`
+}
+
+type TelegramPayload struct {
+	ChatID           string `json:"chat_id"`
+	Text             string `json:"text"`
+	ReplyToMessageID int    `json:"reply_to_message_id"`
+	ParseMode        string `json:"parse_mode,omitempty"`
 }

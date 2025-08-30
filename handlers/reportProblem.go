@@ -291,6 +291,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		if createdByStr := c.FormValue("created_by"); createdByStr != "" {
 			req.CreatedBy, _ = strconv.Atoi(createdByStr)
 		}
+
 		if reportedByStr := c.FormValue("reported_by"); reportedByStr != "" {
 			req.ReportedBy = reportedByStr
 		}
@@ -537,13 +538,20 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	if issueElseStr := c.FormValue("issue_else"); issueElseStr != "" {
 		req.IssueElse = issueElseStr
 	}
+	if assignedToIDStr := c.FormValue("assignedto_id"); assignedToIDStr != "" {
+		req.AssignedtoID, _ = strconv.Atoi(assignedToIDStr)
+	}
 	if textStr := c.FormValue("text"); textStr != "" {
 		req.Text = textStr
 	}
 	if reportedByStr := c.FormValue("reported_by"); reportedByStr != "" {
 		req.ReportedBy = &reportedByStr
 	}
-
+	var previousAssignto string // เพิ่มตัวแปรเก็บ assignto เดิม
+	err = db.DB.QueryRow(`SELECT assignto FROM tasks WHERE id = ?`, id).Scan(&previousAssignto)
+	if err != nil {
+		log.Println("Error fetching previous_assignto:", err)
+	}
 	// Get department_id from phone_id if phone_id exists and is valid
 	if req.PhoneID != nil {
 		err := db.DB.QueryRow("SELECT department_id FROM ip_phones WHERE id = ?", *req.PhoneID).Scan(&req.DepartmentID)
@@ -598,15 +606,15 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			var typeid int
 			db.DB.QueryRow(`SELECT type FROM systems_program WHERE id = ?`, req.SystemID).Scan(&typeid)
 			if req.ReportedBy != nil {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
 			} else {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
 			}
 		} else {
 			if req.ReportedBy != nil {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
 			} else {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
 			}
 		}
 	} else {
@@ -614,15 +622,19 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			var typeid int
 			db.DB.QueryRow(`SELECT type FROM systems_program WHERE id = ?`, req.SystemID).Scan(&typeid)
 			if req.ReportedBy != nil {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
 			} else {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
 			}
 		} else {
+			var assignto string
+			if req.Assignto != nil {
+				assignto = *req.Assignto
+			}
 			if req.ReportedBy != nil {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
 			} else {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, assignto, req.Text, req.Status, req.UpdatedBy, id)
 			}
 		}
 	}
@@ -644,24 +656,31 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	var messageID int
 	var reported string
 	var existingFilePathsJSON string
+	var telegramUser string
+	var assigntoID int
+
 	err = db.DB.QueryRow(`
 		SELECT IFNULL(t.ticket_no, ''),IFNULL(tc.report_id, 0), IFNULL(t.reported_by, ''), 
-		IFNULL(t.file_paths, '[]') FROM tasks t
+		IFNULL(t.file_paths, '[]'), IFNULL(rs.telegram_username, ''), IFNULL(tc.assignto_id, 0) FROM tasks t
 		LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
+		LEFT JOIN responsibilities rs ON t.assignto_id = rs.id
 		WHERE t.id = ?
-		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON)
+		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON, &telegramUser, &assigntoID)
 
 	if err == nil && messageID > 0 {
 		// Create TaskRequest from TaskRequestUpdate for Telegram
 		telegramReq := models.TaskRequest{
-			PhoneID:      req.PhoneID,
-			SystemID:     req.SystemID,
-			DepartmentID: req.DepartmentID,
-			Text:         req.Text,
-			Status:       req.Status,
-			ReportedBy:   reported,
-			Assignto:     "",
-			MessageID:    messageID,
+			PhoneID:          req.PhoneID,
+			SystemID:         req.SystemID,
+			DepartmentID:     req.DepartmentID,
+			Text:             req.Text,
+			Status:           req.Status,
+			ReportedBy:       reported,
+			TelegramUser:     telegramUser,
+			AssigntoID:       assigntoID,
+			Assignto:         "",
+			PreviousAssignto: previousAssignto,
+			MessageID:        messageID,
 
 			Ticket: ticketno,
 		}
@@ -685,10 +704,13 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		telegramReq.BranchName = branchName
 		telegramReq.ProgramName = programName
 		telegramReq.Url = Urlenv
+		telegramReq.PreviousAssignto = previousAssignto
 		telegramReq.CreatedAt = CreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
 		telegramReq.UpdatedAt = time.Now().Add(7 * time.Hour).Format("02/01/2006 15:04:05")
 		telegramReq.Ticket = ticketno
 		telegramReq.ReportedBy = reported
+		telegramReq.TelegramUser = telegramUser
+		telegramReq.AssigntoID = assigntoID
 		if req.Assignto != nil {
 			telegramReq.Assignto = *req.Assignto
 		}
@@ -707,13 +729,27 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		}
 
 		// ส่งหลายไฟล์
+		var notificationResp int
 		if len(photoURLs) > 0 {
-			_, _ = UpdateTelegram(telegramReq, photoURLs...)
+			notificationResp, _ = UpdateTelegram(telegramReq, photoURLs...)
 		} else {
-			_, _ = UpdateTelegram(telegramReq)
+			notificationResp, _ = UpdateTelegram(telegramReq)
+		}
+
+		_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, notificationResp, id)
+		if err != nil {
+			log.Printf("❌ Failed to update assignto_id: %v", err)
+		} else {
+			log.Printf("✅ Assignto ID updated successfully in database")
 		}
 	}
-	log.Printf("Updating task ID: %d", id)
+	currentAssignee := req.Assignto
+	var currentAssigneeStr string
+	if currentAssignee != nil {
+		currentAssigneeStr = *currentAssignee
+	}
+	log.Printf("Previous Assignee: %s and Current Assignee: %s", previousAssignto, currentAssigneeStr)
+	log.Printf("Updating task ID: %s", id)
 	return c.JSON(fiber.Map{"success": true})
 }
 
@@ -1011,8 +1047,8 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
-		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR it.name LIKE ?)
-	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).Scan(&total)
+		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR it.name LIKE ? OR t.status LIKE ?)
+	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).Scan(&total)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to count search results"})
 	}
@@ -1026,10 +1062,10 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
 		LEFT JOIN issue_types it ON t.issue_type = it.id
-		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR it.name LIKE ? OR t.assignto LIKE ?)
+		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR it.name LIKE ? OR t.assignto LIKE ? OR t.status LIKE ?)
 		ORDER BY t.id DESC
 		LIMIT ? OFFSET ?
-	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, pagination.Limit, offset)
+	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, pagination.Limit, offset)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to search tasks"})
 	}
@@ -1084,6 +1120,226 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 	})
 }
 
+func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
+	column := c.Params("column")
+	query := c.Params("query")
+
+	if column == "" || query == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Column and query parameters are required"})
+	}
+
+	// Get pagination parameters
+	pagination := utils.GetPaginationParams(c)
+	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
+
+	// Define column types and validation
+	intColumns := map[string]bool{
+		"phone_id":      true,
+		"issue_type":    true,
+		"system_id":     true,
+		"department_id": true,
+		"branch_id":     true,
+		"status":        true,
+		"created_by":    true,
+		"updated_by":    true,
+		"telegram_id":   true,
+	}
+
+	stringColumns := map[string]bool{
+		"ticket_no":       true,
+		"number":          true,
+		"phone_name":      true,
+		"system_name":     true,
+		"issue_else":      true,
+		"department_name": true,
+		"branch_name":     true,
+		"text":            true,
+		"assignto":        true,
+		"reported_by":     true,
+		"solution":        true,
+	}
+
+	// Validate column exists
+	if !intColumns[column] && !stringColumns[column] {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid column name"})
+	}
+
+	// Validate query parameter based on column type
+	var queryParam interface{}
+	var err error
+
+	if intColumns[column] {
+		// For integer columns, convert string to int
+		intVal, err := strconv.Atoi(query)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("Invalid value for column %s: must be integer", column)})
+		}
+		queryParam = intVal
+	} else {
+		// For string columns, use as is
+		queryParam = query
+	}
+
+	var queryStr string
+	var rows *sql.Rows
+
+	// Declare total variable for pagination
+	var total int
+
+	// Build query based on column type
+	if intColumns[column] {
+		// For integer columns, use exact match
+		var sqlColumn string
+		switch column {
+		case "phone_id":
+			sqlColumn = "t.phone_id"
+		case "issue_type":
+			sqlColumn = "t.issue_type"
+		case "system_id":
+			sqlColumn = "t.system_id"
+		case "department_id":
+			sqlColumn = "t.department_id"
+		case "branch_id":
+			sqlColumn = "d.branch_id"
+		case "status":
+			sqlColumn = "t.status"
+		case "created_by":
+			sqlColumn = "t.created_by"
+		case "updated_by":
+			sqlColumn = "t.updated_by"
+		case "telegram_id":
+			sqlColumn = "t.telegram_id"
+		}
+
+		// Get total count for pagination
+		countQuery := `SELECT COUNT(*) FROM tasks t
+			LEFT JOIN ip_phones p ON t.phone_id = p.id
+			LEFT JOIN departments d ON t.department_id = d.id
+			LEFT JOIN branches b ON d.branch_id = b.id
+			LEFT JOIN systems_program s ON t.system_id = s.id
+			LEFT JOIN issue_types it ON t.issue_type = it.id
+			WHERE ` + sqlColumn + ` = ?`
+		db.DB.QueryRow(countQuery, queryParam).Scan(&total)
+
+		queryStr = `
+		       SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), 
+		              t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), 
+		              IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), 
+		              IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
+		       FROM tasks t
+		       LEFT JOIN ip_phones p ON t.phone_id = p.id
+		       LEFT JOIN departments d ON t.department_id = d.id
+		       LEFT JOIN branches b ON d.branch_id = b.id
+		       LEFT JOIN systems_program s ON t.system_id = s.id
+		       LEFT JOIN issue_types it ON t.issue_type = it.id
+		       WHERE ` + sqlColumn + ` = ?
+		       ORDER BY t.id DESC
+		       LIMIT ? OFFSET ?`
+		rows, err = db.DB.Query(queryStr, queryParam, pagination.Limit, offset)
+	} else {
+		// For string columns, use LIKE search
+		searchPattern := "%" + query + "%"
+		var sqlColumn string
+		switch column {
+		case "phone_name":
+			sqlColumn = "p.name"
+		case "number":
+			sqlColumn = "p.number"
+		case "system_name":
+			sqlColumn = "s.name"
+		case "department_name":
+			sqlColumn = "d.name"
+		case "branch_name":
+			sqlColumn = "b.name"
+		case "solution":
+			sqlColumn = "t.solution"
+		case "reported_by":
+			sqlColumn = "t.reported_by"
+		default:
+			sqlColumn = "t." + column
+		}
+
+		// Get total count for pagination
+		countQuery := `SELECT COUNT(*) FROM tasks t
+			LEFT JOIN ip_phones p ON t.phone_id = p.id
+			LEFT JOIN departments d ON t.department_id = d.id
+			LEFT JOIN branches b ON d.branch_id = b.id
+			LEFT JOIN systems_program s ON t.system_id = s.id
+			LEFT JOIN issue_types it ON t.issue_type = it.id
+			WHERE ` + sqlColumn + ` LIKE ?`
+		db.DB.QueryRow(countQuery, searchPattern).Scan(&total)
+
+		queryStr = `
+		       SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), 
+		              t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), 
+		              IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), 
+		              IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
+		       FROM tasks t
+		       LEFT JOIN ip_phones p ON t.phone_id = p.id
+		       LEFT JOIN departments d ON t.department_id = d.id
+		       LEFT JOIN branches b ON d.branch_id = b.id
+		       LEFT JOIN systems_program s ON t.system_id = s.id
+		       LEFT JOIN issue_types it ON t.issue_type = it.id
+		       WHERE ` + sqlColumn + ` LIKE ?
+		       ORDER BY t.id DESC
+		       LIMIT ? OFFSET ?`
+		rows, err = db.DB.Query(queryStr, searchPattern, pagination.Limit, offset)
+	}
+
+	if err != nil {
+		log.Printf("Query error: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query tasks"})
+	}
+	defer rows.Close()
+
+	var tasks []models.TaskWithDetails
+	for rows.Next() {
+		var t models.TaskWithDetails
+		var issueTypeName string
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName,
+			&t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName,
+			&t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+		if err != nil {
+			log.Printf("Error scanning task: %v", err)
+			continue
+		}
+
+		t.SystemType = issueTypeName
+
+		// Calculate overdue
+		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
+		if err == nil {
+			createdAt = createdAt.Add(7 * time.Hour)
+			now := time.Now().Add(7 * time.Hour)
+			duration := now.Sub(createdAt)
+			if createdAt.Format("2006-01-02") == now.Format("2006-01-02") {
+				hours := int(duration.Hours())
+				minutes := int(duration.Minutes()) % 60
+				seconds := int(duration.Seconds()) % 60
+				t.Overdue = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+			} else {
+				days := int(duration.Hours() / 24)
+				if days == 0 {
+					days = 1
+				}
+				t.Overdue = days
+			}
+		}
+		tasks = append(tasks, t)
+	}
+
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    tasks,
+		Pagination: models.PaginationResponse{
+			Page:       pagination.Page,
+			Limit:      pagination.Limit,
+			Total:      total,
+			TotalPages: utils.CalculateTotalPages(total, pagination.Limit),
+		},
+	})
+}
+
 // UpdateAssignedTo updates the assigned person for a task
 func UpdateAssignedTo(c *fiber.Ctx) error {
 	id := c.Params("id")
@@ -1099,6 +1355,7 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 	env := os.Getenv("env")
 
 	var req struct {
+		AssignedtoID   int    `json:"assignedto_id"`
 		Assignto       string `json:"assign_to"`
 		UpdatedBy      int    `json:"updated_by"`
 		UpdateTelegram bool   `json:"update_telegram"`
@@ -1108,9 +1365,10 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	_, err = db.DB.Exec(`UPDATE tasks SET assignto = ?, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.Assignto, req.UpdatedBy, id)
+	_, err = db.DB.Exec(`UPDATE tasks SET assignto_id = ?, assignto = ?, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.AssignedtoID, req.Assignto, req.UpdatedBy, id)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("Failed to update assigned person %v", req.UpdateTelegram)})
+		log.Printf("Database error: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update assigned person"})
 	}
 	// เฉพาะกรณีที่ต้องการอัพเดต Telegram
 	if req.UpdateTelegram {
@@ -1119,18 +1377,21 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 		var ticket, text, issueElse, reportedBy, assignto, createdAt, updatedAt, branchName, departmentName, programName string
 		var phoneID, systemID, departmentID, status, messageID, phoneNumber, branchID int
 		var filePathsJSON string
+		var telegramUser string
 		// Fix SQL: JOINs before WHERE, select tc.report_id as messageID
 		err := db.DB.QueryRow(`
 			SELECT IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(t.system_id, 0), IFNULL(t.issue_else, ''), IFNULL(t.department_id, 0),
-			IFNULL(t.text, ''), IFNULL(t.status, 0), IFNULL(t.reported_by, ''), IFNULL(t.assignto, ''),
+			IFNULL(t.text, ''), IFNULL(t.status, 0), IFNULL(t.reported_by, ''), IFNULL(t.assignto, ''), IFNULL(rs.telegram_username, ''), 
 			IFNULL(tc.report_id, 0), IFNULL(t.file_paths, '[]'), IFNULL(d.branch_id, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, '')
 			FROM tasks t
 			LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
 			LEFT JOIN departments d ON t.department_id = d.id
 			LEFT JOIN branches b ON d.branch_id = b.id
 			LEFT JOIN systems_program s ON t.system_id = s.id
+			LEFT JOIN responsibilities rs ON t.assignto_id = rs.id
 			WHERE t.id = ?
-		`, id).Scan(&ticket, &phoneID, &systemID, &issueElse, &departmentID, &text, &status, &reportedBy, &assignto, &messageID, &filePathsJSON, &branchID, &createdAt, &updatedAt)
+		`, id).Scan(&ticket, &phoneID, &systemID, &issueElse, &departmentID, &text, &status, &reportedBy, &assignto, &telegramUser, &messageID, &filePathsJSON, &branchID, &createdAt, &updatedAt)
+		log.Printf("Fetched task for Telegram update, ID: %s, MessageID: %d", telegramUser, messageID)
 		// Query extra info for Telegram
 		db.DB.QueryRow(`SELECT name FROM branches WHERE id = ?`, branchID).Scan(&branchName)
 		db.DB.QueryRow(`SELECT name FROM departments WHERE id = ?`, departmentID).Scan(&departmentName)
@@ -1165,6 +1426,7 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 				Status:         status,
 				ReportedBy:     reportedBy,
 				Assignto:       assignto,
+				TelegramUser:   telegramUser,
 				MessageID:      messageID,
 				Ticket:         ticket,
 				BranchName:     branchName,

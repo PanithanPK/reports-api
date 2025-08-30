@@ -42,6 +42,7 @@ type DeleteUserRequest struct {
 }
 
 type ResponseRequest struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+	ID               int    `json:"id"`
+	Name             string `json:"name"`
+	TelegramUsername string `json:"telegram_username"`
 }
