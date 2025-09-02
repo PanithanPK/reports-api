@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.12.0](https://github.com/PanithanPK/reports-api/compare/v1.11.0...v1.12.0) (2025-09-02)
+
+
+### Features
+
+* New Create Resolution ([eecb442](https://github.com/PanithanPK/reports-api/commit/eecb442aa3e33a41bd71f56a173f85fe24df2463))
+
 ## [1.11.0](https://github.com/PanithanPK/reports-api/compare/v1.10.0...v1.11.0) (2025-08-30)
 
 
