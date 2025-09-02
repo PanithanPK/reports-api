@@ -378,6 +378,33 @@ func DeleteTelegram(messageID int) (bool, error) {
 	return true, nil
 }
 
+func formatSolutionMessage(req models.ResolutionReq, photoURLs ...string) string {
+	replyText := "🔧 *วิธีการแก้ไข* 🔧\n"
+	replyText += "━━━━━━━━━━━━━━\n"
+	replyText += "🎫 *Ticket No:* `" + req.TicketNo + "`\n"
+	replyText += "👤 *ผู้รับผิดชอบ:* `" + req.Assignto + "`\n"
+	replyText += "📅 *วันที่แจ้ง:* `" + req.CreatedAt + "`\n"
+	replyText += "📅 *วันที่แก้ไข:* `" + req.ResolvedAt + "`\n"
+	replyText += "━━━━━━━━━━━━━━\n"
+
+	replyText += "📝 *รายละเอียดการแก้ไข:*\n"
+	replyText += "```\n" + req.Solution + "\n```"
+
+	// Add photo links if available
+	if len(photoURLs) > 0 {
+		replyText += "\n━━━━━━━━━━━━━━"
+		for i := 0; i < len(photoURLs); i++ {
+			if photoURLs[i] != "" {
+				replyText += fmt.Sprintf("\n🖼️ [ดูรูปการแก้ไข %d](%s)", i+1, photoURLs[i])
+			}
+		}
+	}
+	replyText += "\n━━━━━━━━━━━━━━"
+	replyText += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")"
+
+	return replyText
+}
+
 func replyToSpecificMessage(req models.ResolutionReq, photoURLs ...string) (int, error) {
 	err := godotenv.Load()
 	if err != nil {
@@ -391,30 +418,8 @@ func replyToSpecificMessage(req models.ResolutionReq, photoURLs ...string) (int,
 		return 0, err
 	}
 
-	// Format solution message (เพิ่มผู้รับผิดชอบ, วันที่แจ้ง, วันที่แก้ไข)
-	replyText := "🔧 *วิธีการแก้ไข* 🔧\n"
-	replyText += "━━━━━━━━━━━━━━\n"
-	replyText += "🎫 *Ticket No:* `" + req.TicketNo + "`\n"
-	replyText += "👤 *ผู้รับผิดชอบ:* `" + req.Assignto + "`\n"
-	replyText += "📅 *วันที่แจ้ง:* `" + req.CreatedAt + "`\n"
-	replyText += "📅 *วันที่แก้ไข:* `" + req.ResolvedAt + "`\n"
-	replyText += "━━━━━━━━━━━━━━\n"
-
-	replyText += "📝 *รายละเอียดการแก้ไข:*\n"
-	replyText += "```\n" + req.Solution + "\n```"
-	replyText += "\n━━━━━━━━━━━━━━"
-	replyText += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")"
-
-	// Add photo links if available (except first one which will be shown as image)
-	if len(photoURLs) > 0 {
-		replyText += "\n━━━━━━━━━━━━━━"
-		for i := 0; i < len(photoURLs); i++ {
-			if photoURLs[i] != "" {
-				replyText += fmt.Sprintf("\n🖼️ [ดูรูปการแก้ไข %d](%s)", i+1, photoURLs[i])
-			}
-		}
-	}
-	replyText += "\n━━━━━━━━━━━━━━"
+	// Format solution message
+	replyText := formatSolutionMessage(req, photoURLs...)
 
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
@@ -500,29 +505,7 @@ func UpdatereplyToSpecificMessage(messageID int, req models.ResolutionReq, photo
 	}
 
 	// Format solution message
-	replyText := "🔧 *วิธีการแก้ไข* 🔧\n"
-	replyText += "━━━━━━━━━━━━━━\n"
-	replyText += "🎫 *Ticket No:* `" + req.TicketNo + "`\n"
-	replyText += "👤 *ผู้รับผิดชอบ:* `" + req.Assignto + "`\n"
-	replyText += "📅 *วันที่แจ้ง:* `" + req.CreatedAt + "`\n"
-	replyText += "📅 *วันที่แก้ไข:* `" + req.ResolvedAt + "`\n"
-	replyText += "━━━━━━━━━━━━━━\n"
-
-	replyText += "📝 *รายละเอียดการแก้ไข:*\n"
-	replyText += "```\n" + req.Solution + "\n```"
-	replyText += "\n━━━━━━━━━━━━━━"
-	replyText += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")"
-
-	// Add photo links if available (except first one which will be shown as image)
-	if len(photoURLs) > 0 {
-		replyText += "\n━━━━━━━━━━━━━━"
-		for i := 1; i < len(photoURLs); i++ {
-			if photoURLs[i] != "" {
-				replyText += fmt.Sprintf("\n🖼️ [ดูรูปการแก้ไข %d](%s)", i+1, photoURLs[i])
-			}
-		}
-	}
-	replyText += "\n━━━━━━━━━━━━━━"
+	replyText := formatSolutionMessage(req, photoURLs...)
 
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {

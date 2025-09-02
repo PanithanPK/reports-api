@@ -35,7 +35,7 @@ func problemRoutes(r *fiber.App) {
 }
 
 func resolutionRoutes(r *fiber.App) {
-	r.Get("/api/v1/resolution/list", handlers.ListResolutionsHandler)
+	r.Get("/api/v1/resolution/:id", handlers.GetResolutionHandler)
 	r.Post("/api/v1/resolution/create/:id", handlers.CreateResolutionHandler)
 	r.Put("/api/v1/resolution/update/:id", handlers.UpdateResolutionHandler)
 	r.Delete("/api/v1/resolution/delete/:id", handlers.DeleteResolutionHandler)

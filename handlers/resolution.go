@@ -87,31 +87,45 @@ func handleFileUploadsResolution(files []*multipart.FileHeader, ticketno string)
 	return uploadedFiles, errors
 }
 
-func ListResolutionsHandler(c *fiber.Ctx) error {
-	rows, err := db.DB.Query(`
-		SELECT  IFNULL(r.text, '') as text, IFNULL(r.telegram_id, 0) as telegram_id, 
+func GetResolutionHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	var solution, filePaths string
+	var telegramID int
+	var SolutionID int
+	var resolvedAt time.Time
+
+	err := db.DB.QueryRow(`
+		SELECT IFNULL(t.solution_id, 0) as solution_id
+		FROM tasks t
+		WHERE t.id = ?
+	`, id).Scan(&SolutionID)
+
+	if err != nil {
+		log.Printf("Failed to retrieve resolution: %v", err)
+		return c.Status(404).JSON(fiber.Map{"error": "Resolution not found SolutionID"})
+	}
+
+	err = db.DB.QueryRow(`
+		SELECT IFNULL(r.text, '') as text, IFNULL(r.telegram_id, 0) as telegram_id, 
 		IFNULL(r.file_paths, '[]') as file_paths, r.resolved_at
 		FROM resolutions r
-		ORDER BY r.id DESC
-	`)
+		WHERE r.id = ?
+	`, SolutionID).Scan(&solution, &telegramID, &filePaths, &resolvedAt)
+
 	if err != nil {
-		log.Printf("Failed to retrieve resolutions: %v", err)
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to retrieve resolutions"})
-	}
-	defer rows.Close()
-
-	var resolutions []models.ResolutionReq
-	for rows.Next() {
-		var r models.ResolutionReq
-		err := rows.Scan(&r.Solution, &r.TelegramID, &r.FilePaths, &r.ResolvedAt)
-		if err != nil {
-			log.Printf("Error scanning resolution: %v", err)
-			continue
-		}
-		resolutions = append(resolutions, r)
+		log.Printf("Failed to retrieve resolution: %v", err)
+		return c.Status(404).JSON(fiber.Map{"error": "Resolution not found"})
 	}
 
-	return c.JSON(fiber.Map{"success": true, "data": resolutions})
+	response := fiber.Map{
+		"solution":    solution,
+		"telegram_id": telegramID,
+		"file_paths":  filePaths,
+		"resolved_at": resolvedAt,
+	}
+
+	return c.JSON(fiber.Map{"success": true, "data": response})
 }
 
 func CreateResolutionHandler(c *fiber.Ctx) error {
@@ -173,9 +187,6 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	}
 
 	// ตรวจสอบว่ามี solution text หรือไฟล์รูป อย่างน้อยอย่างใดอย่างหนึ่ง
-	if req.Solution == "" && len(uploadedFiles) == 0 {
-		return c.Status(400).JSON(fiber.Map{"error": "Solution text or image file is required"})
-	}
 
 	// เตรียม file paths JSON
 	var filePathsJSON interface{}
