@@ -221,10 +221,6 @@ func UpdateResponsHandler(c *fiber.Ctx) error {
 
 func DeleteResponsHandler(c *fiber.Ctx) error {
 	id := c.Params("id")
-	var req models.ResponseRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
-	}
 
 	_, err := db.DB.Exec(
 		"DELETE FROM responsibilities WHERE id = ?",
@@ -239,15 +235,19 @@ func DeleteResponsHandler(c *fiber.Ctx) error {
 }
 
 func GetResponsDetailHandler(c *fiber.Ctx) error {
-	id := c.Params("id")
-	var user models.ResponseRequest
-	err := db.DB.QueryRow("SELECT id, IFNULL(telegram_username, '') as telegram_username, IFNULL(name, '') as name FROM responsibilities WHERE id = ?", id).Scan(&user.ID, &user.TelegramUsername, &user.Name)
+	idStr := c.Params("id")
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
+	}
+	var user models.ResponseRequest
+	err = db.DB.QueryRow("SELECT id, IFNULL(telegram_username, '') as telegram_username, IFNULL(name, '') as name FROM responsibilities WHERE id = ?", id).Scan(&user.ID, &user.TelegramUsername, &user.Name)
+
+	if err != nil {
+		log.Printf("Error fetching program details: %v", err)
+		return c.Status(404).JSON(fiber.Map{"error": "Program not found"})
 	}
 
-	return c.JSON(fiber.Map{
-		"success": true,
-		"data":    []models.ResponseRequest{user},
-	})
+	log.Printf("Getting program details Success for ID: %d", id)
+	return c.JSON(fiber.Map{"success": true, "data": user})
 }

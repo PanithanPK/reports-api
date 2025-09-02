@@ -10,10 +10,8 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/joho/godotenv v1.5.1
 	github.com/minio/minio-go/v7 v7.0.95
-	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/swaggo/fiber-swagger v1.3.0
 	github.com/swaggo/swag v1.16.6
-	golang.org/x/image v0.30.0
 )
 
 require (

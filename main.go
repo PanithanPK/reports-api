@@ -159,15 +159,10 @@ func main() {
 		})
 	})
 
-	// Register API routes
-	logger.Info.Println("🔗 Registering API routes...")
-	routes.MainRoutes(app)
-	logger.Info.Println("✅ API routes registered successfully")
-
 	// Register Authentication routes
-	logger.Info.Println("🔐 Registering Authentication routes...")
-	routes.RegisterAuthRoutes(app)
-	logger.Info.Println("✅ Authentication routes registered successfully")
+	logger.Info.Println("🔐 Registering routes...")
+	routes.RegisterRoutes(app)
+	logger.Info.Println("✅ Routes registered successfully")
 
 	// Test route for RecoveryMiddleware
 	app.Get("/test-panic", func(c *fiber.Ctx) error {

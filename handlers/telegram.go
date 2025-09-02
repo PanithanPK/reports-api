@@ -45,7 +45,7 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 		Program = req.IssueElse
 	}
 
-	bot.Debug = true
+	bot.Debug = false
 	// สร้างข้อความตามสถานะ
 	var statusIcon, statusText, headerColor string
 	switch req.Status {
@@ -227,22 +227,22 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		newMessage += "🎫 *Ticket No:* " + req.Ticket + "\n"
 	}
 	if req.BranchName != "" {
-		newMessage += "🏢 *สาขา:* " + escapeMarkdown(req.BranchName) + "\n"
+		newMessage += "🏢 *สาขา:* " + req.BranchName + "\n"
 	}
 	if req.DepartmentName != "" {
-		newMessage += "🏛️ *แผนก:* " + escapeMarkdown(req.DepartmentName) + "\n"
+		newMessage += "🏛️ *แผนก:* " + req.DepartmentName + "\n"
 	}
 	if req.PhoneNumber > 0 {
 		newMessage += fmt.Sprintf("📞 *เบอร์โทร:* %d\n", req.PhoneNumber)
 	}
 	if Program != "" {
-		newMessage += "💻 *โปรแกรม:* " + escapeMarkdown(Program) + "\n"
+		newMessage += "💻 *โปรแกรม:* " + Program + "\n"
 	}
 	if req.ReportedBy != "" {
-		newMessage += "\n👤 *ผู้แจ้ง:* " + escapeMarkdown(req.ReportedBy) + "\n"
+		newMessage += "\n👤 *ผู้แจ้ง:* " + req.ReportedBy + "\n"
 	}
 
-	newMessage += "📅 *วันที่แจ้งปัญหา:* " + escapeMarkdown(req.CreatedAt) + "\n"
+	newMessage += "📅 *วันที่แจ้งปัญหา:* " + req.CreatedAt + "\n"
 	newMessage += "━━━━━━━━━━━━━━"
 	if req.Assignto != "" {
 		if req.TelegramUser != "" {
@@ -260,7 +260,7 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	}
 	newMessage += "\n" + statusIcon + " *สถานะ:* " + escapeMarkdown(statusText) + "\n"
 	if req.Status == 1 {
-		newMessage += "📅 *วันที่แก้ไขเสร็จ:* " + escapeMarkdown(req.UpdatedAt) + "\n"
+		newMessage += "📅 *วันที่แก้ไขเสร็จ:* " + req.UpdatedAt + "\n"
 	}
 
 	newMessage += "━━━━━━━━━━━━━━\n"
@@ -339,6 +339,10 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 }
 
 func DeleteTelegram(messageID int) (bool, error) {
+	if messageID <= 0 {
+		return false, nil
+	}
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Printf("Warning: Error loading .env file: %v", err)
@@ -349,26 +353,32 @@ func DeleteTelegram(messageID int) (bool, error) {
 
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		log.Fatal("Invalid CHAT_ID format:", err)
+		log.Printf("Invalid CHAT_ID format: %v", err)
+		return false, err
 	}
 
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
+		log.Printf("Failed to create bot: %v", err)
 		return false, err
 	}
 
 	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
-	_, err = bot.Send(deleteMsg)
+	resp, err := bot.Request(deleteMsg)
 	if err != nil {
-		log.Printf("Error deleting message: %v", err)
-		return false, err
+		log.Printf("Cannot delete message ID %d: %v", messageID, err)
+		return false, nil // Return nil error to prevent cascade failures
+	}
+	if !resp.Ok {
+		log.Printf("Delete message failed for ID %d: %s", messageID, resp.Description)
+		return false, nil
 	}
 
 	log.Printf("Message ID %d deleted successfully!", messageID)
 	return true, nil
 }
 
-func replyToSpecificMessage(messageID int, ticketNo string, solution string, photoURLs []string) (int, error) {
+func replyToSpecificMessage(req models.ResolutionReq, photoURLs ...string) (int, error) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Printf("Warning: Error loading .env file: %v", err)
@@ -381,18 +391,24 @@ func replyToSpecificMessage(messageID int, ticketNo string, solution string, pho
 		return 0, err
 	}
 
-	// Format solution message
+	// Format solution message (เพิ่มผู้รับผิดชอบ, วันที่แจ้ง, วันที่แก้ไข)
 	replyText := "🔧 *วิธีการแก้ไข* 🔧\n"
 	replyText += "━━━━━━━━━━━━━━\n"
-	replyText += "🎫 *Ticket No:* `" + ticketNo + "`\n"
+	replyText += "🎫 *Ticket No:* `" + req.TicketNo + "`\n"
+	replyText += "👤 *ผู้รับผิดชอบ:* `" + req.Assignto + "`\n"
+	replyText += "📅 *วันที่แจ้ง:* `" + req.CreatedAt + "`\n"
+	replyText += "📅 *วันที่แก้ไข:* `" + req.ResolvedAt + "`\n"
 	replyText += "━━━━━━━━━━━━━━\n"
+
 	replyText += "📝 *รายละเอียดการแก้ไข:*\n"
-	replyText += "```\n" + solution + "\n```"
+	replyText += "```\n" + req.Solution + "\n```"
+	replyText += "\n━━━━━━━━━━━━━━"
+	replyText += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")"
 
 	// Add photo links if available (except first one which will be shown as image)
-	if len(photoURLs) > 1 {
+	if len(photoURLs) > 0 {
 		replyText += "\n━━━━━━━━━━━━━━"
-		for i := 1; i < len(photoURLs); i++ {
+		for i := 0; i < len(photoURLs); i++ {
 			if photoURLs[i] != "" {
 				replyText += fmt.Sprintf("\n🖼️ [ดูรูปการแก้ไข %d](%s)", i+1, photoURLs[i])
 			}
@@ -415,7 +431,7 @@ func replyToSpecificMessage(messageID int, ticketNo string, solution string, pho
 			// ส่งเป็นข้อความแทน
 			message := tgbotapi.NewMessage(chatID, replyText)
 			message.ParseMode = "Markdown"
-			message.ReplyToMessageID = messageID
+			message.ReplyToMessageID = req.MessageID
 			sentMsg, err = bot.Send(message)
 			if err != nil {
 				return 0, err
@@ -428,7 +444,7 @@ func replyToSpecificMessage(messageID int, ticketNo string, solution string, pho
 				// ส่งเป็นข้อความแทน
 				message := tgbotapi.NewMessage(chatID, replyText)
 				message.ParseMode = "Markdown"
-				message.ReplyToMessageID = messageID
+				message.ReplyToMessageID = req.MessageID
 				sentMsg, err = bot.Send(message)
 				if err != nil {
 					return 0, err
@@ -441,13 +457,13 @@ func replyToSpecificMessage(messageID int, ticketNo string, solution string, pho
 				})
 				photoMsg.Caption = replyText
 				photoMsg.ParseMode = "Markdown"
-				photoMsg.ReplyToMessageID = messageID
+				photoMsg.ReplyToMessageID = req.MessageID
 				sentMsg, err = bot.Send(photoMsg)
 				if err != nil {
 					log.Printf("❌ ส่งภาพไม่สำเร็จ ส่งเป็นข้อความแทน: %v", err)
 					message := tgbotapi.NewMessage(chatID, replyText)
 					message.ParseMode = "Markdown"
-					message.ReplyToMessageID = messageID
+					message.ReplyToMessageID = req.MessageID
 					sentMsg, err = bot.Send(message)
 					if err != nil {
 						return 0, err
@@ -459,7 +475,7 @@ func replyToSpecificMessage(messageID int, ticketNo string, solution string, pho
 		// ส่งเฉพาะข้อความ
 		message := tgbotapi.NewMessage(chatID, replyText)
 		message.ParseMode = "Markdown"
-		message.ReplyToMessageID = messageID
+		message.ReplyToMessageID = req.MessageID
 		sentMsg, err = bot.Send(message)
 		if err != nil {
 			return 0, err
@@ -468,4 +484,70 @@ func replyToSpecificMessage(messageID int, ticketNo string, solution string, pho
 
 	log.Printf("Solution reply sent successfully with ID: %d", sentMsg.MessageID)
 	return sentMsg.MessageID, nil
+}
+
+func UpdatereplyToSpecificMessage(messageID int, req models.ResolutionReq, photoURLs ...string) (int, error) {
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("Warning: Error loading .env file: %v", err)
+	}
+
+	botToken := os.Getenv("BOT_TOKEN")
+	chatIDStr := os.Getenv("CHAT_ID")
+	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	// Format solution message
+	replyText := "🔧 *วิธีการแก้ไข* 🔧\n"
+	replyText += "━━━━━━━━━━━━━━\n"
+	replyText += "🎫 *Ticket No:* `" + req.TicketNo + "`\n"
+	replyText += "👤 *ผู้รับผิดชอบ:* `" + req.Assignto + "`\n"
+	replyText += "📅 *วันที่แจ้ง:* `" + req.CreatedAt + "`\n"
+	replyText += "📅 *วันที่แก้ไข:* `" + req.ResolvedAt + "`\n"
+	replyText += "━━━━━━━━━━━━━━\n"
+
+	replyText += "📝 *รายละเอียดการแก้ไข:*\n"
+	replyText += "```\n" + req.Solution + "\n```"
+	replyText += "\n━━━━━━━━━━━━━━"
+	replyText += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")"
+
+	// Add photo links if available (except first one which will be shown as image)
+	if len(photoURLs) > 0 {
+		replyText += "\n━━━━━━━━━━━━━━"
+		for i := 1; i < len(photoURLs); i++ {
+			if photoURLs[i] != "" {
+				replyText += fmt.Sprintf("\n🖼️ [ดูรูปการแก้ไข %d](%s)", i+1, photoURLs[i])
+			}
+		}
+	}
+	replyText += "\n━━━━━━━━━━━━━━"
+
+	bot, err := tgbotapi.NewBotAPI(botToken)
+	if err != nil {
+		return 0, err
+	}
+
+	// ถ้ามีรูป ให้ edit caption ของรูปเดิม
+	if len(photoURLs) > 0 && photoURLs[0] != "" {
+		editMsg := tgbotapi.NewEditMessageCaption(chatID, messageID, replyText)
+		editMsg.ParseMode = "Markdown"
+		_, err = bot.Send(editMsg)
+		if err != nil {
+			log.Printf("Error editing photo caption: %v", err)
+			return 0, err
+		}
+	} else {
+		// ถ้าไม่มีรูป ให้ edit ข้อความเดิม
+		editMsg := tgbotapi.NewEditMessageText(chatID, messageID, replyText)
+		editMsg.ParseMode = "Markdown"
+		_, err = bot.Send(editMsg)
+		if err != nil {
+			log.Printf("Error editing message text: %v", err)
+			return 0, err
+		}
+	}
+	log.Printf("Solution edit sent successfully for message ID: %d", messageID)
+	return messageID, nil
 }

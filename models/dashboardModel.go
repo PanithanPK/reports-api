@@ -10,6 +10,7 @@ type DashboardResponse struct {
 	IPPhones    []IPPhoneDb         `json:"ip_phones"`
 	Programs    []ProgramDb         `json:"programs"`
 	Tasks       []TaskWithDetailsDb `json:"tasks"`
+	IssueTypes  []IssueTypeDb       `json:"issue_types"`
 }
 
 // TaskWithDetailsDb model for task with details
@@ -20,16 +21,24 @@ type TaskWithDetailsDb struct {
 	PhoneName      *string `json:"phone_name"`
 	SystemID       *int    `json:"system_id"`
 	SystemName     *string `json:"system_name"`
+	SystemType     *string `json:"system_type"`
 	DepartmentID   *int    `json:"department_id"`
 	DepartmentName *string `json:"department_name"`
 	BranchID       *int    `json:"branch_id"`
 	BranchName     *string `json:"branch_name"`
+	ReportedBy     string  `json:"reported_by"`
 	Text           string  `json:"text"`
 	Status         int     `json:"status"`
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
 	Month          string  `json:"month"`
 	Year           string  `json:"year"`
+}
+
+type IssueTypeDb struct {
+	ID        int     `json:"id"`
+	Name      *string `json:"name"`
+	CreatedAt *string `json:"created_at"`
 }
 
 // ChartData model for chart data
