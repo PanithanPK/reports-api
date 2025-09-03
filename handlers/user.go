@@ -26,7 +26,16 @@ func generateDummyToken() string {
 	return string(token)
 }
 
-// LoginHandler handles user login
+// @Summary User login
+// @Description Authenticate user and create session
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param credentials body models.Credentials true "Login credentials"
+// @Success 200 {object} models.LoginResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /api/authEntry/login [post]
 func LoginHandler(c *fiber.Ctx) error {
 	var credentials models.Credentials
 	if err := c.BodyParser(&credentials); err != nil {
@@ -65,7 +74,17 @@ func LoginHandler(c *fiber.Ctx) error {
 	})
 }
 
-// RegisterHandler returns a handler for registering a user or admin
+// @Summary Register user
+// @Description Register a new user or admin
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param user body models.RegisterUserRequest true "User registration data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 409 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/authEntry/registerUser [post]
 func RegisterHandler(role string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var req models.RegisterUserRequest
@@ -95,7 +114,17 @@ func RegisterHandler(role string) fiber.Handler {
 	}
 }
 
-// UpdateUserHandler updates user info
+// @Summary Update user
+// @Description Update user information
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param user body models.UpdateUserRequest true "User update data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/authEntry/updateUser [put]
 func UpdateUserHandler(c *fiber.Ctx) error {
 	var req models.UpdateUserRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -123,7 +152,16 @@ func UpdateUserHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "User updated"})
 }
 
-// DeleteUserHandler deletes a user
+// @Summary Delete user
+// @Description Delete a user (soft delete)
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param user body models.DeleteUserRequest true "User delete data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/authEntry/deleteUser [delete]
 func DeleteUserHandler(c *fiber.Ctx) error {
 	var req models.DeleteUserRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -142,7 +180,13 @@ func DeleteUserHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "User deleted"})
 }
 
-// LogoutHandler logs out a user
+// @Summary User logout
+// @Description Log out user and clear session
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/authEntry/logout [post]
 func LogoutHandler(c *fiber.Ctx) error {
 	sessionID := c.Cookies("session")
 	if sessionID != "" {
@@ -160,6 +204,14 @@ func LogoutHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Logged out"})
 }
 
+// @Summary Get responsibilities
+// @Description Get all responsibilities
+// @Tags responsibilities
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/respons/list [get]
 func GetresponsHandler(c *fiber.Ctx) error {
 	rows, err := db.DB.Query("SELECT id, IFNULL(telegram_username, '') as telegram_username, COALESCE(name, '') as name FROM responsibilities")
 	if err != nil {
@@ -182,6 +234,16 @@ func GetresponsHandler(c *fiber.Ctx) error {
 	})
 }
 
+// @Summary Add responsibility
+// @Description Add a new responsibility
+// @Tags responsibilities
+// @Accept json
+// @Produce json
+// @Param responsibility body models.ResponseRequest true "Responsibility data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/respons/create [post]
 func AddresponsHandler(c *fiber.Ctx) error {
 	var req models.ResponseRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -200,6 +262,17 @@ func AddresponsHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Responsibility added"})
 }
 
+// @Summary Update responsibility
+// @Description Update an existing responsibility
+// @Tags responsibilities
+// @Accept json
+// @Produce json
+// @Param id path string true "Responsibility ID"
+// @Param responsibility body models.ResponseRequest true "Responsibility data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/respons/update/{id} [put]
 func UpdateResponsHandler(c *fiber.Ctx) error {
 	id := c.Params("id")
 	var req models.ResponseRequest
@@ -219,6 +292,16 @@ func UpdateResponsHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Responsibility updated"})
 }
 
+// @Summary Delete responsibility
+// @Description Delete a responsibility
+// @Tags responsibilities
+// @Accept json
+// @Produce json
+// @Param id path string true "Responsibility ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/respons/delete/{id} [delete]
 func DeleteResponsHandler(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -234,6 +317,16 @@ func DeleteResponsHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Responsibility deleted"})
 }
 
+// @Summary Get responsibility details
+// @Description Get detailed information about a specific responsibility
+// @Tags responsibilities
+// @Accept json
+// @Produce json
+// @Param id path string true "Responsibility ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/v1/respons/{id} [get]
 func GetResponsDetailHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)

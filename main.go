@@ -8,6 +8,7 @@ import (
 	"reports-api/db"
 	"time"
 
+	_ "reports-api/docs"
 	"reports-api/routes"
 	"runtime"
 	"runtime/debug"
@@ -48,6 +49,11 @@ func init() {
 	}
 }
 
+// @title Example API – Report Problem System
+// @version 1.0
+// @description This is a sample swagger server in Go.
+// @host helpdesk-dev.nopadol.com
+// @BasePath /
 func main() {
 	logger.Info.Println("🚀 Starting Problem Report System...")
 
@@ -121,7 +127,7 @@ func main() {
 
 	// Add CORS middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000,http://helpdesk.nopadol.com,http://helpdesk-dev.nopadol.com,http://10.0.2.94:3000",
+		AllowOrigins:     "http://localhost:5000,http://localhost:3000,http://helpdesk.nopadol.com,http://helpdesk-dev.nopadol.com,http://10.0.2.94:3000",
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS,PATCH",
 		AllowHeaders:     "Content-Type,Authorization,X-Requested-With",
 		AllowCredentials: true,

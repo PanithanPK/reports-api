@@ -12,7 +12,16 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// ListBranchesHandler returns a handler for listing all branches with pagination
+// @Summary List branches
+// @Description Get list of all branches with pagination
+// @Tags branches
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/branch/list [get]
 func ListBranchesHandler(c *fiber.Ctx) error {
 	pagination := utils.GetPaginationParams(c)
 	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
@@ -61,7 +70,16 @@ func ListBranchesHandler(c *fiber.Ctx) error {
 	})
 }
 
-// CreateBranchHandler returns a handler for creating a new branch
+// @Summary Create branch
+// @Description Create a new branch
+// @Tags branches
+// @Accept json
+// @Produce json
+// @Param branch body models.BranchRequest true "Branch data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/branch/create [post]
 func CreateBranchHandler(c *fiber.Ctx) error {
 	var req models.BranchRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -77,7 +95,17 @@ func CreateBranchHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "id": id})
 }
 
-// UpdateBranchHandler returns a handler for updating an existing branch
+// @Summary Update branch
+// @Description Update an existing branch
+// @Tags branches
+// @Accept json
+// @Produce json
+// @Param id path string true "Branch ID"
+// @Param branch body models.BranchRequest true "Branch data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/branch/update/{id} [put]
 func UpdateBranchHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -98,7 +126,16 @@ func UpdateBranchHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-// DeleteBranchHandler returns a handler for deleting a branch
+// @Summary Delete branch
+// @Description Delete a branch
+// @Tags branches
+// @Accept json
+// @Produce json
+// @Param id path string true "Branch ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/branch/delete/{id} [delete]
 func DeleteBranchHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -115,7 +152,16 @@ func DeleteBranchHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-// GetBranchDetailHandler returns detailed information about a specific branch
+// @Summary Get branch details
+// @Description Get detailed information about a specific branch
+// @Tags branches
+// @Accept json
+// @Produce json
+// @Param id path string true "Branch ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/v1/branch/{id} [get]
 func GetBranchDetailHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -158,6 +204,18 @@ func GetBranchDetailHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "data": branchDetail})
 }
 
+// @Summary Search branches
+// @Description Search branches by query string with pagination
+// @Tags branches
+// @Accept json
+// @Produce json
+// @Param query path string true "Search query (use 'all' for all branches)"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/branch/list/{query} [get]
 func ListBranchesQueryHandler(c *fiber.Ctx) error {
 	query := c.Params("query")
 

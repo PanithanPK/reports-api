@@ -138,6 +138,13 @@ func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 }
 
 // GetTasksHandler returns a handler for listing all tasks with details and pagination
+// @Summary Get all problems
+// @Description Get list of all problems with pagination
+// @Tags problems
+// @Accept json
+// @Produce json
+// @Success 200 {object} models.PaginatedResponse
+// @Router /api/v1/problem/list [get]
 func GetTasksHandler(c *fiber.Ctx) error {
 	pagination := utils.GetPaginationParams(c)
 	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
@@ -242,7 +249,71 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	})
 }
 
+// @Summary Get problem details
+// @Description Get detailed information of a specific problem
+// @Tags problems
+// @Accept json
+// @Produce json
+// @Param id path string true "Problem ID"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/problem/{id} [get]
+func GetTaskDetailHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
+	}
+	var filePathsJSON string
+	var task models.TaskWithDetails
+	var issueTypeName string
+	err = db.DB.QueryRow(`
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), IFNULL(t.system_id, 0), IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), IFNULL(t.text, ''), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), IFNULL(t.status, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, ''), IFNULL(t.file_paths, '[]')
+		FROM tasks t
+		LEFT JOIN ip_phones p ON t.phone_id = p.id
+		LEFT JOIN departments d ON t.department_id = d.id
+		LEFT JOIN branches b ON d.branch_id = b.id
+		LEFT JOIN systems_program s ON t.system_id = s.id
+		LEFT JOIN issue_types it ON t.issue_type = it.id
+		WHERE t.id = ?
+	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.IssueTypeID, &task.IssueElse, &issueTypeName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Assignto, &task.ReportedBy, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
+
+	if task.SystemID > 0 {
+		task.SystemType = issueTypeName
+	} else {
+		task.SystemType = issueTypeName
+	}
+
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
+	}
+
+	// Parse file_paths JSON and convert to image_{index} format
+	fileMap := make(map[string]string)
+	if filePathsJSON != "" && filePathsJSON != "[]" {
+		var filePaths []fiber.Map
+		if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
+			for i, fp := range filePaths {
+				if url, ok := fp["url"].(string); ok {
+					fileMap[fmt.Sprintf("image_%d", i)] = url
+				}
+			}
+		}
+	}
+	// Set FilePaths as map instead of array
+	task.FilePaths = fileMap
+
+	log.Printf("Getting task ID: %d details", id)
+	return c.JSON(fiber.Map{"success": true, "data": task})
+}
+
 // CreateTaskHandler เพิ่ม task ใหม่
+// @Summary Create new problem
+// @Description Create a new problem report
+// @Tags problems
+// @Accept multipart/form-data
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/problem/create [post]
 func CreateTaskHandler(c *fiber.Ctx) error {
 	var req models.TaskRequest
 	var uploadedFiles []fiber.Map
@@ -468,6 +539,14 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 }
 
 // UpdateTaskHandler แก้ไข task
+// @Summary Update problem
+// @Description Update an existing problem
+// @Tags problems
+// @Accept json
+// @Produce json
+// @Param id path string true "Problem ID"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/problem/update/{id} [put]
 func UpdateTaskHandler(c *fiber.Ctx) error {
 	id := c.Params("id")
 	var err error
@@ -787,6 +866,14 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 }
 
 // DeleteTaskHandler (soft delete)
+// @Summary Delete problem
+// @Description Delete a problem and related data
+// @Tags problems
+// @Accept json
+// @Produce json
+// @Param id path string true "Problem ID"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/problem/delete/{id} [delete]
 func DeleteTaskHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -894,55 +981,6 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-func GetTaskDetailHandler(c *fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
-	}
-	var filePathsJSON string
-	var task models.TaskWithDetails
-	var issueTypeName string
-	err = db.DB.QueryRow(`
-		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), IFNULL(t.system_id, 0), IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), IFNULL(t.text, ''), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), IFNULL(t.status, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, ''), IFNULL(t.file_paths, '[]')
-		FROM tasks t
-		LEFT JOIN ip_phones p ON t.phone_id = p.id
-		LEFT JOIN departments d ON t.department_id = d.id
-		LEFT JOIN branches b ON d.branch_id = b.id
-		LEFT JOIN systems_program s ON t.system_id = s.id
-		LEFT JOIN issue_types it ON t.issue_type = it.id
-		WHERE t.id = ?
-	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.IssueTypeID, &task.IssueElse, &issueTypeName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Assignto, &task.ReportedBy, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
-
-	if task.SystemID > 0 {
-		task.SystemType = issueTypeName
-	} else {
-		task.SystemType = issueTypeName
-	}
-
-	if err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
-	}
-
-	// Parse file_paths JSON and convert to image_{index} format
-	fileMap := make(map[string]string)
-	if filePathsJSON != "" && filePathsJSON != "[]" {
-		var filePaths []fiber.Map
-		if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
-			for i, fp := range filePaths {
-				if url, ok := fp["url"].(string); ok {
-					fileMap[fmt.Sprintf("image_%d", i)] = url
-				}
-			}
-		}
-	}
-	// Set FilePaths as map instead of array
-	task.FilePaths = fileMap
-
-	log.Printf("Getting task ID: %d details", id)
-	return c.JSON(fiber.Map{"success": true, "data": task})
-}
-
 // updateDepartmentScore updates the department score based on problem count
 func updateDepartmentScore(departmentID int) error {
 	now := time.Now()
@@ -1000,7 +1038,18 @@ func updateDepartmentScore(departmentID int) error {
 	return nil
 }
 
-// GetTasksWithQueryHandler handles both list all and search functionality
+// @Summary Search problems
+// @Description Search problems by query string with pagination
+// @Tags problems
+// @Accept json
+// @Produce json
+// @Param query path string true "Search query (use 'all' for all problems)"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/problem/list/{query} [get]
 func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 	query := c.Params("query")
 
@@ -1111,6 +1160,19 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 	})
 }
 
+// @Summary Search problems by column
+// @Description Search problems by specific column and value with pagination
+// @Tags problems
+// @Accept json
+// @Produce json
+// @Param column path string true "Column name to search in"
+// @Param query path string true "Search value"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/problem/list/{column}/{query} [get]
 func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
 	column := c.Params("column")
 	query := c.Params("query")
@@ -1331,7 +1393,17 @@ func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
 	})
 }
 
-// UpdateAssignedTo updates the assigned person for a task
+// @Summary Update assigned person
+// @Description Update the assigned person for a specific problem
+// @Tags problems
+// @Accept json
+// @Produce json
+// @Param id path string true "Problem ID"
+// @Param request body object true "Assignment update data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/problem/update/assignto/{id} [put]
 func UpdateAssignedTo(c *fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {

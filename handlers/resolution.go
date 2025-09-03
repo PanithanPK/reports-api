@@ -87,6 +87,15 @@ func handleFileUploadsResolution(files []*multipart.FileHeader, ticketno string)
 	return uploadedFiles, errors
 }
 
+// @Summary Get resolution by task ID
+// @Description Get resolution details for a specific task
+// @Tags resolutions
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/v1/resolution/{id} [get]
 func GetResolutionHandler(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -118,16 +127,41 @@ func GetResolutionHandler(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Resolution not found"})
 	}
 
+	fileMap := make(map[string]string)
+	if filePaths != "" && filePaths != "[]" {
+		var filePathsArray []fiber.Map
+		if err := json.Unmarshal([]byte(filePaths), &filePathsArray); err == nil {
+			for i, fp := range filePathsArray {
+				if url, ok := fp["url"].(string); ok {
+					fileMap[fmt.Sprintf("image_%d", i)] = url
+				}
+			}
+		}
+	}
+
 	response := fiber.Map{
 		"solution":    solution,
 		"telegram_id": telegramID,
-		"file_paths":  filePaths,
+		"file_paths":  fileMap,
 		"resolved_at": resolvedAt,
 	}
 
 	return c.JSON(fiber.Map{"success": true, "data": response})
 }
 
+// @Summary Create resolution for task
+// @Description Create a new resolution for a specific task with optional file uploads
+// @Tags resolutions
+// @Accept multipart/form-data
+// @Produce json
+// @Param id path string true "Task ID"
+// @Param solution formData string false "Resolution text"
+// @Param image formData file false "Resolution image files"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/resolution/create/{id} [post]
 func CreateResolutionHandler(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -354,6 +388,19 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	})
 }
 
+// @Summary Update resolution
+// @Description Update an existing resolution with optional file uploads
+// @Tags resolutions
+// @Accept multipart/form-data
+// @Produce json
+// @Param id path string true "Task ID"
+// @Param solution formData string false "Updated resolution text"
+// @Param image formData file false "Updated resolution image files"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/resolution/update/{id} [put]
 func UpdateResolutionHandler(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -516,12 +563,18 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-
+		var messageID int
 		// อัปเดต reply message
-		_, err = UpdatereplyToSpecificMessage(solutionMessageID, req, photoURLs...)
+		messageID, err = UpdatereplyToSpecificMessage(solutionMessageID, req, photoURLs...)
 		if err != nil {
 			log.Printf("Failed to update Telegram reply: %v", err)
 		}
+
+		_, err = db.DB.Exec(`UPDATE telegram_chat SET solution_id = ? WHERE id = ?`, messageID, telegramID)
+		if err != nil {
+			log.Printf("Failed to update telegram_chat with message ID: %v", err)
+		}
+
 	}
 
 	log.Printf("Updated resolution ID: %s", resolutions)
@@ -532,6 +585,17 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	})
 }
 
+// @Summary Delete resolution
+// @Description Delete a resolution and reset task status
+// @Tags resolutions
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/resolution/delete/{id} [delete]
 func DeleteResolutionHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)

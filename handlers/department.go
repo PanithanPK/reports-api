@@ -12,7 +12,16 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// ListDepartmentsHandler returns a handler for listing all departments with pagination
+// @Summary List departments
+// @Description Get list of all departments with pagination
+// @Tags departments
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/department/list [get]
 func ListDepartmentsHandler(c *fiber.Ctx) error {
 	pagination := utils.GetPaginationParams(c)
 	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
@@ -65,7 +74,16 @@ func ListDepartmentsHandler(c *fiber.Ctx) error {
 	})
 }
 
-// CreateDepartmentHandler returns a handler for creating a new department
+// @Summary Create department
+// @Description Create a new department
+// @Tags departments
+// @Accept json
+// @Produce json
+// @Param department body models.DepartmentRequest true "Department data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/department/create [post]
 func CreateDepartmentHandler(c *fiber.Ctx) error {
 	var req models.DepartmentRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -82,7 +100,17 @@ func CreateDepartmentHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "id": id})
 }
 
-// UpdateDepartmentHandler returns a handler for updating an existing department
+// @Summary Update department
+// @Description Update an existing department
+// @Tags departments
+// @Accept json
+// @Produce json
+// @Param id path string true "Department ID"
+// @Param department body models.DepartmentRequest true "Department data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/department/update/{id} [put]
 func UpdateDepartmentHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -104,7 +132,16 @@ func UpdateDepartmentHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-// DeleteDepartmentHandler returns a handler for deleting a department
+// @Summary Delete department
+// @Description Delete a department
+// @Tags departments
+// @Accept json
+// @Produce json
+// @Param id path string true "Department ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/department/delete/{id} [delete]
 func DeleteDepartmentHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -121,7 +158,16 @@ func DeleteDepartmentHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-// GetDepartmentDetailHandler returns detailed information about a specific department
+// @Summary Get department details
+// @Description Get detailed information about a specific department
+// @Tags departments
+// @Accept json
+// @Produce json
+// @Param id path string true "Department ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/v1/department/{id} [get]
 func GetDepartmentDetailHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -173,6 +219,14 @@ func GetDepartmentDetailHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "data": departmentDetail})
 }
 
+// @Summary Get all departments
+// @Description Get all departments without pagination
+// @Tags departments
+// @Accept json
+// @Produce json
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/department/listall [get]
 func AllDepartmentsHandler(c *fiber.Ctx) error {
 	// Get total count
 	var total int
@@ -215,6 +269,18 @@ func AllDepartmentsHandler(c *fiber.Ctx) error {
 	})
 }
 
+// @Summary Search departments
+// @Description Search departments by query string with pagination
+// @Tags departments
+// @Accept json
+// @Produce json
+// @Param query path string true "Search query (use 'all' for all departments)"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/department/list/{query} [get]
 func ListDepartmentsQueryHandler(c *fiber.Ctx) error {
 	query := c.Params("query")
 

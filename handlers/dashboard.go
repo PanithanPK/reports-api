@@ -10,7 +10,16 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// GetDashboardDataHandler ดึงข้อมูลสำหรับ Dashboard
+// @Summary Get dashboard data
+// @Description Get dashboard data including branches, departments, IP phones, programs, and tasks
+// @Tags dashboard
+// @Accept json
+// @Produce json
+// @Param month query string false "Month filter"
+// @Param year query string false "Year filter"
+// @Success 200 {object} models.DashboardResponse
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/dashboard/data [get]
 func GetDashboardDataHandler(c *fiber.Ctx) error {
 	logger := log.Default()
 	logger.Printf("📊 Loading dashboard data from %s", c.IP())

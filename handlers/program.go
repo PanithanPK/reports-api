@@ -12,7 +12,16 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// ListProgramsHandler returns a handler for listing all programs with pagination
+// @Summary List programs
+// @Description Get list of all programs with pagination
+// @Tags programs
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/program/list [get]
 func ListProgramsHandler(c *fiber.Ctx) error {
 	pagination := utils.GetPaginationParams(c)
 	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
@@ -62,7 +71,16 @@ func ListProgramsHandler(c *fiber.Ctx) error {
 	})
 }
 
-// CreateProgramHandler returns a handler for creating a new program
+// @Summary Create program
+// @Description Create a new program
+// @Tags programs
+// @Accept json
+// @Produce json
+// @Param program body models.ProgramRequest true "Program data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/program/create [post]
 func CreateProgramHandler(c *fiber.Ctx) error {
 	var req models.ProgramRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -83,7 +101,17 @@ func CreateProgramHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "id": id})
 }
 
-// UpdateProgramHandler returns a handler for updating an existing program
+// @Summary Update program
+// @Description Update an existing program
+// @Tags programs
+// @Accept json
+// @Produce json
+// @Param id path string true "Program ID"
+// @Param program body models.ProgramRequest true "Program data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/program/update/{id} [put]
 func UpdateProgramHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -104,7 +132,16 @@ func UpdateProgramHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-// DeleteProgramHandler returns a handler for deleting a program (soft delete)
+// @Summary Delete program
+// @Description Delete a program
+// @Tags programs
+// @Accept json
+// @Produce json
+// @Param id path string true "Program ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/program/delete/{id} [delete]
 func DeleteProgramHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -121,6 +158,18 @@ func DeleteProgramHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
+// @Summary Search programs
+// @Description Search programs by query string with pagination
+// @Tags programs
+// @Accept json
+// @Produce json
+// @Param query path string true "Search query (use 'all' for all programs)"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/program/list/{query} [get]
 func ListProgramsQueryHandler(c *fiber.Ctx) error {
 	query := c.Params("query")
 
@@ -197,6 +246,16 @@ func ListProgramsQueryHandler(c *fiber.Ctx) error {
 	})
 }
 
+// @Summary Get program details
+// @Description Get detailed information about a specific program
+// @Tags programs
+// @Accept json
+// @Produce json
+// @Param id path string true "Program ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/v1/program/{id} [get]
 func GetProgramDetailHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -224,7 +283,14 @@ func GetProgramDetailHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "data": program})
 }
 
-// GETTypeProgramHandler returns all program types
+// @Summary Get program types
+// @Description Get all program types
+// @Tags programs
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/program/type/list [get]
 func GETTypeProgramHandler(c *fiber.Ctx) error {
 	rows, err := db.DB.Query(`SELECT id, name FROM issue_types ORDER BY id`)
 	if err != nil {
@@ -247,6 +313,16 @@ func GETTypeProgramHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "data": types})
 }
 
+// @Summary Add program type
+// @Description Add a new program type
+// @Tags programs
+// @Accept json
+// @Produce json
+// @Param type body models.Type true "Type data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/program/type/create [post]
 func AddTypeProgramHandler(c *fiber.Ctx) error {
 	var req models.Type
 	if err := c.BodyParser(&req); err != nil {
@@ -262,6 +338,17 @@ func AddTypeProgramHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "id": id})
 }
 
+// @Summary Update program type
+// @Description Update an existing program type
+// @Tags programs
+// @Accept json
+// @Produce json
+// @Param id path string true "Type ID"
+// @Param type body models.Type true "Type data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/program/type/update/{id} [post]
 func UpdateTypeProgramHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -282,6 +369,16 @@ func UpdateTypeProgramHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
+// @Summary Delete program type
+// @Description Delete a program type
+// @Tags programs
+// @Accept json
+// @Produce json
+// @Param id path string true "Type ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/program/type/delete/{id} [delete]
 func DeleteTypeHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -298,6 +395,16 @@ func DeleteTypeHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
+// @Summary Search program types
+// @Description Search program types by query string
+// @Tags programs
+// @Accept json
+// @Produce json
+// @Param query path string true "Search query (use 'all' for all types)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/program/type/list/{query} [get]
 func GetTypeWithQueryHandler(c *fiber.Ctx) error {
 	query := c.Params("query")
 

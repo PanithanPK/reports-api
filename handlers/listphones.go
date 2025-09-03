@@ -12,7 +12,16 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// ListIPPhonesHandler returns a handler for listing all IP phones with pagination
+// @Summary List IP phones
+// @Description Get list of all IP phones with pagination
+// @Tags ip-phones
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/ipphone/list [get]
 func ListIPPhonesHandler(c *fiber.Ctx) error {
 	pagination := utils.GetPaginationParams(c)
 	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
@@ -69,7 +78,16 @@ func ListIPPhonesHandler(c *fiber.Ctx) error {
 	})
 }
 
-// CreateIPPhoneHandler returns a handler for creating a new IP phone
+// @Summary Create IP phone
+// @Description Create a new IP phone
+// @Tags ip-phones
+// @Accept json
+// @Produce json
+// @Param ip_phone body models.IPPhoneRequest true "IP phone data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/ipphone/create [post]
 func CreateIPPhoneHandler(c *fiber.Ctx) error {
 	var req models.IPPhoneRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -86,7 +104,17 @@ func CreateIPPhoneHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "id": id})
 }
 
-// UpdateIPPhoneHandler returns a handler for updating an existing IP phone
+// @Summary Update IP phone
+// @Description Update an existing IP phone
+// @Tags ip-phones
+// @Accept json
+// @Produce json
+// @Param id path string true "IP phone ID"
+// @Param ip_phone body models.IPPhoneRequest true "IP phone data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/ipphone/update/{id} [put]
 func UpdateIPPhoneHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -108,7 +136,16 @@ func UpdateIPPhoneHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-// DeleteIPPhoneHandler returns a handler for deleting an IP phone
+// @Summary Delete IP phone
+// @Description Delete an IP phone
+// @Tags ip-phones
+// @Accept json
+// @Produce json
+// @Param id path string true "IP phone ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/ipphone/delete/{id} [delete]
 func DeleteIPPhoneHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
@@ -125,6 +162,14 @@ func DeleteIPPhoneHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
+// @Summary Get all IP phones
+// @Description Get all IP phones without pagination
+// @Tags ip-phones
+// @Accept json
+// @Produce json
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/ipphone/listall [get]
 func AllIPPhonesHandler(c *fiber.Ctx) error {
 
 	// Get total count
@@ -171,6 +216,18 @@ func AllIPPhonesHandler(c *fiber.Ctx) error {
 	})
 }
 
+// @Summary Search IP phones
+// @Description Search IP phones by query string with pagination
+// @Tags ip-phones
+// @Accept json
+// @Produce json
+// @Param query path string true "Search query (use 'all' for all IP phones)"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/ipphone/list/{query} [get]
 func ListIPPhonesQueryHandler(c *fiber.Ctx) error {
 	query := c.Params("query")
 
@@ -258,6 +315,16 @@ func ListIPPhonesQueryHandler(c *fiber.Ctx) error {
 	})
 }
 
+// @Summary Get IP phone details
+// @Description Get detailed information about a specific IP phone
+// @Tags ip-phones
+// @Accept json
+// @Produce json
+// @Param id path string true "IP phone ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/v1/ipphone/{id} [get]
 func GetIPPhonesDetailHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
