@@ -1,9 +1,5 @@
 # Reports API
 
-<div align="center">
-  <img src="/dockergo.png" alt="Reports API Logo" width="600">
-</div>
-
 ![Reports API](/dockergo.png)
 
 <div align="center">
