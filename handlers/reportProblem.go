@@ -552,9 +552,6 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	var err error
 	var ticketno string
 	var uploadedFiles []fiber.Map
-	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
-	}
 
 	var req models.TaskRequestUpdate
 	if err := c.BodyParser(&req); err != nil {
@@ -566,7 +563,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		req.PhoneID = nil
 	}
 
-	log.Printf("Looking for task with ID: %d", id)
+	log.Printf("Looking for task with ID: %s", id)
 	err = db.DB.QueryRow("SELECT ticket_no FROM tasks WHERE id = ?", id).Scan(&ticketno)
 	if err != nil {
 		log.Printf("Task not found error: %v", err)

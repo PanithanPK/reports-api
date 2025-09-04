@@ -114,7 +114,7 @@ func formatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 		newMessage += "━━━━━━━━━━━━━━"
 		for i, url := range photoURLs {
 			if url != "" {
-				newMessage += fmt.Sprintf("\n🖼️ [ดูรูปรายงานปัญหา %d](%s)", i+1, url)
+				newMessage += fmt.Sprintf("\n🖼️ [ดูรูปรายงานปัญหา %d](%s)\n", i+1, url)
 			}
 		}
 	}

@@ -352,7 +352,40 @@ info:
   title: Example API – Report Problem System
   version: "1.0"
 paths:
-  /api/v1/auth/login:
+  /api/authEntry/deleteUser:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a user (soft delete)
+      parameters:
+      - description: User delete data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.DeleteUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete user
+      tags:
+      - users
+  /api/authEntry/login:
     post:
       consumes:
       - application/json
@@ -384,7 +417,7 @@ paths:
       summary: User login
       tags:
       - authentication
-  /api/v1/auth/logout:
+  /api/authEntry/logout:
     post:
       consumes:
       - application/json
@@ -400,7 +433,7 @@ paths:
       summary: User logout
       tags:
       - authentication
-  /api/v1/auth/register:
+  /api/authEntry/registerUser:
     post:
       consumes:
       - application/json
@@ -438,37 +471,77 @@ paths:
       summary: Register user
       tags:
       - authentication
-  /api/v1/branches:
-    get:
+  /api/authEntry/updateUser:
+    put:
       consumes:
       - application/json
-      description: Get list of all branches with pagination
+      description: Update user information
       parameters:
-      - default: 1
-        description: Page number
-        in: query
-        name: page
-        type: integer
-      - default: 10
-        description: Items per page
-        in: query
-        name: limit
-        type: integer
+      - description: User update data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateUserRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.PaginatedResponse'
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
             additionalProperties: true
             type: object
-      summary: List branches
+      summary: Update user
+      tags:
+      - users
+  /api/v1/branch/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific branch
+      parameters:
+      - description: Branch ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get branch details
       tags:
       - branches
+  /api/v1/branch/create:
     post:
       consumes:
       - application/json
@@ -501,7 +574,7 @@ paths:
       summary: Create branch
       tags:
       - branches
-  /api/v1/branches/{id}:
+  /api/v1/branch/delete/{id}:
     delete:
       consumes:
       - application/json
@@ -533,75 +606,38 @@ paths:
       summary: Delete branch
       tags:
       - branches
+  /api/v1/branch/list:
     get:
       consumes:
       - application/json
-      description: Get detailed information about a specific branch
+      description: Get list of all branches with pagination
       parameters:
-      - description: Branch ID
-        in: path
-        name: id
-        required: true
-        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Get branch details
-      tags:
-      - branches
-    put:
-      consumes:
-      - application/json
-      description: Update an existing branch
-      parameters:
-      - description: Branch ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Branch data
-        in: body
-        name: branch
-        required: true
-        schema:
-          $ref: '#/definitions/models.BranchRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/models.PaginatedResponse'
         "500":
           description: Internal Server Error
           schema:
             additionalProperties: true
             type: object
-      summary: Update branch
+      summary: List branches
       tags:
       - branches
-  /api/v1/branches/search/{query}:
+  /api/v1/branch/list/{query}:
     get:
       consumes:
       - application/json
@@ -642,7 +678,45 @@ paths:
       summary: Search branches
       tags:
       - branches
-  /api/v1/dashboard:
+  /api/v1/branch/update/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Update an existing branch
+      parameters:
+      - description: Branch ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Branch data
+        in: body
+        name: branch
+        required: true
+        schema:
+          $ref: '#/definitions/models.BranchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update branch
+      tags:
+      - branches
+  /api/v1/dashboard/data:
     get:
       consumes:
       - application/json
@@ -672,37 +746,39 @@ paths:
       summary: Get dashboard data
       tags:
       - dashboard
-  /api/v1/departments:
+  /api/v1/department/{id}:
     get:
       consumes:
       - application/json
-      description: Get list of all departments with pagination
+      description: Get detailed information about a specific department
       parameters:
-      - default: 1
-        description: Page number
-        in: query
-        name: page
-        type: integer
-      - default: 10
-        description: Items per page
-        in: query
-        name: limit
-        type: integer
+      - description: Department ID
+        in: path
+        name: id
+        required: true
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.PaginatedResponse'
-        "500":
-          description: Internal Server Error
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
           schema:
             additionalProperties: true
             type: object
-      summary: List departments
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get department details
       tags:
       - departments
+  /api/v1/department/create:
     post:
       consumes:
       - application/json
@@ -735,7 +811,7 @@ paths:
       summary: Create department
       tags:
       - departments
-  /api/v1/departments/{id}:
+  /api/v1/department/delete/{id}:
     delete:
       consumes:
       - application/json
@@ -767,79 +843,22 @@ paths:
       summary: Delete department
       tags:
       - departments
+  /api/v1/department/list:
     get:
       consumes:
       - application/json
-      description: Get detailed information about a specific department
+      description: Get list of all departments with pagination
       parameters:
-      - description: Department ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Get department details
-      tags:
-      - departments
-    put:
-      consumes:
-      - application/json
-      description: Update an existing department
-      parameters:
-      - description: Department ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Department data
-        in: body
-        name: department
-        required: true
-        schema:
-          $ref: '#/definitions/models.DepartmentRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Update department
-      tags:
-      - departments
-  /api/v1/departments/all:
-    get:
-      consumes:
-      - application/json
-      description: Get all departments without pagination
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
@@ -852,10 +871,10 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: Get all departments
+      summary: List departments
       tags:
       - departments
-  /api/v1/departments/search/{query}:
+  /api/v1/department/list/{query}:
     get:
       consumes:
       - application/json
@@ -896,22 +915,11 @@ paths:
       summary: Search departments
       tags:
       - departments
-  /api/v1/ip-phones:
+  /api/v1/department/listall:
     get:
       consumes:
       - application/json
-      description: Get list of all IP phones with pagination
-      parameters:
-      - default: 1
-        description: Page number
-        in: query
-        name: page
-        type: integer
-      - default: 10
-        description: Items per page
-        in: query
-        name: limit
-        type: integer
+      description: Get all departments without pagination
       produces:
       - application/json
       responses:
@@ -924,9 +932,80 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: List IP phones
+      summary: Get all departments
+      tags:
+      - departments
+  /api/v1/department/update/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Update an existing department
+      parameters:
+      - description: Department ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Department data
+        in: body
+        name: department
+        required: true
+        schema:
+          $ref: '#/definitions/models.DepartmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update department
+      tags:
+      - departments
+  /api/v1/ipphone/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific IP phone
+      parameters:
+      - description: IP phone ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get IP phone details
       tags:
       - ip-phones
+  /api/v1/ipphone/create:
     post:
       consumes:
       - application/json
@@ -959,7 +1038,7 @@ paths:
       summary: Create IP phone
       tags:
       - ip-phones
-  /api/v1/ip-phones/{id}:
+  /api/v1/ipphone/delete/{id}:
     delete:
       consumes:
       - application/json
@@ -991,80 +1070,22 @@ paths:
       summary: Delete IP phone
       tags:
       - ip-phones
-    put:
-      consumes:
-      - application/json
-      description: Update an existing IP phone
-      parameters:
-      - description: IP phone ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: IP phone data
-        in: body
-        name: ip_phone
-        required: true
-        schema:
-          $ref: '#/definitions/models.IPPhoneRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Update IP phone
-      tags:
-      - ip-phones
-  /api/v1/ip-phones/{id}/details:
+  /api/v1/ipphone/list:
     get:
       consumes:
       - application/json
-      description: Get detailed information about a specific IP phone
+      description: Get list of all IP phones with pagination
       parameters:
-      - description: IP phone ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Get IP phone details
-      tags:
-      - ip-phones
-  /api/v1/ip-phones/all:
-    get:
-      consumes:
-      - application/json
-      description: Get all IP phones without pagination
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
@@ -1077,10 +1098,10 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: Get all IP phones
+      summary: List IP phones
       tags:
       - ip-phones
-  /api/v1/ip-phones/search/{query}:
+  /api/v1/ipphone/list/{query}:
     get:
       consumes:
       - application/json
@@ -1121,6 +1142,64 @@ paths:
       summary: Search IP phones
       tags:
       - ip-phones
+  /api/v1/ipphone/listall:
+    get:
+      consumes:
+      - application/json
+      description: Get all IP phones without pagination
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaginatedResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get all IP phones
+      tags:
+      - ip-phones
+  /api/v1/ipphone/update/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Update an existing IP phone
+      parameters:
+      - description: IP phone ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: IP phone data
+        in: body
+        name: ip_phone
+        required: true
+        schema:
+          $ref: '#/definitions/models.IPPhoneRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update IP phone
+      tags:
+      - ip-phones
   /api/v1/problem/{id}:
     get:
       consumes:
@@ -1141,44 +1220,6 @@ paths:
             additionalProperties: true
             type: object
       summary: Get problem details
-      tags:
-      - problems
-  /api/v1/problem/assign/{id}:
-    put:
-      consumes:
-      - application/json
-      description: Update the assigned person for a specific problem
-      parameters:
-      - description: Problem ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Assignment update data
-        in: body
-        name: request
-        required: true
-        schema:
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Update assigned person
       tags:
       - problems
   /api/v1/problem/create:
@@ -1234,7 +1275,7 @@ paths:
       summary: Get all problems
       tags:
       - problems
-  /api/v1/problem/search/{column}/{query}:
+  /api/v1/problem/list/{column}/{query}:
     get:
       consumes:
       - application/json
@@ -1280,7 +1321,7 @@ paths:
       summary: Search problems by column
       tags:
       - problems
-  /api/v1/problem/search/{query}:
+  /api/v1/problem/list/{query}:
     get:
       consumes:
       - application/json
@@ -1343,37 +1384,77 @@ paths:
       summary: Update problem
       tags:
       - problems
-  /api/v1/programs:
-    get:
+  /api/v1/problem/update/assignto/{id}:
+    put:
       consumes:
       - application/json
-      description: Get list of all programs with pagination
+      description: Update the assigned person for a specific problem
       parameters:
-      - default: 1
-        description: Page number
-        in: query
-        name: page
-        type: integer
-      - default: 10
-        description: Items per page
-        in: query
-        name: limit
-        type: integer
+      - description: Problem ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Assignment update data
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.PaginatedResponse'
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
             additionalProperties: true
             type: object
-      summary: List programs
+      summary: Update assigned person
+      tags:
+      - problems
+  /api/v1/program/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific program
+      parameters:
+      - description: Program ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get program details
       tags:
       - programs
+  /api/v1/program/create:
     post:
       consumes:
       - application/json
@@ -1406,7 +1487,7 @@ paths:
       summary: Create program
       tags:
       - programs
-  /api/v1/programs/{id}:
+  /api/v1/program/delete/{id}:
     delete:
       consumes:
       - application/json
@@ -1438,75 +1519,38 @@ paths:
       summary: Delete program
       tags:
       - programs
+  /api/v1/program/list:
     get:
       consumes:
       - application/json
-      description: Get detailed information about a specific program
+      description: Get list of all programs with pagination
       parameters:
-      - description: Program ID
-        in: path
-        name: id
-        required: true
-        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Get program details
-      tags:
-      - programs
-    put:
-      consumes:
-      - application/json
-      description: Update an existing program
-      parameters:
-      - description: Program ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Program data
-        in: body
-        name: program
-        required: true
-        schema:
-          $ref: '#/definitions/models.ProgramRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/models.PaginatedResponse'
         "500":
           description: Internal Server Error
           schema:
             additionalProperties: true
             type: object
-      summary: Update program
+      summary: List programs
       tags:
       - programs
-  /api/v1/programs/search/{query}:
+  /api/v1/program/list/{query}:
     get:
       consumes:
       - application/json
@@ -1547,27 +1591,7 @@ paths:
       summary: Search programs
       tags:
       - programs
-  /api/v1/programs/types:
-    get:
-      consumes:
-      - application/json
-      description: Get all program types
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Get program types
-      tags:
-      - programs
+  /api/v1/program/type/create:
     post:
       consumes:
       - application/json
@@ -1600,7 +1624,7 @@ paths:
       summary: Add program type
       tags:
       - programs
-  /api/v1/programs/types/{id}:
+  /api/v1/program/type/delete/{id}:
     delete:
       consumes:
       - application/json
@@ -1632,7 +1656,61 @@ paths:
       summary: Delete program type
       tags:
       - programs
-    put:
+  /api/v1/program/type/list:
+    get:
+      consumes:
+      - application/json
+      description: Get all program types
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get program types
+      tags:
+      - programs
+  /api/v1/program/type/list/{query}:
+    get:
+      consumes:
+      - application/json
+      description: Search program types by query string
+      parameters:
+      - description: Search query (use 'all' for all types)
+        in: path
+        name: query
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Search program types
+      tags:
+      - programs
+  /api/v1/program/type/update/{id}:
+    post:
       consumes:
       - application/json
       description: Update an existing program type
@@ -1669,17 +1747,23 @@ paths:
       summary: Update program type
       tags:
       - programs
-  /api/v1/programs/types/search/{query}:
-    get:
+  /api/v1/program/update/{id}:
+    put:
       consumes:
       - application/json
-      description: Search program types by query string
+      description: Update an existing program
       parameters:
-      - description: Search query (use 'all' for all types)
+      - description: Program ID
         in: path
-        name: query
+        name: id
         required: true
         type: string
+      - description: Program data
+        in: body
+        name: program
+        required: true
+        schema:
+          $ref: '#/definitions/models.ProgramRequest'
       produces:
       - application/json
       responses:
@@ -1698,7 +1782,7 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: Search program types
+      summary: Update program
       tags:
       - programs
   /api/v1/resolution/{id}:
@@ -1826,10 +1910,22 @@ paths:
         in: formData
         name: solution
         type: string
+      - description: User to assign the task
+        in: formData
+        name: assignedto
+        type: string
+      - description: User ID to assign the task
+        in: formData
+        name: assignedto_id
+        type: integer
       - description: Updated resolution image files
         in: formData
         name: image
         type: file
+      - description: Existing image URLs to keep (JSON array)
+        in: formData
+        name: image_urls
+        type: string
       produces:
       - application/json
       responses:
@@ -1856,11 +1952,17 @@ paths:
       summary: Update resolution
       tags:
       - resolutions
-  /api/v1/responsibilities:
+  /api/v1/respons/{id}:
     get:
       consumes:
       - application/json
-      description: Get all responsibilities
+      description: Get detailed information about a specific responsibility
+      parameters:
+      - description: Responsibility ID
+        in: path
+        name: id
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1869,14 +1971,20 @@ paths:
           schema:
             additionalProperties: true
             type: object
-        "500":
-          description: Internal Server Error
+        "400":
+          description: Bad Request
           schema:
             additionalProperties: true
             type: object
-      summary: Get responsibilities
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get responsibility details
       tags:
       - responsibilities
+  /api/v1/respons/create:
     post:
       consumes:
       - application/json
@@ -1909,7 +2017,7 @@ paths:
       summary: Add responsibility
       tags:
       - responsibilities
-  /api/v1/responsibilities/{id}:
+  /api/v1/respons/delete/{id}:
     delete:
       consumes:
       - application/json
@@ -1941,16 +2049,11 @@ paths:
       summary: Delete responsibility
       tags:
       - responsibilities
+  /api/v1/respons/list:
     get:
       consumes:
       - application/json
-      description: Get detailed information about a specific responsibility
-      parameters:
-      - description: Responsibility ID
-        in: path
-        name: id
-        required: true
-        type: string
+      description: Get all responsibilities
       produces:
       - application/json
       responses:
@@ -1959,19 +2062,15 @@ paths:
           schema:
             additionalProperties: true
             type: object
-        "400":
-          description: Bad Request
+        "500":
+          description: Internal Server Error
           schema:
             additionalProperties: true
             type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Get responsibility details
+      summary: Get responsibilities
       tags:
       - responsibilities
+  /api/v1/respons/update/{id}:
     put:
       consumes:
       - application/json
@@ -2009,74 +2108,4 @@ paths:
       summary: Update responsibility
       tags:
       - responsibilities
-  /api/v1/users:
-    delete:
-      consumes:
-      - application/json
-      description: Delete a user (soft delete)
-      parameters:
-      - description: User delete data
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/models.DeleteUserRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Delete user
-      tags:
-      - users
-    put:
-      consumes:
-      - application/json
-      description: Update user information
-      parameters:
-      - description: User update data
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/models.UpdateUserRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Update user
-      tags:
-      - users
 swagger: "2.0"

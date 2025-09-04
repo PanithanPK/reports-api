@@ -15,7 +15,56 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v1/auth/login": {
+        "/api/authEntry/deleteUser": {
+            "delete": {
+                "description": "Delete a user (soft delete)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Delete user",
+                "parameters": [
+                    {
+                        "description": "User delete data",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.DeleteUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/authEntry/login": {
             "post": {
                 "description": "Authenticate user and create session",
                 "consumes": [
@@ -63,7 +112,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/logout": {
+        "/api/authEntry/logout": {
             "post": {
                 "description": "Log out user and clear session",
                 "consumes": [
@@ -87,7 +136,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/register": {
+        "/api/authEntry/registerUser": {
             "post": {
                 "description": "Register a new user or admin",
                 "consumes": [
@@ -143,9 +192,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/branches": {
-            "get": {
-                "description": "Get list of all branches with pagination",
+        "/api/authEntry/updateUser": {
+            "put": {
+                "description": "Update user information",
                 "consumes": [
                     "application/json"
                 ],
@@ -153,30 +202,40 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "branches"
+                    "users"
                 ],
-                "summary": "List branches",
+                "summary": "Update user",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Page number",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 10,
-                        "description": "Items per page",
-                        "name": "limit",
-                        "in": "query"
+                        "description": "User update data",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UpdateUserRequest"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.PaginatedResponse"
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "500": {
@@ -187,7 +246,9 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
+            }
+        },
+        "/api/v1/branch/create": {
             "post": {
                 "description": "Create a new branch",
                 "consumes": [
@@ -236,7 +297,100 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/branches/search/{query}": {
+        "/api/v1/branch/delete/{id}": {
+            "delete": {
+                "description": "Delete a branch",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "branches"
+                ],
+                "summary": "Delete branch",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Branch ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/branch/list": {
+            "get": {
+                "description": "Get list of all branches with pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "branches"
+                ],
+                "summary": "List branches",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.PaginatedResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/branch/list/{query}": {
             "get": {
                 "description": "Search branches by query string with pagination",
                 "consumes": [
@@ -296,52 +450,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/branches/{id}": {
-            "get": {
-                "description": "Get detailed information about a specific branch",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "branches"
-                ],
-                "summary": "Get branch details",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Branch ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
+        "/api/v1/branch/update/{id}": {
             "put": {
                 "description": "Update an existing branch",
                 "consumes": [
@@ -395,9 +504,11 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "delete": {
-                "description": "Delete a branch",
+            }
+        },
+        "/api/v1/branch/{id}": {
+            "get": {
+                "description": "Get detailed information about a specific branch",
                 "consumes": [
                     "application/json"
                 ],
@@ -407,7 +518,7 @@ const docTemplate = `{
                 "tags": [
                     "branches"
                 ],
-                "summary": "Delete branch",
+                "summary": "Get branch details",
                 "parameters": [
                     {
                         "type": "string",
@@ -432,8 +543,8 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -442,7 +553,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/dashboard": {
+        "/api/v1/dashboard/data": {
             "get": {
                 "description": "Get dashboard data including branches, departments, IP phones, programs, and tasks",
                 "consumes": [
@@ -486,51 +597,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/departments": {
-            "get": {
-                "description": "Get list of all departments with pagination",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "departments"
-                ],
-                "summary": "List departments",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Page number",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 10,
-                        "description": "Items per page",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.PaginatedResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
+        "/api/v1/department/create": {
             "post": {
                 "description": "Create a new department",
                 "consumes": [
@@ -579,9 +646,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/departments/all": {
-            "get": {
-                "description": "Get all departments without pagination",
+        "/api/v1/department/delete/{id}": {
+            "delete": {
+                "description": "Delete a department",
                 "consumes": [
                     "application/json"
                 ],
@@ -591,7 +658,70 @@ const docTemplate = `{
                 "tags": [
                     "departments"
                 ],
-                "summary": "Get all departments",
+                "summary": "Delete department",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Department ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/department/list": {
+            "get": {
+                "description": "Get list of all departments with pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "departments"
+                ],
+                "summary": "List departments",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -609,7 +739,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/departments/search/{query}": {
+        "/api/v1/department/list/{query}": {
             "get": {
                 "description": "Search departments by query string with pagination",
                 "consumes": [
@@ -669,9 +799,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/departments/{id}": {
+        "/api/v1/department/listall": {
             "get": {
-                "description": "Get detailed information about a specific department",
+                "description": "Get all departments without pagination",
                 "consumes": [
                     "application/json"
                 ],
@@ -681,40 +811,25 @@ const docTemplate = `{
                 "tags": [
                     "departments"
                 ],
-                "summary": "Get department details",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Department ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
+                "summary": "Get all departments",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/models.PaginatedResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
                         }
                     }
                 }
-            },
+            }
+        },
+        "/api/v1/department/update/{id}": {
             "put": {
                 "description": "Update an existing department",
                 "consumes": [
@@ -768,9 +883,11 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "delete": {
-                "description": "Delete a department",
+            }
+        },
+        "/api/v1/department/{id}": {
+            "get": {
+                "description": "Get detailed information about a specific department",
                 "consumes": [
                     "application/json"
                 ],
@@ -780,7 +897,7 @@ const docTemplate = `{
                 "tags": [
                     "departments"
                 ],
-                "summary": "Delete department",
+                "summary": "Get department details",
                 "parameters": [
                     {
                         "type": "string",
@@ -805,8 +922,8 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -815,51 +932,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/ip-phones": {
-            "get": {
-                "description": "Get list of all IP phones with pagination",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "ip-phones"
-                ],
-                "summary": "List IP phones",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Page number",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 10,
-                        "description": "Items per page",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.PaginatedResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
+        "/api/v1/ipphone/create": {
             "post": {
                 "description": "Create a new IP phone",
                 "consumes": [
@@ -908,9 +981,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/ip-phones/all": {
-            "get": {
-                "description": "Get all IP phones without pagination",
+        "/api/v1/ipphone/delete/{id}": {
+            "delete": {
+                "description": "Delete an IP phone",
                 "consumes": [
                     "application/json"
                 ],
@@ -920,7 +993,70 @@ const docTemplate = `{
                 "tags": [
                     "ip-phones"
                 ],
-                "summary": "Get all IP phones",
+                "summary": "Delete IP phone",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "IP phone ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ipphone/list": {
+            "get": {
+                "description": "Get list of all IP phones with pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ip-phones"
+                ],
+                "summary": "List IP phones",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -938,7 +1074,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/ip-phones/search/{query}": {
+        "/api/v1/ipphone/list/{query}": {
             "get": {
                 "description": "Search IP phones by query string with pagination",
                 "consumes": [
@@ -998,7 +1134,37 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/ip-phones/{id}": {
+        "/api/v1/ipphone/listall": {
+            "get": {
+                "description": "Get all IP phones without pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ip-phones"
+                ],
+                "summary": "Get all IP phones",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.PaginatedResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ipphone/update/{id}": {
             "put": {
                 "description": "Update an existing IP phone",
                 "consumes": [
@@ -1052,54 +1218,9 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "delete": {
-                "description": "Delete an IP phone",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "ip-phones"
-                ],
-                "summary": "Delete IP phone",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "IP phone ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
             }
         },
-        "/api/v1/ip-phones/{id}/details": {
+        "/api/v1/ipphone/{id}": {
             "get": {
                 "description": "Get detailed information about a specific IP phone",
                 "consumes": [
@@ -1138,62 +1259,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/problem/assign/{id}": {
-            "put": {
-                "description": "Update the assigned person for a specific problem",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "problems"
-                ],
-                "summary": "Update assigned person",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Problem ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Assignment update data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -1282,7 +1347,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/problem/search/{column}/{query}": {
+        "/api/v1/problem/list/{column}/{query}": {
             "get": {
                 "description": "Search problems by specific column and value with pagination",
                 "consumes": [
@@ -1349,7 +1414,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/problem/search/{query}": {
+        "/api/v1/problem/list/{query}": {
             "get": {
                 "description": "Search problems by query string with pagination",
                 "consumes": [
@@ -1390,6 +1455,62 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.PaginatedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/problem/update/assignto/{id}": {
+            "put": {
+                "description": "Update the assigned person for a specific problem",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "problems"
+                ],
+                "summary": "Update assigned person",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Problem ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Assignment update data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {
@@ -1475,51 +1596,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/programs": {
-            "get": {
-                "description": "Get list of all programs with pagination",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "programs"
-                ],
-                "summary": "List programs",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Page number",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 10,
-                        "description": "Items per page",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.PaginatedResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
+        "/api/v1/program/create": {
             "post": {
                 "description": "Create a new program",
                 "consumes": [
@@ -1568,7 +1645,100 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/programs/search/{query}": {
+        "/api/v1/program/delete/{id}": {
+            "delete": {
+                "description": "Delete a program",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "programs"
+                ],
+                "summary": "Delete program",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Program ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/program/list": {
+            "get": {
+                "description": "Get list of all programs with pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "programs"
+                ],
+                "summary": "List programs",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.PaginatedResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/program/list/{query}": {
             "get": {
                 "description": "Search programs by query string with pagination",
                 "consumes": [
@@ -1628,36 +1798,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/programs/types": {
-            "get": {
-                "description": "Get all program types",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "programs"
-                ],
-                "summary": "Get program types",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
+        "/api/v1/program/type/create": {
             "post": {
                 "description": "Add a new program type",
                 "consumes": [
@@ -1706,7 +1847,85 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/programs/types/search/{query}": {
+        "/api/v1/program/type/delete/{id}": {
+            "delete": {
+                "description": "Delete a program type",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "programs"
+                ],
+                "summary": "Delete program type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Type ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/program/type/list": {
+            "get": {
+                "description": "Get all program types",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "programs"
+                ],
+                "summary": "Get program types",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/program/type/list/{query}": {
             "get": {
                 "description": "Search program types by query string",
                 "consumes": [
@@ -1753,8 +1972,8 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/programs/types/{id}": {
-            "put": {
+        "/api/v1/program/type/update/{id}": {
+            "post": {
                 "description": "Update an existing program type",
                 "consumes": [
                     "application/json"
@@ -1807,99 +2026,9 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "delete": {
-                "description": "Delete a program type",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "programs"
-                ],
-                "summary": "Delete program type",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Type ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
             }
         },
-        "/api/v1/programs/{id}": {
-            "get": {
-                "description": "Get detailed information about a specific program",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "programs"
-                ],
-                "summary": "Get program details",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Program ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
+        "/api/v1/program/update/{id}": {
             "put": {
                 "description": "Update an existing program",
                 "consumes": [
@@ -1953,9 +2082,11 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "delete": {
-                "description": "Delete a program",
+            }
+        },
+        "/api/v1/program/{id}": {
+            "get": {
+                "description": "Get detailed information about a specific program",
                 "consumes": [
                     "application/json"
                 ],
@@ -1965,7 +2096,7 @@ const docTemplate = `{
                 "tags": [
                     "programs"
                 ],
-                "summary": "Delete program",
+                "summary": "Get program details",
                 "parameters": [
                     {
                         "type": "string",
@@ -1990,8 +2121,8 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -2148,9 +2279,27 @@ const docTemplate = `{
                         "in": "formData"
                     },
                     {
+                        "type": "string",
+                        "description": "User to assign the task",
+                        "name": "assignedto",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "User ID to assign the task",
+                        "name": "assignedto_id",
+                        "in": "formData"
+                    },
+                    {
                         "type": "file",
                         "description": "Updated resolution image files",
                         "name": "image",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Existing image URLs to keep (JSON array)",
+                        "name": "image_urls",
                         "in": "formData"
                     }
                 ],
@@ -2226,36 +2375,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/responsibilities": {
-            "get": {
-                "description": "Get all responsibilities",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "responsibilities"
-                ],
-                "summary": "Get responsibilities",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
+        "/api/v1/respons/create": {
             "post": {
                 "description": "Add a new responsibility",
                 "consumes": [
@@ -2304,9 +2424,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/responsibilities/{id}": {
-            "get": {
-                "description": "Get detailed information about a specific responsibility",
+        "/api/v1/respons/delete/{id}": {
+            "delete": {
+                "description": "Delete a responsibility",
                 "consumes": [
                     "application/json"
                 ],
@@ -2316,7 +2436,7 @@ const docTemplate = `{
                 "tags": [
                     "responsibilities"
                 ],
-                "summary": "Get responsibility details",
+                "summary": "Delete responsibility",
                 "parameters": [
                     {
                         "type": "string",
@@ -2341,15 +2461,48 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
-                    "404": {
-                        "description": "Not Found",
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
                         }
                     }
                 }
-            },
+            }
+        },
+        "/api/v1/respons/list": {
+            "get": {
+                "description": "Get all responsibilities",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "responsibilities"
+                ],
+                "summary": "Get responsibilities",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/respons/update/{id}": {
             "put": {
                 "description": "Update an existing responsibility",
                 "consumes": [
@@ -2403,9 +2556,11 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "delete": {
-                "description": "Delete a responsibility",
+            }
+        },
+        "/api/v1/respons/{id}": {
+            "get": {
+                "description": "Get detailed information about a specific responsibility",
                 "consumes": [
                     "application/json"
                 ],
@@ -2415,7 +2570,7 @@ const docTemplate = `{
                 "tags": [
                     "responsibilities"
                 ],
-                "summary": "Delete responsibility",
+                "summary": "Get responsibility details",
                 "parameters": [
                     {
                         "type": "string",
@@ -2440,111 +2595,8 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/users": {
-            "put": {
-                "description": "Update user information",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Update user",
-                "parameters": [
-                    {
-                        "description": "User update data",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.UpdateUserRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Delete a user (soft delete)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Delete user",
-                "parameters": [
-                    {
-                        "description": "User delete data",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.DeleteUserRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true

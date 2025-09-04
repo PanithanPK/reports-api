@@ -288,7 +288,7 @@ func UpdateResponsHandler(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update responsibility"})
 	}
 
-	log.Printf("Responsibility ID: %d updated successfully", id)
+	log.Printf("Responsibility ID: %s updated successfully", id)
 	return c.JSON(fiber.Map{"message": "Responsibility updated"})
 }
 
@@ -313,7 +313,7 @@ func DeleteResponsHandler(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete responsibility"})
 	}
 
-	log.Printf("Responsibility ID: %d deleted successfully", id)
+	log.Printf("Responsibility ID: %s deleted successfully", id)
 	return c.JSON(fiber.Map{"message": "Responsibility deleted"})
 }
 
