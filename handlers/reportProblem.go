@@ -24,36 +24,39 @@ import (
 )
 
 func generateticketno() string {
-	// สร้าง ticket เป็น TK-วันเดือนปี-no โดยใช้เลขล่าสุดของเดือนนั้น ๆ + 1
+	// create ticket as TK-DDMMYYYY-no using the latest number of that month/year + 1
 	now := time.Now().Add(7 * time.Hour)
 	dateStr := now.Format("02012006") // วันเดือนปี
 	year := now.Year()
 	month := int(now.Month())
 
-	// ดึงเลข ticket ล่าสุดของเดือน/ปีนี้
+	// get last ticket number for this month/year
 	var lastNo int
 	err := db.DB.QueryRow(`SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_no, LENGTH(ticket_no)-4, 5) AS UNSIGNED)), 0) FROM tasks WHERE YEAR(created_at) = ? AND MONTH(created_at) = ?`, year, month).Scan(&lastNo)
 	if err != nil {
 		log.Printf("Error getting last ticket no for month/year: %v", err)
 		lastNo = 0
 	}
+	// increment by 1
 	ticketNo := lastNo + 1
 	ticket := fmt.Sprintf("TK-%s-%05d", dateStr, ticketNo)
 	return ticket
 }
 
 func deleteImage(objectName string) error {
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Printf("Warning: Error loading .env file: %v", err)
 	}
-
+	// MinIO configuration
 	endpoint := os.Getenv("End_POINT")
 	accessKeyID := os.Getenv("ACCESS_KEY")
 	secretAccessKey := os.Getenv("SECRET_ACCESSKEY")
 	useSSL := false
 	bucketName := os.Getenv("BUCKET_NAME")
 
+	// Initialize MinIO client
 	minioClient, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
 		Secure: useSSL,
@@ -62,6 +65,7 @@ func deleteImage(objectName string) error {
 		return err
 	}
 
+	// Delete the object
 	err = minioClient.RemoveObject(context.Background(), bucketName, objectName, minio.RemoveObjectOptions{})
 	if err != nil {
 		log.Printf("Failed to delete %s: %v", objectName, err)
@@ -87,6 +91,7 @@ func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 	useSSL := false
 	bucketName := os.Getenv("BUCKET_NAME")
 
+	// Initialize MinIO client
 	minioClient, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
 		Secure: useSSL,
@@ -96,8 +101,11 @@ func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 		return uploadedFiles, []string{"Failed to initialize storage client"}
 	}
 
+	// loop through files and upload to MinIO
 	for i, file := range files {
+		// Load file image
 		src, err := file.Open()
+		// Check file type file image
 		contentType := "image/jpeg"
 		if filepath.Ext(file.Filename) == ".png" {
 			contentType = "image/png"
@@ -107,11 +115,12 @@ func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 			errors = append(errors, fmt.Sprintf("Failed to open %s: %v", file.Filename, err))
 			continue
 		}
-
+		// Name Object
 		dateStr := time.Now().Add(7 * time.Hour).Format("01022006")
 		filenameSafe := strings.ReplaceAll(file.Filename, " ", "-")
 		objectName := fmt.Sprintf("%s-%02d-%s-%s", ticketno, i+1, dateStr, filenameSafe)
 
+		// Upload to MinIO
 		_, err = minioClient.PutObject(
 			context.Background(),
 			bucketName,
@@ -121,13 +130,13 @@ func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 			minio.PutObjectOptions{ContentType: contentType},
 		)
 		src.Close()
-
 		if err != nil {
 			log.Printf("Failed to upload %s: %v", file.Filename, err)
 			errors = append(errors, fmt.Sprintf("Failed to upload %s: %v", file.Filename, err))
 			continue
 		}
 
+		// Return URL for get file path
 		fileURL := fmt.Sprintf("https://minio.sys9.co/api/v1/buckets/%s/objects/download?preview=true&prefix=%s", bucketName, objectName)
 		uploadedFiles = append(uploadedFiles, fiber.Map{
 			"url": fileURL,
@@ -146,6 +155,7 @@ func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 // @Success 200 {object} models.PaginatedResponse
 // @Router /api/v1/problem/list [get]
 func GetTasksHandler(c *fiber.Ctx) error {
+	// Get pagination params
 	pagination := utils.GetPaginationParams(c)
 	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
 
@@ -175,18 +185,19 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	}
 	defer rows.Close()
 
+	// task model Mapping
 	var tasks []models.TaskWithDetails
 	for rows.Next() {
 		var t models.TaskWithDetails
 		var issueTypeName string
 		var filePathsJSON string
+		// Scan row into task model
 		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
-
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue
 		}
-
+		// Set SystemType based on SystemID
 		if t.SystemID > 0 {
 			t.SystemType = issueTypeName
 		} else {
@@ -195,8 +206,10 @@ func GetTasksHandler(c *fiber.Ctx) error {
 
 		// Parse file_paths JSON
 		fileMap := make(map[string]string)
+		// Check file Path
 		if filePathsJSON != "" && filePathsJSON != "[]" {
 			var filePaths []fiber.Map
+			// Parse JSON array file paths
 			if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
 				for i, fp := range filePaths {
 					if url, ok := fp["url"].(string); ok {
@@ -237,6 +250,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	}
 
 	log.Printf("Getting tasks Success")
+	// Return paginated response
 	return c.JSON(models.PaginatedResponse{
 		Success: true,
 		Data:    tasks,

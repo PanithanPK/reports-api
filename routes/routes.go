@@ -23,6 +23,7 @@ func MainRoutes(r *fiber.App) {
 	r.Delete("/api/v1/respons/delete/:id", handlers.DeleteResponsHandler)
 }
 
+// problemRoutes registers all problem-related routes
 func problemRoutes(r *fiber.App) {
 	r.Get("/api/v1/problem/list", handlers.GetTasksHandler)
 	r.Get("/api/v1/problem/list/:query", handlers.GetTasksWithQueryHandler)
@@ -34,6 +35,7 @@ func problemRoutes(r *fiber.App) {
 	r.Put("/api/v1/problem/update/assignto/:id", handlers.UpdateAssignedTo)
 }
 
+// resolutionRoutes registers all resolution-related routes
 func resolutionRoutes(r *fiber.App) {
 	r.Get("/api/v1/resolution/:id", handlers.GetResolutionHandler)
 	r.Post("/api/v1/resolution/create/:id", handlers.CreateResolutionHandler)
@@ -41,6 +43,7 @@ func resolutionRoutes(r *fiber.App) {
 	r.Delete("/api/v1/resolution/delete/:id", handlers.DeleteResolutionHandler)
 }
 
+// ipphoneRoutes registers all IP phone-related routes
 func ipphoneRoutes(r *fiber.App) {
 	r.Get("/api/v1/ipphone/list", handlers.ListIPPhonesHandler)
 	r.Get("/api/v1/ipphone/list/:query", handlers.ListIPPhonesQueryHandler)
@@ -51,6 +54,7 @@ func ipphoneRoutes(r *fiber.App) {
 	r.Delete("/api/v1/ipphone/delete/:id", handlers.DeleteIPPhoneHandler)
 }
 
+// programRoutes registers all program-related routes
 func programRoutes(r *fiber.App) {
 	r.Get("/api/v1/program/list", handlers.ListProgramsHandler)
 	r.Get("/api/v1/program/list/:query", handlers.ListProgramsQueryHandler)
@@ -65,6 +69,7 @@ func programRoutes(r *fiber.App) {
 	r.Delete("/api/v1/program/delete/:id", handlers.DeleteProgramHandler)
 }
 
+// departmentRoutes registers all department-related routes
 func departmentRoutes(r *fiber.App) {
 	r.Get("/api/v1/department/list", handlers.ListDepartmentsHandler)
 	r.Get("/api/v1/department/list/:query", handlers.ListDepartmentsQueryHandler)
@@ -75,6 +80,7 @@ func departmentRoutes(r *fiber.App) {
 	r.Delete("/api/v1/department/delete/:id", handlers.DeleteDepartmentHandler)
 }
 
+// branchRoutes registers all branch-related routes
 func branchRoutes(r *fiber.App) {
 	r.Get("/api/v1/branch/list", handlers.ListBranchesHandler)
 	r.Get("/api/v1/branch/list/:query", handlers.ListBranchesQueryHandler)
@@ -95,6 +101,7 @@ func RegisterAuthRoutes(r *fiber.App) {
 	r.Post("/api/authEntry/logout", handlers.LogoutHandler)
 }
 
+// RegisterRoutes registers all routes
 func RegisterRoutes(r *fiber.App) {
 	RegisterAuthRoutes(r)
 	MainRoutes(r)

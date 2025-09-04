@@ -92,8 +92,7 @@ func main() {
 	} else {
 		logger.Info.Println("🔧 Running with default environment")
 	}
-
-	// เก็บสภาพแวดล้อมใน environment variable เพื่อให้โค้ดส่วนอื่นเข้าถึงได้
+	// Set APP_ENV for application use
 	os.Setenv("APP_ENV", CurrentEnvironment)
 
 	// Load environment variables
