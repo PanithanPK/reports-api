@@ -83,6 +83,7 @@ func main() {
 	if selectedEnv == "dev" {
 		envFile = ".env.dev"
 		CurrentEnvironment = "dev"
+
 		logger.Info.Println("🔧 Running in DEVELOPMENT environment")
 	} else if selectedEnv == "prod" {
 		envFile = ".env.prod"
@@ -186,7 +187,11 @@ func main() {
 		logger.Info.Printf("🔧 Using port from environment: %s", port)
 	}
 
-	// Swagger UI route
+	if selectedEnv == "dev" {
+		app.Get("/api/v1/swagger/*", fiberSwagger.WrapHandler)
+		logger.Info.Println("📚 Swagger UI available at /api/v1/swagger/index.html")
+	}
+
 	app.Get("/api/v1/swagger/*", fiberSwagger.WrapHandler)
 	logger.Info.Println("📚 Swagger UI available at /api/v1/swagger/index.html")
 
