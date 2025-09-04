@@ -21,11 +21,11 @@
     <img src="https://img.shields.io/github/stars/GearRata/reports-ui?style=social" alt="UI GitHub Stars">
   </a>
   <br>
-  <a href="https://codecov.io/gh/PanithanPK/reports-api">
-    <img src="https://codecov.io/gh/PanithanPK/reports-api/branch/main/graph/badge.svg" alt="API Coverage Status">
+  <a href="https://hub.docker.com/r/lovee12345e/reports-api">
+    <img src="https://img.shields.io/docker/pulls/lovee12345e/reports-api?style=flat-square&logo=docker" alt="API Docker Pulls">
   </a>
-  <a href="https://codecov.io/gh/GearRata/reports-ui">
-    <img src="https://codecov.io/gh/GearRata/reports-ui/branch/main/graph/badge.svg" alt="UI Coverage Status">
+  <a href="https://hub.docker.com/r/gearmcc/reports-ui">
+    <img src="https://img.shields.io/docker/pulls/gearmcc/reports-ui?style=flat-square&logo=docker" alt="UI Docker Pulls">
   </a>
 </div>
 
