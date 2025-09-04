@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.13.0](https://github.com/PanithanPK/reports-api/compare/v1.12.0...v1.13.0) (2025-09-04)
+
+
+### Features
+
+* Add new feater Update solution ([ba7123f](https://github.com/PanithanPK/reports-api/commit/ba7123fc91a4baaac2364b4c31a07495443bd6ab))
+
+
+### Bug Fixes
+
+* Update feater Update resoluion and format telegram ([29639b2](https://github.com/PanithanPK/reports-api/commit/29639b211274be29eefe55b4d4ead141548dfca7))
+
 ## [1.12.0](https://github.com/PanithanPK/reports-api/compare/v1.11.0...v1.12.0) (2025-09-02)
 
 
