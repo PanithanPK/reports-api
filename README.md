@@ -4,6 +4,8 @@
   <img src="/dockergo.png" alt="Reports API Logo" width="600">
 </div>
 
+![Reports API](/dockergo.png)
+
 <div align="center">
   <img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go">
   <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
