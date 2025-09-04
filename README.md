@@ -1,7 +1,7 @@
 # Reports API
 
 <div align="center">
-  <img src="/dockergo.png" alt="Reports API Logo" width="1000">
+  <img src="/dockergo.png" alt="Reports API Logo" width="700">
 </div>
 
 This project is a backend API built with Go for managing a problem reporting system. While a detailed description was not initially provided, this README aims to provide comprehensive information based on the available details and project structure.
