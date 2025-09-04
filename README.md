@@ -13,6 +13,22 @@
   <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js">
 </div>
 
+<div align="center">
+  <a href="https://github.com/PanithanPK/reports-api">
+    <img src="https://img.shields.io/github/stars/PanithanPK/reports-api?style=social" alt="GitHub Stars">
+  </a>
+  <a href="https://github.com/GearRata/reports-ui">
+    <img src="https://img.shields.io/github/stars/GearRata/reports-ui?style=social" alt="UI GitHub Stars">
+  </a>
+  <br>
+  <a href="https://codecov.io/gh/PanithanPK/reports-api">
+    <img src="https://codecov.io/gh/PanithanPK/reports-api/branch/main/graph/badge.svg" alt="API Coverage Status">
+  </a>
+  <a href="https://codecov.io/gh/GearRata/reports-ui">
+    <img src="https://codecov.io/gh/GearRata/reports-ui/branch/main/graph/badge.svg" alt="UI Coverage Status">
+  </a>
+</div>
+
 This project is a backend API built with Go for managing a problem reporting system. While a detailed description was not initially provided, this README aims to provide comprehensive information based on the available details and project structure.
 
 ## Key Features & Benefits
