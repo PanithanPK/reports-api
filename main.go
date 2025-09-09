@@ -78,18 +78,19 @@ func main() {
 	}
 
 	// Load environment variables based on environment
-	envFile := ".env"
-	CurrentEnvironment = "default"
-	if selectedEnv == "dev" {
+	var envFile string
+	switch selectedEnv {
+	case "dev":
 		envFile = ".env.dev"
 		CurrentEnvironment = "dev"
-
 		logger.Info.Println("🔧 Running in DEVELOPMENT environment")
-	} else if selectedEnv == "prod" {
+	case "prod":
 		envFile = ".env.prod"
 		CurrentEnvironment = "prod"
 		logger.Info.Println("🔧 Running in PRODUCTION environment")
-	} else {
+	default:
+		envFile = ".env"
+		CurrentEnvironment = "default"
 		logger.Info.Println("🔧 Running with default environment")
 	}
 	// Set APP_ENV for application use
@@ -186,13 +187,13 @@ func main() {
 		logger.Info.Printf("🔧 Using port from environment: %s", port)
 	}
 
-	if selectedEnv == "dev" {
+	switch selectedEnv {
+	case "dev":
 		app.Get("/api/v1/swagger/*", fiberSwagger.WrapHandler)
 		logger.Info.Println("📚 Swagger UI available at /api/v1/swagger/index.html")
+	default:
+		logger.Info.Println("🔒 Swagger UI disabled in production environment")
 	}
-
-	app.Get("/api/v1/swagger/*", fiberSwagger.WrapHandler)
-	logger.Info.Println("📚 Swagger UI available at /api/v1/swagger/index.html")
 
 	// Log system information
 	logger.Info.Printf("💻 System Info - CPU Cores: %d, Memory Limit: 384MB", runtime.NumCPU())

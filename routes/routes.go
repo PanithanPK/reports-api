@@ -11,6 +11,9 @@ func MainRoutes(r *fiber.App) {
 	//Dashboard routes
 	r.Get("/api/v1/dashboard/data", handlers.GetDashboardDataHandler)
 
+	//Data export routes
+	r.Get("/api/v1/dashboard/data/excel", handlers.ExportToExcel)
+
 	r.Get("/api/v1/scores/list", handlers.ListScoresHandler)
 	r.Get("/api/v1/scores/:id", handlers.GetScoreDetailHandler)
 	r.Put("/api/v1/scores/update/:id", handlers.UpdateScoreHandler)

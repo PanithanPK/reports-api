@@ -1,137 +1,137 @@
-REPORTS API - สรุปการทำงานทั้งหมด
+REPORTS API - Complete System Overview
 
-=== ภาพรวมของระบบ ===
-Reports API เป็น backend service ที่พัฒนาด้วย Go สำหรับจัดการ:
-- ปัญหา (Problems)
-- งาน (Tasks) 
-- โทรศัพท์ IP (IP Phones)
-- โปรแกรม (Programs)
-- แผนก (Departments)
-- สาขา (Branches)
-- ระบบ Authentication สำหรับผู้ใช้และ Admin
+=== System Overview ===
+Reports API is a backend service developed with Go for managing:
+- Problems
+- Tasks
+- IP Phones
+- Programs
+- Departments
+- Branches
+- Authentication system for Users and Admins
 
-=== เทคโนโลยีที่ใช้ ===
-- Go 1.23.0 (ภาษาหลัก)
+=== Technologies Used ===
+- Go 1.23.0 (Main language)
 - Fiber v2 (Web framework)
-- MySQL (ฐานข้อมูล)
-- Docker (สำหรับ containerization)
-- GitLab CI/CD (สำหรับ automation)
+- MySQL (Database)
+- Docker (For containerization)
+- GitLab CI/CD (For automation)
 
-=== โครงสร้างโปรเจกต์ ===
+=== Project Structure ===
 reports-api/
-├── db/                 - การเชื่อมต่อฐานข้อมูล
-├── handlers/           - จัดการ HTTP requests
-├── middleware/         - middleware สำหรับ security และ logging
-├── models/            - โครงสร้างข้อมูล
-├── routes/            - กำหนด API endpoints
-├── utils/             - ฟังก์ชันช่วยเหลือ
-├── docs/              - เอกสารประกอบ
-├── Dockerfile         - สำหรับ production
-├── Dockerfile.dev     - สำหรับ development
+├── db/                 - Database connections
+├── handlers/           - HTTP request handlers
+├── middleware/         - Middleware for security and logging
+├── models/            - Data structures
+├── routes/            - API endpoint definitions
+├── utils/             - Helper functions
+├── docs/              - Documentation
+├── Dockerfile         - For production
+├── Dockerfile.dev     - For development
 ├── .gitlab-ci.yml     - CI/CD pipeline
-└── main.go           - จุดเริ่มต้นของแอป
+└── main.go           - Application entry point
 
-=== การทำงานของแอปพลิเคชัน ===
+=== Application Workflow ===
 
-1. การเริ่มต้น (Initialization):
-   - ตั้งค่า memory limit 384MB
-   - จำกัด CPU cores เป็น 2
-   - สร้าง custom logger
-   - อ่าน command line arguments (dev/prod)
+1. Initialization:
+   - Set memory limit to 384MB
+   - Limit CPU cores to 2
+   - Create custom logger
+   - Read command line arguments (dev/prod)
 
-2. การโหลด Environment:
-   - โหลดไฟล์ .env.dev สำหรับ development
-   - โหลดไฟล์ .env.prod สำหรับ production
-   - ใช้ environment variables หากไม่มีไฟล์
+2. Environment Loading:
+   - Load .env.dev file for development
+   - Load .env.prod file for production
+   - Use environment variables if files don't exist
 
-3. การเชื่อมต่อฐานข้อมูล:
-   - เชื่อมต่อ MySQL database
-   - มี error handling และ connection pooling
+3. Database Connection:
+   - Connect to MySQL database
+   - Include error handling and connection pooling
 
-4. การตั้งค่า Web Server:
-   - ใช้ Fiber framework
-   - ตั้งค่า CORS สำหรับ cross-origin requests
-   - เพิ่ม security headers
-   - จำกัดขนาดไฟล์อัปโหลด 100MB
-   - ตั้งค่า timeout 30 วินาที
+4. Web Server Configuration:
+   - Use Fiber framework
+   - Configure CORS for cross-origin requests
+   - Add security headers
+   - Limit file upload size to 100MB
+   - Set timeout to 30 seconds
 
-5. การลงทะเบียน Routes:
-   - API routes สำหรับ CRUD operations
-   - Authentication routes สำหรับ login/register
+5. Route Registration:
+   - API routes for CRUD operations
+   - Authentication routes for login/register
    - Health check endpoint (GET /)
    - Static file serving
 
-=== API Endpoints หลัก ===
+=== Main API Endpoints ===
 
 Authentication:
-- POST /authEntry/login - เข้าสู่ระบบ
-- POST /authEntry/registerUser - สมัครสมาชิก
-- POST /authEntry/registerAdmin - สมัคร admin
+- POST /authEntry/login - User login
+- POST /authEntry/registerUser - User registration
+- POST /authEntry/registerAdmin - Admin registration
 
 Problem Management:
-- GET /api/v1/problem/list - ดูรายการปัญหา
-- POST /api/v1/problem/create - สร้างปัญหาใหม่
-- PUT /api/v1/problem/update/{id} - แก้ไขปัญหา
-- DELETE /api/v1/problem/delete/{id} - ลบปัญหา
+- GET /api/v1/problem/list - List problems
+- POST /api/v1/problem/create - Create new problem
+- PUT /api/v1/problem/update/{id} - Update problem
+- DELETE /api/v1/problem/delete/{id} - Delete problem
 
 Task Management:
-- GET /api/v1/task/list - ดูรายการงาน
-- POST /api/v1/task/create - สร้างงานใหม่
-- PUT /api/v1/task/update/{id} - แก้ไขงาน
-- DELETE /api/v1/task/delete/{id} - ลบงาน
+- GET /api/v1/task/list - List tasks
+- POST /api/v1/task/create - Create new task
+- PUT /api/v1/task/update/{id} - Update task
+- DELETE /api/v1/task/delete/{id} - Delete task
 
-อื่นๆ:
+Others:
 - IP Phone Management: /api/v1/ipphone/*
 - Program Management: /api/v1/program/*
 - Department Management: /api/v1/department/*
 - Branch Management: /api/v1/branch/*
 
-=== การ Build และ Deploy ===
+=== Build and Deploy ===
 
 1. Manual Build:
    - Development: docker build -t username/reports-api:dev -f Dockerfile.dev .
    - Production: docker build -t username/reports-api:prod -f Dockerfile .
 
 2. Automated Build (build2.sh):
-   - Interactive script ที่ให้เลือก environment
-   - มี confirmation prompts
-   - Auto login Docker Hub
-   - Error handling และ cleanup
+   - Interactive script for environment selection
+   - Includes confirmation prompts
+   - Auto Docker Hub login
+   - Error handling and cleanup
 
 3. GitLab CI/CD Pipeline:
-   - Push ไป develop branch = auto build dev image
-   - Push ไป main branch = manual trigger สำหรับ prod image
-   - ใช้ Docker Hub สำหรับเก็บ images
+   - Push to develop branch = auto build dev image
+   - Push to main branch = manual trigger for prod image
+   - Uses Docker Hub for image storage
 
-=== Environment Variables ที่สำคัญ ===
-- PORT: พอร์ตของเซิร์ฟเวอร์ (default: 5001)
-- DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME: การเชื่อมต่อฐานข้อมูล
-- JWT_SECRET: สำหรับ JWT token
-- TELEGRAM_BOT_TOKEN: สำหรับ Telegram integration
-- MINIO_*: สำหรับ file storage
+=== Important Environment Variables ===
+- PORT: Server port (default: 5001)
+- DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME: Database connection
+- JWT_SECRET: For JWT token
+- TELEGRAM_BOT_TOKEN: For Telegram integration
+- MINIO_*: For file storage
 
 === Docker Configuration ===
 
 Development (Dockerfile.dev):
-- ใช้ Go 1.23-alpine สำหรับ build
-- ใช้ alpine:latest สำหรับ runtime
-- รันบนพอร์ต 5000
-- รันด้วย ./main -d
+- Uses Go 1.23-alpine for build
+- Uses alpine:latest for runtime
+- Runs on port 5000
+- Runs with ./main -d
 
 Production (Dockerfile):
-- เหมือน dev แต่รันบนพอร์ต 5001
-- รันด้วย ./main -p
-- เหมาะสำหรับ production environment
+- Same as dev but runs on port 5001
+- Runs with ./main -p
+- Suitable for production environment
 
 === Security Features ===
 - JWT-based authentication
 - CORS configuration
 - Security headers (X-Frame-Options, X-XSS-Protection, etc.)
 - Input validation
-- Error handling และ logging
-- Memory และ CPU limits
+- Error handling and logging
+- Memory and CPU limits
 
-=== การใช้งาน ===
+=== Usage ===
 
 1. Local Development:
    go run main.go dev
@@ -144,21 +144,21 @@ Production (Dockerfile):
    curl http://localhost:5001/
    Response: {"status": "OK", "version": "1.0.0"}
 
-=== เอกสารประกอบ ===
-- README.md: ภาพรวมและ quick start
-- docs/API_USAGE.md: วิธีใช้ API
-- docs/INSTALLATION.md: คู่มือติดตั้ง
-- docs/DEPLOYMENT.md: คู่มือ deploy
-- BUILD_GUIDE.md: คู่มือ build Docker
+=== Documentation ===
+- README.md: Overview and quick start
+- docs/API_USAGE.md: API usage guide
+- docs/INSTALLATION.md: Installation guide
+- docs/DEPLOYMENT.md: Deployment guide
+- BUILD_GUIDE.md: Docker build guide
 - swagger.yaml: API documentation
 - swagger.html: Swagger UI interface
 
-=== การแก้ปัญหาที่พบบ่อย ===
-1. Database connection error: ตรวจสอบ MySQL service และ credentials
-2. Port already in use: เปลี่ยนพอร์ตใน environment variables
-3. Docker build fails: ตรวจสอบ Dockerfile และ dependencies
-4. GitLab CI variables not working: ตรวจสอบ Protected settings
-5. Authentication fails: ตรวจสอบ JWT_SECRET และ token expiry
+=== Common Troubleshooting ===
+1. Database connection error: Check MySQL service and credentials
+2. Port already in use: Change port in environment variables
+3. Docker build fails: Check Dockerfile and dependencies
+4. GitLab CI variables not working: Check Protected settings
+5. Authentication fails: Check JWT_SECRET and token expiry
 
 === Performance Optimization ===
 - Memory limit: 384MB
@@ -168,4 +168,4 @@ Production (Dockerfile):
 - File upload limit: 100MB
 - Request/response compression
 
-ระบบนี้ถูกออกแบบให้รองรับการใช้งานจริงด้วย scalability, security และ maintainability ที่ดี
+This system is designed to support real-world usage with good scalability, security, and maintainability

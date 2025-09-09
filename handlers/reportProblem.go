@@ -168,7 +168,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 
 	// Get paginated data
 	query := `
-		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), t.text, IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
@@ -192,7 +192,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 		var issueTypeName string
 		var filePathsJSON string
 		// Scan row into task model
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.AssignedtoID, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue
@@ -281,7 +281,7 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 	var task models.TaskWithDetails
 	var issueTypeName string
 	err = db.DB.QueryRow(`
-		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), IFNULL(t.system_id, 0), IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), IFNULL(t.text, ''), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), IFNULL(t.status, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, ''), IFNULL(t.file_paths, '[]')
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), IFNULL(t.system_id, 0), IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), IFNULL(t.text, ''), IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), IFNULL(t.status, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, ''), IFNULL(t.file_paths, '[]')
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
@@ -289,7 +289,7 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 		LEFT JOIN systems_program s ON t.system_id = s.id
 		LEFT JOIN issue_types it ON t.issue_type = it.id
 		WHERE t.id = ?
-	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.IssueTypeID, &task.IssueElse, &issueTypeName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Assignto, &task.ReportedBy, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
+	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.IssueTypeID, &task.IssueElse, &issueTypeName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.AssignedtoID, &task.Assignto, &task.ReportedBy, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
 
 	if task.SystemID > 0 {
 		task.SystemType = issueTypeName
@@ -1079,13 +1079,25 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 		decodedQuery = query
 	}
 
-	// Clean query
+	// Clean and validate query
 	decodedQuery = strings.TrimSpace(decodedQuery)
+	if len(decodedQuery) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "Search query cannot be empty"})
+	}
+	if len(decodedQuery) > 100 {
+		return c.Status(400).JSON(fiber.Map{"error": "Search query too long"})
+	}
+
+	// Clean query - remove SQL wildcards and quotes
 	decodedQuery = strings.ReplaceAll(decodedQuery, "  ", " ")
 	decodedQuery = strings.ReplaceAll(decodedQuery, "%", "")
 	decodedQuery = strings.ReplaceAll(decodedQuery, "_", "")
 	decodedQuery = strings.ReplaceAll(decodedQuery, "'", "")
 	decodedQuery = strings.ReplaceAll(decodedQuery, "\"", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, ";", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "--", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "/*", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "*/", "")
 
 	searchPattern := "%" + decodedQuery + "%"
 
@@ -1250,103 +1262,66 @@ func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
 	// Declare total variable for pagination
 	var total int
 
+	// Column mapping to prevent SQL injection
+	columnMap := map[string]string{
+		"phone_id":        "t.phone_id",
+		"issue_type":      "t.issue_type",
+		"system_id":       "t.system_id",
+		"department_id":   "t.department_id",
+		"branch_id":       "d.branch_id",
+		"status":          "t.status",
+		"created_by":      "t.created_by",
+		"updated_by":      "t.updated_by",
+		"telegram_id":     "t.telegram_id",
+		"phone_name":      "p.name",
+		"number":          "p.number",
+		"system_name":     "s.name",
+		"department_name": "d.name",
+		"branch_name":     "b.name",
+		"solution":        "t.solution",
+		"reported_by":     "t.reported_by",
+		"ticket_no":       "t.ticket_no",
+		"issue_else":      "t.issue_else",
+		"text":            "t.text",
+		"assignto":        "t.assignto",
+	}
+
+	sqlColumn, exists := columnMap[column]
+	if !exists {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid column name"})
+	}
+
+	baseQuery := `FROM tasks t
+		LEFT JOIN ip_phones p ON t.phone_id = p.id
+		LEFT JOIN departments d ON t.department_id = d.id
+		LEFT JOIN branches b ON d.branch_id = b.id
+		LEFT JOIN systems_program s ON t.system_id = s.id
+		LEFT JOIN issue_types it ON t.issue_type = it.id`
+
+	selectFields := `t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), 
+		t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), 
+		IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), 
+		IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at`
+
 	// Build query based on column type
 	if intColumns[column] {
-		// For integer columns, use exact match
-		var sqlColumn string
-		switch column {
-		case "phone_id":
-			sqlColumn = "t.phone_id"
-		case "issue_type":
-			sqlColumn = "t.issue_type"
-		case "system_id":
-			sqlColumn = "t.system_id"
-		case "department_id":
-			sqlColumn = "t.department_id"
-		case "branch_id":
-			sqlColumn = "d.branch_id"
-		case "status":
-			sqlColumn = "t.status"
-		case "created_by":
-			sqlColumn = "t.created_by"
-		case "updated_by":
-			sqlColumn = "t.updated_by"
-		case "telegram_id":
-			sqlColumn = "t.telegram_id"
-		}
-
 		// Get total count for pagination
-		countQuery := `SELECT COUNT(*) FROM tasks t
-			LEFT JOIN ip_phones p ON t.phone_id = p.id
-			LEFT JOIN departments d ON t.department_id = d.id
-			LEFT JOIN branches b ON d.branch_id = b.id
-			LEFT JOIN systems_program s ON t.system_id = s.id
-			LEFT JOIN issue_types it ON t.issue_type = it.id
-			WHERE ` + sqlColumn + ` = ?`
+		countQuery := fmt.Sprintf("SELECT COUNT(*) %s WHERE %s = ?", baseQuery, sqlColumn)
 		db.DB.QueryRow(countQuery, queryParam).Scan(&total)
 
-		queryStr = `
-		       SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), 
-		              t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), 
-		              IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), 
-		              IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
-		       FROM tasks t
-		       LEFT JOIN ip_phones p ON t.phone_id = p.id
-		       LEFT JOIN departments d ON t.department_id = d.id
-		       LEFT JOIN branches b ON d.branch_id = b.id
-		       LEFT JOIN systems_program s ON t.system_id = s.id
-		       LEFT JOIN issue_types it ON t.issue_type = it.id
-		       WHERE ` + sqlColumn + ` = ?
-		       ORDER BY t.id DESC
-		       LIMIT ? OFFSET ?`
+		queryStr = fmt.Sprintf("SELECT %s %s WHERE %s = ? ORDER BY t.id DESC LIMIT ? OFFSET ?",
+			selectFields, baseQuery, sqlColumn)
 		rows, err = db.DB.Query(queryStr, queryParam, pagination.Limit, offset)
 	} else {
 		// For string columns, use LIKE search
 		searchPattern := "%" + query + "%"
-		var sqlColumn string
-		switch column {
-		case "phone_name":
-			sqlColumn = "p.name"
-		case "number":
-			sqlColumn = "p.number"
-		case "system_name":
-			sqlColumn = "s.name"
-		case "department_name":
-			sqlColumn = "d.name"
-		case "branch_name":
-			sqlColumn = "b.name"
-		case "solution":
-			sqlColumn = "t.solution"
-		case "reported_by":
-			sqlColumn = "t.reported_by"
-		default:
-			sqlColumn = "t." + column
-		}
 
 		// Get total count for pagination
-		countQuery := `SELECT COUNT(*) FROM tasks t
-			LEFT JOIN ip_phones p ON t.phone_id = p.id
-			LEFT JOIN departments d ON t.department_id = d.id
-			LEFT JOIN branches b ON d.branch_id = b.id
-			LEFT JOIN systems_program s ON t.system_id = s.id
-			LEFT JOIN issue_types it ON t.issue_type = it.id
-			WHERE ` + sqlColumn + ` LIKE ?`
+		countQuery := fmt.Sprintf("SELECT COUNT(*) %s WHERE %s LIKE ?", baseQuery, sqlColumn)
 		db.DB.QueryRow(countQuery, searchPattern).Scan(&total)
 
-		queryStr = `
-		       SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), 
-		              t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), 
-		              IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), 
-		              IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
-		       FROM tasks t
-		       LEFT JOIN ip_phones p ON t.phone_id = p.id
-		       LEFT JOIN departments d ON t.department_id = d.id
-		       LEFT JOIN branches b ON d.branch_id = b.id
-		       LEFT JOIN systems_program s ON t.system_id = s.id
-		       LEFT JOIN issue_types it ON t.issue_type = it.id
-		       WHERE ` + sqlColumn + ` LIKE ?
-		       ORDER BY t.id DESC
-		       LIMIT ? OFFSET ?`
+		queryStr = fmt.Sprintf("SELECT %s %s WHERE %s LIKE ? ORDER BY t.id DESC LIMIT ? OFFSET ?",
+			selectFields, baseQuery, sqlColumn)
 		rows, err = db.DB.Query(queryStr, searchPattern, pagination.Limit, offset)
 	}
 

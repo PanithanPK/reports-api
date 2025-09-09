@@ -16,32 +16,31 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func formatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
+func escapeMarkdown(text string) string {
+	replacer := strings.NewReplacer(
+		"_", "\\_",
+		"*", "\\*",
+		"[", "\\[",
+		"]", "\\]",
+		"(", "\\(",
+		")", "\\)",
+		"~", "\\~",
+		"`", "\\`",
+		">", "\\>",
+		"#", "\\#",
+		"+", "\\+",
+		"-", "\\-",
+		"=", "\\=",
+		"|", "\\|",
+		"{", "\\{",
+		"}", "\\}",
+		".", "\\.",
+		"!", "\\!",
+	)
+	return replacer.Replace(text)
+}
 
-	escapeMarkdown := func(text string) string {
-		// Characters that need to be escaped in Telegram Markdown
-		replacer := strings.NewReplacer(
-			"_", "\\_",
-			"*", "\\*",
-			"[", "\\[",
-			"]", "\\]",
-			"(", "\\(",
-			")", "\\)",
-			"~", "\\~",
-			"`", "\\`",
-			">", "\\>",
-			"#", "\\#",
-			"+", "\\+",
-			"-", "\\-",
-			"=", "\\=",
-			"|", "\\|",
-			"{", "\\{",
-			"}", "\\}",
-			".", "\\.",
-			"!", "\\!",
-		)
-		return replacer.Replace(text)
-	}
+func formatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 
 	var Program string
 	if req.SystemID > 0 {
@@ -210,30 +209,6 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 
 func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	// Helper function to escape Markdown characters
-	escapeMarkdown := func(text string) string {
-		// Characters that need to be escaped in Telegram Markdown
-		replacer := strings.NewReplacer(
-			"_", "\\_",
-			"*", "\\*",
-			"[", "\\[",
-			"]", "\\]",
-			"(", "\\(",
-			")", "\\)",
-			"~", "\\~",
-			"`", "\\`",
-			">", "\\>",
-			"#", "\\#",
-			"+", "\\+",
-			"-", "\\-",
-			"=", "\\=",
-			"|", "\\|",
-			"{", "\\{",
-			"}", "\\}",
-			".", "\\.",
-			"!", "\\!",
-		)
-		return replacer.Replace(text)
-	}
 
 	err := godotenv.Load()
 	if err != nil {
@@ -288,7 +263,6 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		case 1:
 
 		}
-
 		if notificationMsg != "" {
 			notifyMsg := tgbotapi.NewMessage(chatID, notificationMsg)
 			notifyMsg.ParseMode = "Markdown"
@@ -307,6 +281,59 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		return notificationID, nil
 	}
 	return notificationID, nil
+}
+
+func UpdateAssignedtoMsg(messageID int, req models.TaskRequest) (int, error) {
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("Warning: Error loading .env file: %v", err)
+	}
+
+	botToken := os.Getenv("BOT_TOKEN")
+	chatIDStr := os.Getenv("CHAT_ID")
+
+	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	bot, err := tgbotapi.NewBotAPI(botToken)
+	if err != nil {
+		return 0, err
+	}
+
+	telegramTag := req.TelegramUser
+	if telegramTag != "" && !strings.HasPrefix(telegramTag, "@") {
+		telegramTag = "@" + telegramTag
+	}
+
+	var notificationMsg string
+	switch req.Status {
+	case 0:
+		notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", escapeMarkdown(telegramTag), req.Ticket, req.Url)
+	case 1:
+		notificationMsg = fmt.Sprintf("✅ *งานเสร็จสิ้นแล้ว* ✅\n━━━━━━━━━━━━━━\n👋 %s\n📋 งานที่คุณรับผิดชอบเสร็จสิ้นแล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", escapeMarkdown(telegramTag), req.Ticket, req.Url)
+	}
+
+	if messageID > 0 {
+		editMsg := tgbotapi.NewEditMessageText(chatID, messageID, notificationMsg)
+		editMsg.ParseMode = "Markdown"
+		_, err = bot.Send(editMsg)
+		if err != nil {
+			return 0, err
+		}
+		return messageID, nil
+	} else {
+		notifyMsg := tgbotapi.NewMessage(chatID, notificationMsg)
+		notifyMsg.ParseMode = "Markdown"
+		notifyMsg.ReplyToMessageID = req.MessageID
+		notificationResp, err := bot.Send(notifyMsg)
+		if err != nil {
+			return 0, err
+		}
+		return notificationResp.MessageID, nil
+	}
 }
 
 func DeleteTelegram(messageID int) (bool, error) {

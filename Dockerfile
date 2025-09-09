@@ -12,6 +12,7 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+COPY .env.prod .env.prod
 
 # Build with memory optimization flags
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o main .
@@ -24,7 +25,7 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/main .
-COPY --from=builder /app/.env.prod* .env
+COPY --from=builder /app/.env.prod .env.prod
 COPY --from=builder /app/package.json .
 
 # Set default environment
@@ -42,4 +43,4 @@ EXPOSE 5001
 # Run with memory limits
 # Use environment variable to set the environment flag
 # Default to production (-p) if no environment is specified
-CMD if [ "${APP_ENV}" = "prod" ]; then ./main -p; else ./main -d; fi
+CMD ./main prod
