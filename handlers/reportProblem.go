@@ -389,12 +389,12 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 					photoURLs = append(photoURLs, url)
 				}
 			}
-			messageID, messageName, err = SendTelegram(req, photoURLs...)
+			messageID, messageName, err = common.SendTelegram(req, photoURLs...)
 			if err != nil {
 				log.Printf("❌ Error sending Telegram: %v", err)
 			}
 		} else {
-			messageID, messageName, err = SendTelegram(req)
+			messageID, messageName, err = common.SendTelegram(req)
 			if err != nil {
 				log.Printf("❌ Error sending Telegram: %v", err)
 			}
@@ -726,16 +726,16 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			var oldNotificationID int
 			db.DB.QueryRow(`SELECT IFNULL(assignto_id, 0) FROM telegram_chat WHERE id = ?`, telegramID).Scan(&oldNotificationID)
 			if oldNotificationID > 0 {
-				_, _ = DeleteTelegram(oldNotificationID)
+				_, _ = common.DeleteTelegram(oldNotificationID)
 			}
 		}
 
 		// ส่งหลายไฟล์
 		var notificationResp int
 		if len(photoURLs) > 0 {
-			notificationResp, _ = UpdateTelegram(telegramReq, photoURLs...)
+			notificationResp, _ = common.UpdateTelegram(telegramReq, photoURLs...)
 		} else {
-			notificationResp, _ = UpdateTelegram(telegramReq)
+			notificationResp, _ = common.UpdateTelegram(telegramReq)
 		}
 
 		_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, notificationResp, telegramID)
@@ -744,12 +744,68 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		} else {
 			log.Printf("✅ Assignto ID updated successfully in database")
 		}
+
+		// ใช้ UpdatereplyToSpecificMessage เมื่อมีการอัปเดต assignto
+		if previousAssignto != currentAssignto {
+			// ดึงข้อมูลจาก resolutions table
+			var resolutionID sql.NullInt64
+			var solutionMessageID int
+			db.DB.QueryRow(`SELECT solution_id FROM tasks WHERE id = ?`, id).Scan(&resolutionID)
+			db.DB.QueryRow(`SELECT IFNULL(solution_id, 0) FROM telegram_chat WHERE id = ?`, telegramID).Scan(&solutionMessageID)
+
+			if resolutionID.Valid && solutionMessageID > 0 {
+				var resolutionText string
+				var resolutionFilePathsJSON string
+				var resolutionResolvedAt string
+				err = db.DB.QueryRow(`
+					SELECT IFNULL(text, ''), IFNULL(file_paths, '[]'), 
+					DATE_FORMAT(resolved_at, '%d/%m/%Y %H:%i:%s') 
+					FROM resolutions WHERE id = ?
+				`, resolutionID.Int64).Scan(&resolutionText, &resolutionFilePathsJSON, &resolutionResolvedAt)
+
+				if err == nil {
+					// สร้าง ResolutionReq
+					resolutionReq := models.ResolutionReq{
+						Solution:     resolutionText,
+						TelegramUser: telegramUser,
+						MessageID:    messageID,
+						Url:          Urlenv,
+						Assignto:     currentAssignto,
+						TicketNo:     ticketno,
+						CreatedAt:    CreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05"),
+						ResolvedAt:   resolutionResolvedAt,
+					}
+
+					// ดึง photo URLs จาก resolution files
+					var resolutionPhotoURLs []string
+					if resolutionFilePathsJSON != "" && resolutionFilePathsJSON != "[]" {
+						var resolutionFiles []fiber.Map
+						if err := json.Unmarshal([]byte(resolutionFilePathsJSON), &resolutionFiles); err == nil {
+							for _, file := range resolutionFiles {
+								if url, ok := file["url"].(string); ok {
+									resolutionPhotoURLs = append(resolutionPhotoURLs, url)
+								}
+							}
+						}
+					}
+
+					// เรียกใช้ UpdatereplyToSpecificMessage
+					newSolutionMessageID, err := common.UpdatereplyToSpecificMessage(solutionMessageID, resolutionReq, resolutionPhotoURLs...)
+					if err != nil {
+						log.Printf("❌ Failed to update resolution message: %v", err)
+					} else {
+						// อัปเดต solution_id ใน telegram_chat
+						_, err = db.DB.Exec(`UPDATE telegram_chat SET solution_id = ? WHERE id = ?`, newSolutionMessageID, telegramID)
+						if err != nil {
+							log.Printf("❌ Failed to update solution_id: %v", err)
+						} else {
+							log.Printf("✅ Resolution message updated successfully")
+						}
+					}
+				}
+			}
+		}
 	}
-	var currentAssignto string
-	if req.Assignto != nil {
-		currentAssignto = *req.Assignto
-	}
-	log.Printf("Previous assignto: %s, Current assignto: %s", previousAssignto, currentAssignto)
 	log.Printf("Updating task ID: %s", id)
 	return c.JSON(fiber.Map{"success": true})
 }
@@ -833,7 +889,7 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 	}
 	log.Printf("Deleting Telegram message ID: %d", assigntoID)
 	if assigntoID > 0 {
-		_, _ = DeleteTelegram(assigntoID)
+		_, _ = common.DeleteTelegram(assigntoID)
 	}
 	// Delete resolution if exists
 	if solutionID != nil {
@@ -860,10 +916,10 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 
 	// Delete Telegram messages if they exist
 	if messageID > 0 {
-		_, _ = DeleteTelegram(messageID)
+		_, _ = common.DeleteTelegram(messageID)
 	}
 	if solutionMessageID > 0 {
-		_, _ = DeleteTelegram(solutionMessageID)
+		_, _ = common.DeleteTelegram(solutionMessageID)
 	}
 
 	log.Printf("Deleted task ID: %d", id)
@@ -1295,7 +1351,7 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 	}
 
 	if messageID > 0 {
-		_, _ = DeleteTelegram(messageID)
+		_, _ = common.DeleteTelegram(messageID)
 	}
 
 	_, err = db.DB.Exec(`UPDATE tasks SET assignto_id = ?, assignto = ?, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.AssignedtoID, req.Assignto, req.UpdatedBy, id)
@@ -1373,9 +1429,9 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 			}
 			var notificationResp int
 			if len(photoURLs) > 0 {
-				notificationResp, _ = UpdateTelegram(telegramReq, photoURLs...)
+				notificationResp, _ = common.UpdateTelegram(telegramReq, photoURLs...)
 			} else {
-				notificationResp, _ = UpdateTelegram(telegramReq)
+				notificationResp, _ = common.UpdateTelegram(telegramReq)
 			}
 			_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, notificationResp, telegramID)
 			if err != nil {

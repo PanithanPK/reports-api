@@ -32,6 +32,242 @@ func ExportToCSV(c *fiber.Ctx) error {
 	return nil
 }
 
+func IpphonesExportCsv(c *fiber.Ctx) error {
+	filename := fmt.Sprintf("IPPhones_%s.csv", time.Now().Add(7*time.Hour).Format("20060102_150405"))
+	c.Set("Content-Type", "text/csv; charset=utf-8")
+	c.Set("Content-Disposition", "attachment; filename="+filename)
+
+	c.Response().BodyWriter().Write([]byte{0xEF, 0xBB, 0xBF})
+
+	writer := csv.NewWriter(c.Response().BodyWriter())
+	defer writer.Flush()
+
+	headers := []string{"ID", "Number", "Name", "Department", "Branch", "Created At", "Updated At"}
+	if err := writer.Write(headers); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to write headers"})
+	}
+
+	query := `
+		SELECT 
+			ip.id, 
+			ip.number, 
+			ip.name, 
+			d.name as department_name,
+			b.name as branch_name,
+			DATE_ADD(ip.created_at, INTERVAL 7 HOUR) as created_at,
+			DATE_ADD(ip.updated_at, INTERVAL 7 HOUR) as updated_at
+		FROM ip_phones ip
+		LEFT JOIN departments d ON ip.department_id = d.id
+		LEFT JOIN branches b ON d.branch_id = b.id
+		WHERE ip.deleted_at IS NULL
+		ORDER BY ip.id`
+
+	rows, err := db.DB.Query(query)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query data"})
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var number, name, departmentName, branchName, createdAt, updatedAt sql.NullString
+
+		err := rows.Scan(&id, &number, &name, &departmentName, &branchName, &createdAt, &updatedAt)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to scan data"})
+		}
+
+		record := []string{
+			fmt.Sprintf("%d", id),
+			number.String,
+			name.String,
+			departmentName.String,
+			branchName.String,
+			createdAt.String,
+			updatedAt.String,
+		}
+
+		if err := writer.Write(record); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to write record"})
+		}
+	}
+
+	return nil
+}
+
+func DepartmentsExportCsv(c *fiber.Ctx) error {
+	filename := fmt.Sprintf("Departments_%s.csv", time.Now().Add(7*time.Hour).Format("20060102_150405"))
+	c.Set("Content-Type", "text/csv; charset=utf-8")
+	c.Set("Content-Disposition", "attachment; filename="+filename)
+
+	c.Response().BodyWriter().Write([]byte{0xEF, 0xBB, 0xBF})
+
+	writer := csv.NewWriter(c.Response().BodyWriter())
+	defer writer.Flush()
+
+	headers := []string{"ID", "Name", "Branch", "Created At", "Updated At"}
+	if err := writer.Write(headers); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to write headers"})
+	}
+
+	query := `
+		SELECT 
+			d.id, 
+			d.name, 
+			b.name as branch_name,
+			DATE_ADD(d.created_at, INTERVAL 7 HOUR) as created_at,
+			DATE_ADD(d.updated_at, INTERVAL 7 HOUR) as updated_at
+		FROM departments d
+		LEFT JOIN branches b ON d.branch_id = b.id
+		WHERE d.deleted_at IS NULL
+		ORDER BY d.id`
+
+	rows, err := db.DB.Query(query)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query data"})
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var name, branchName, createdAt, updatedAt sql.NullString
+
+		err := rows.Scan(&id, &name, &branchName, &createdAt, &updatedAt)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to scan data"})
+		}
+
+		record := []string{
+			fmt.Sprintf("%d", id),
+			name.String,
+			branchName.String,
+			createdAt.String,
+			updatedAt.String,
+		}
+
+		if err := writer.Write(record); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to write record"})
+		}
+	}
+
+	return nil
+}
+
+func BranchExportCsv(c *fiber.Ctx) error {
+	filename := fmt.Sprintf("Branches_%s.csv", time.Now().Add(7*time.Hour).Format("20060102_150405"))
+	c.Set("Content-Type", "text/csv; charset=utf-8")
+	c.Set("Content-Disposition", "attachment; filename="+filename)
+
+	c.Response().BodyWriter().Write([]byte{0xEF, 0xBB, 0xBF})
+
+	writer := csv.NewWriter(c.Response().BodyWriter())
+	defer writer.Flush()
+
+	headers := []string{"ID", "Name", "Created At", "Updated At"}
+	if err := writer.Write(headers); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to write headers"})
+	}
+
+	query := `
+		SELECT 
+			id, 
+			name,
+			DATE_ADD(created_at, INTERVAL 7 HOUR) as created_at,
+			DATE_ADD(updated_at, INTERVAL 7 HOUR) as updated_at
+		FROM branches
+		WHERE deleted_at IS NULL
+		ORDER BY id`
+
+	rows, err := db.DB.Query(query)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query data"})
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var name, createdAt, updatedAt sql.NullString
+
+		err := rows.Scan(&id, &name, &createdAt, &updatedAt)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to scan data"})
+		}
+
+		record := []string{
+			fmt.Sprintf("%d", id),
+			name.String,
+			createdAt.String,
+			updatedAt.String,
+		}
+
+		if err := writer.Write(record); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to write record"})
+		}
+	}
+
+	return nil
+}
+
+func SystemExportCsv(c *fiber.Ctx) error {
+	filename := fmt.Sprintf("Systems_%s.csv", time.Now().Add(7*time.Hour).Format("20060102_150405"))
+	c.Set("Content-Type", "text/csv; charset=utf-8")
+	c.Set("Content-Disposition", "attachment; filename="+filename)
+
+	c.Response().BodyWriter().Write([]byte{0xEF, 0xBB, 0xBF})
+
+	writer := csv.NewWriter(c.Response().BodyWriter())
+	defer writer.Flush()
+
+	headers := []string{"ID", "Name", "Priority", "Issue Type", "Created At", "Updated At"}
+	if err := writer.Write(headers); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to write headers"})
+	}
+
+	query := `
+		SELECT 
+			sp.id, 
+			sp.name, 
+			sp.priority,
+			it.name as issue_type_name,
+			DATE_ADD(sp.created_at, INTERVAL 7 HOUR) as created_at,
+			DATE_ADD(sp.updated_at, INTERVAL 7 HOUR) as updated_at
+		FROM systems_program sp
+		LEFT JOIN issue_types it ON sp.type = it.id
+		WHERE sp.deleted_at IS NULL
+		ORDER BY sp.id`
+
+	rows, err := db.DB.Query(query)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query data"})
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id, priority int
+		var name, issueTypeName, createdAt, updatedAt sql.NullString
+
+		err := rows.Scan(&id, &name, &priority, &issueTypeName, &createdAt, &updatedAt)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to scan data"})
+		}
+
+		record := []string{
+			fmt.Sprintf("%d", id),
+			name.String,
+			fmt.Sprintf("%d", priority),
+			issueTypeName.String,
+			createdAt.String,
+			updatedAt.String,
+		}
+
+		if err := writer.Write(record); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to write record"})
+		}
+	}
+
+	return nil
+}
+
 func exportTableToCSV(writer *csv.Writer, db *sql.DB, tableName string) error {
 	var query string
 	var headers []string

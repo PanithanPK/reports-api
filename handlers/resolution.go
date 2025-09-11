@@ -7,7 +7,6 @@ import (
 	"mime/multipart"
 	"reports-api/config"
 	"reports-api/db"
-
 	"reports-api/handlers/common"
 	"reports-api/models"
 	"strconv"
@@ -137,12 +136,11 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	}
 
 	var reportID int
-	var assignID int
 	err = db.DB.QueryRow(`
-			SELECT report_id, assignto_id
+			SELECT report_id
 			FROM telegram_chat
 			WHERE id = ?
-		`, telegramID).Scan(&reportID, &assignID)
+		`, telegramID).Scan(&reportID)
 
 	if err != nil {
 		log.Printf("Failed to retrieve report ID: %v", err)
@@ -159,12 +157,6 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 			log.Println("Error parsing created_at:", err)
 			createdAt = time.Now() // fallback
 		}
-	}
-
-	_, err = DeleteTelegram(assignID)
-
-	if err != nil {
-		log.Printf("Failed to delete assingn ID: %v", err)
 	}
 
 	// ลองแยกการ parse ข้อมูล
@@ -237,10 +229,11 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	req.Url = Urlenv
 	req.ResolvedAt = resolvedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
 
+	var assignmsgID int
 	// ส่ง solution ไปยัง Telegram ถ้ามี reportID
 	if reportID > 0 {
 		// ดึง MessageID จาก telegram_chat
-		err = db.DB.QueryRow(`SELECT report_id FROM telegram_chat WHERE id = ?`, telegramID).Scan(&req.MessageID)
+		err = db.DB.QueryRow(`SELECT IFNULL(report_id, 0), IFNULL(assignto_id, 0) FROM telegram_chat WHERE id = ?`, telegramID).Scan(&req.MessageID, &assignmsgID)
 		if err != nil {
 			log.Printf("Failed to get message ID: %v", err)
 		}
@@ -325,19 +318,22 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 
 		// อัปเดตสถานะใน Telegram
 		if len(photoURLs) > 0 {
-			_, err = UpdateTelegram(taskReq, photoURLs...)
+			_, err = common.UpdateTelegram(taskReq, photoURLs...)
 		} else {
-			_, err = UpdateTelegram(taskReq)
+			_, err = common.UpdateTelegram(taskReq)
 		}
 		if err != nil {
 			log.Printf("Failed to update Telegram status: %q", err)
 		}
 
-		// ใช้ UpdateAssignedtoMsg สำหรับแจ้งเตือนผู้รับผิดชอบ
-		if telegramUser != "" {
-			_, err = UpdateAssignedtoMsg(0, taskReq)
+		if assignmsgID > 0 {
+			_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = 0 WHERE id = ?`, telegramID)
 			if err != nil {
-				log.Printf("Failed to send assignment notification: %v", err)
+				log.Printf("Failed to update telegram_chat with message ID: %v", err)
+			}
+			_, err = common.DeleteTelegram(assignmsgID)
+			if err != nil {
+				log.Printf("Failed to Delete assign message!")
 			}
 		}
 
@@ -348,13 +344,13 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 				replyPhotoURLs = append(replyPhotoURLs, url)
 			}
 		}
-
+		req.TelegramUser = telegramUser
 		// ส่ง reply message ไปยัง Telegram
-		replyMessageID, err := replyToSpecificMessage(req, replyPhotoURLs...)
+		replyMessageID, err := common.ReplyToSpecificMessage(req, replyPhotoURLs...)
 		if err != nil {
 			log.Printf("Failed to send solution to Telegram: %v", err)
 		} else {
-			log.Printf("Solution sent to Telegram with reply message ID: %d", replyMessageID)
+			log.Printf("Solution sent to Telegram with reply message ID: %d telegram user: %s", replyMessageID, telegramUser)
 		}
 
 		_, err = db.DB.Exec(`UPDATE telegram_chat SET solution_id = ? WHERE id = ?`, replyMessageID, telegramID)
@@ -575,7 +571,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 						}
 						req.Url = Urlenv
 
-						messageID, _ := UpdatereplyToSpecificMessage(solutionMessageID, req, keepImageURLs...)
+						messageID, _ := common.UpdatereplyToSpecificMessage(solutionMessageID, req, keepImageURLs...)
 						db.DB.Exec(`UPDATE telegram_chat SET solution_id = ? WHERE id = ?`, messageID, telegramID)
 					}
 
@@ -744,9 +740,9 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 
 	// อัปเดตสถานะใน Telegram
 	if len(photoURLs) > 0 {
-		_, err = UpdateTelegram(taskReq, photoURLs...)
+		_, err = common.UpdateTelegram(taskReq, photoURLs...)
 	} else {
-		_, err = UpdateTelegram(taskReq)
+		_, err = common.UpdateTelegram(taskReq)
 	}
 	if err != nil {
 		log.Printf("Failed to update Telegram status: %q", err)
@@ -754,7 +750,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 
 	// ใช้ UpdateAssignedtoMsg สำหรับแจ้งเตือนผู้รับผิดชอบ
 	if telegramUser != "" {
-		_, err = UpdateAssignedtoMsg(0, taskReq)
+		_, err = common.UpdateAssignedtoMsg(0, taskReq)
 		if err != nil {
 			log.Printf("Failed to send assignment notification: %v", err)
 		}
@@ -782,7 +778,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 
 		var messageID int
 		// อัปเดต reply message
-		messageID, err = UpdatereplyToSpecificMessage(solutionMessageID, req, solutionPhotoURLs...)
+		messageID, err = common.UpdatereplyToSpecificMessage(solutionMessageID, req, solutionPhotoURLs...)
 		if err != nil {
 			log.Printf("Failed to update Telegram reply: %v", err)
 		}
@@ -915,7 +911,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 	// ลบ solution message จาก Telegram ก่อน
 	if messageID > 0 {
 		log.Printf("Deleting solution message from Telegram, messageID: %d", messageID)
-		_, err = DeleteTelegram(messageID)
+		_, err = common.DeleteTelegram(messageID)
 		if err != nil {
 			log.Printf("Failed to delete solution message from Telegram (messageID: %d): %v", messageID, err)
 		} else {
@@ -1081,9 +1077,9 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 
 	var telegramUpdateErr error
 	if len(photoURLs) > 0 {
-		_, telegramUpdateErr = UpdateTelegram(taskReq, photoURLs...)
+		_, telegramUpdateErr = common.UpdateTelegram(taskReq, photoURLs...)
 	} else {
-		_, telegramUpdateErr = UpdateTelegram(taskReq)
+		_, telegramUpdateErr = common.UpdateTelegram(taskReq)
 	}
 
 	if telegramUpdateErr != nil {
