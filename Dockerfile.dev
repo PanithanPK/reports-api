@@ -14,6 +14,7 @@ RUN go mod download
 COPY . .
 
 COPY docs ./docs
+COPY .env.dev .env.dev
 
 # Build with memory optimization flags
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o main .
@@ -26,7 +27,7 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/main .
-COPY --from=builder /app/.env.dev* .env
+COPY --from=builder /app/.env.dev .env.dev
 COPY --from=builder /app/package.json .
 
 # Copy .env.dev if it exists, otherwise skip
@@ -47,4 +48,4 @@ EXPOSE 5000
 # Run with memory limits
 # Use environment variable to set the environment flag
 # Default to development (-d) for dev image
-CMD if [ "${APP_ENV}" = "dev" ]; then ./main -p; else ./main -d; fi
+CMD ./main dev

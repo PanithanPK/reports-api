@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.13.1](https://github.com/PanithanPK/reports-api/compare/v1.13.0...v1.13.1) (2025-09-09)
+
+
+### Bug Fixes
+
+* Update Readme.md ([032f0e9](https://github.com/PanithanPK/reports-api/commit/032f0e9c2ea8f7dceb130684a4ffa0e1ae93dcbe))
+* Update Readme.md ([bbeab12](https://github.com/PanithanPK/reports-api/commit/bbeab12708e9da4500dbdac29a6d77037d2ca6db))
+* Update Readme.md ([53e2d5d](https://github.com/PanithanPK/reports-api/commit/53e2d5d2d7a4479c608fda5ea91361ac9f4393f6))
+* Update Readme.md ([efc567d](https://github.com/PanithanPK/reports-api/commit/efc567d93ded0ad96d53ecbb42ad87b42b4669c5))
+
 ## [1.13.0](https://github.com/PanithanPK/reports-api/compare/v1.12.0...v1.13.0) (2025-09-04)
 
 

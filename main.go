@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"runtime/debug"
 
+	"reports-api/config"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
@@ -31,6 +33,20 @@ type Logger struct {
 
 var logger *Logger
 
+func initConfig(envFile string) {
+	// Load environment variables
+	err := godotenv.Load(envFile)
+	if err != nil {
+		logger.Warn.Printf("⚠️ %s file not found, using environment variables", envFile)
+	} else {
+		logger.Info.Printf("✅ Environment variables loaded from %s file", envFile)
+	}
+
+	// Initialize config after loading env variables
+	config.InitConfig()
+	logger.Info.Println("⚙️ Configuration initialized")
+}
+
 func init() {
 	// Set memory limit to 384MB
 	debug.SetMemoryLimit(384 * 1024 * 1024) // 384MB in bytes
@@ -47,6 +63,7 @@ func init() {
 		Warn:  log.New(os.Stdout, "[WARN] ", log.Ldate|log.Ltime),
 		Error: log.New(os.Stderr, "[ERROR] ", log.Ldate|log.Ltime),
 	}
+
 }
 
 // @title Example API – Report Problem System
@@ -78,31 +95,26 @@ func main() {
 	}
 
 	// Load environment variables based on environment
-	envFile := ".env"
-	CurrentEnvironment = "default"
-	if selectedEnv == "dev" {
+	var envFile string
+	switch selectedEnv {
+	case "dev":
 		envFile = ".env.dev"
 		CurrentEnvironment = "dev"
-
 		logger.Info.Println("🔧 Running in DEVELOPMENT environment")
-	} else if selectedEnv == "prod" {
+	case "prod":
 		envFile = ".env.prod"
 		CurrentEnvironment = "prod"
 		logger.Info.Println("🔧 Running in PRODUCTION environment")
-	} else {
+	default:
+		envFile = ".env"
+		CurrentEnvironment = "default"
 		logger.Info.Println("🔧 Running with default environment")
 	}
-
-	// เก็บสภาพแวดล้อมใน environment variable เพื่อให้โค้ดส่วนอื่นเข้าถึงได้
+	// Set APP_ENV for application use
 	os.Setenv("APP_ENV", CurrentEnvironment)
 
-	// Load environment variables
-	err := godotenv.Load(envFile)
-	if err != nil {
-		logger.Warn.Printf("⚠️ %s file not found, using environment variables", envFile)
-	} else {
-		logger.Info.Printf("✅ Environment variables loaded from %s file", envFile)
-	}
+	// Load environment and initialize config
+	initConfig(envFile)
 
 	// Initialize database connection
 	logger.Info.Println("🔌 Initializing database connection...")
@@ -128,7 +140,7 @@ func main() {
 
 	// Add CORS middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:5000,http://localhost:3000,http://helpdesk.nopadol.com,http://helpdesk-dev.nopadol.com,http://10.0.2.94:3000",
+		AllowOrigins:     "http://localhost:5000,http://localhost:3000,http://helpdesk.nopadol.com,http://helpdesk-dev.nopadol.com,http://10.0.2.94:3000,http://192.168.1.81:3000",
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS,PATCH",
 		AllowHeaders:     "Content-Type,Authorization,X-Requested-With",
 		AllowCredentials: true,
@@ -187,13 +199,13 @@ func main() {
 		logger.Info.Printf("🔧 Using port from environment: %s", port)
 	}
 
-	if selectedEnv == "dev" {
+	switch selectedEnv {
+	case "dev":
 		app.Get("/api/v1/swagger/*", fiberSwagger.WrapHandler)
 		logger.Info.Println("📚 Swagger UI available at /api/v1/swagger/index.html")
+	default:
+		logger.Info.Println("🔒 Swagger UI disabled in production environment")
 	}
-
-	app.Get("/api/v1/swagger/*", fiberSwagger.WrapHandler)
-	logger.Info.Println("📚 Swagger UI available at /api/v1/swagger/index.html")
 
 	// Log system information
 	logger.Info.Printf("💻 System Info - CPU Cores: %d, Memory Limit: 384MB", runtime.NumCPU())

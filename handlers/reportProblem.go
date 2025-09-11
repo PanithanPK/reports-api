@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,8 +8,9 @@ import (
 	"mime/multipart"
 	"net/url"
 	"os"
-	"path/filepath"
+	"reports-api/config"
 	"reports-api/db"
+	"reports-api/handlers/common"
 	"reports-api/models"
 	"reports-api/utils"
 	"strconv"
@@ -18,124 +18,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/joho/godotenv"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
-
-func generateticketno() string {
-	// สร้าง ticket เป็น TK-วันเดือนปี-no โดยใช้เลขล่าสุดของเดือนนั้น ๆ + 1
-	now := time.Now().Add(7 * time.Hour)
-	dateStr := now.Format("02012006") // วันเดือนปี
-	year := now.Year()
-	month := int(now.Month())
-
-	// ดึงเลข ticket ล่าสุดของเดือน/ปีนี้
-	var lastNo int
-	err := db.DB.QueryRow(`SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_no, LENGTH(ticket_no)-4, 5) AS UNSIGNED)), 0) FROM tasks WHERE YEAR(created_at) = ? AND MONTH(created_at) = ?`, year, month).Scan(&lastNo)
-	if err != nil {
-		log.Printf("Error getting last ticket no for month/year: %v", err)
-		lastNo = 0
-	}
-	ticketNo := lastNo + 1
-	ticket := fmt.Sprintf("TK-%s-%05d", dateStr, ticketNo)
-	return ticket
-}
-
-func deleteImage(objectName string) error {
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
-
-	endpoint := os.Getenv("End_POINT")
-	accessKeyID := os.Getenv("ACCESS_KEY")
-	secretAccessKey := os.Getenv("SECRET_ACCESSKEY")
-	useSSL := false
-	bucketName := os.Getenv("BUCKET_NAME")
-
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
-		Secure: useSSL,
-	})
-	if err != nil {
-		return err
-	}
-
-	err = minioClient.RemoveObject(context.Background(), bucketName, objectName, minio.RemoveObjectOptions{})
-	if err != nil {
-		log.Printf("Failed to delete %s: %v", objectName, err)
-		return err
-	}
-
-	log.Printf("Successfully deleted %s", objectName)
-	return nil
-}
-
-func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.Map, []string) {
-	var uploadedFiles []fiber.Map
-	var errors []string
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
-	// MinIO configuration
-	endpoint := os.Getenv("End_POINT")
-	accessKeyID := os.Getenv("ACCESS_KEY")
-	secretAccessKey := os.Getenv("SECRET_ACCESSKEY")
-	useSSL := false
-	bucketName := os.Getenv("BUCKET_NAME")
-
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
-		Secure: useSSL,
-	})
-	if err != nil {
-		log.Printf("Failed to create MinIO client: %v", err)
-		return uploadedFiles, []string{"Failed to initialize storage client"}
-	}
-
-	for i, file := range files {
-		src, err := file.Open()
-		contentType := "image/jpeg"
-		if filepath.Ext(file.Filename) == ".png" {
-			contentType = "image/png"
-		}
-		if err != nil {
-			log.Printf("Failed to open %s: %v", file.Filename, err)
-			errors = append(errors, fmt.Sprintf("Failed to open %s: %v", file.Filename, err))
-			continue
-		}
-
-		dateStr := time.Now().Add(7 * time.Hour).Format("01022006")
-		filenameSafe := strings.ReplaceAll(file.Filename, " ", "-")
-		objectName := fmt.Sprintf("%s-%02d-%s-%s", ticketno, i+1, dateStr, filenameSafe)
-
-		_, err = minioClient.PutObject(
-			context.Background(),
-			bucketName,
-			objectName,
-			src,
-			file.Size,
-			minio.PutObjectOptions{ContentType: contentType},
-		)
-		src.Close()
-
-		if err != nil {
-			log.Printf("Failed to upload %s: %v", file.Filename, err)
-			errors = append(errors, fmt.Sprintf("Failed to upload %s: %v", file.Filename, err))
-			continue
-		}
-
-		fileURL := fmt.Sprintf("https://minio.sys9.co/api/v1/buckets/%s/objects/download?preview=true&prefix=%s", bucketName, objectName)
-		uploadedFiles = append(uploadedFiles, fiber.Map{
-			"url": fileURL,
-		})
-	}
-
-	return uploadedFiles, errors
-}
 
 // GetTasksHandler returns a handler for listing all tasks with details and pagination
 // @Summary Get all problems
@@ -146,6 +29,7 @@ func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 // @Success 200 {object} models.PaginatedResponse
 // @Router /api/v1/problem/list [get]
 func GetTasksHandler(c *fiber.Ctx) error {
+	// Get pagination params
 	pagination := utils.GetPaginationParams(c)
 	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
 
@@ -158,7 +42,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 
 	// Get paginated data
 	query := `
-		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), t.text, IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
@@ -175,18 +59,19 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	}
 	defer rows.Close()
 
+	// task model Mapping
 	var tasks []models.TaskWithDetails
 	for rows.Next() {
 		var t models.TaskWithDetails
 		var issueTypeName string
 		var filePathsJSON string
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
-
+		// Scan row into task model
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.AssignedtoID, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue
 		}
-
+		// Set SystemType based on SystemID
 		if t.SystemID > 0 {
 			t.SystemType = issueTypeName
 		} else {
@@ -195,8 +80,10 @@ func GetTasksHandler(c *fiber.Ctx) error {
 
 		// Parse file_paths JSON
 		fileMap := make(map[string]string)
+		// Check file Path
 		if filePathsJSON != "" && filePathsJSON != "[]" {
 			var filePaths []fiber.Map
+			// Parse JSON array file paths
 			if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
 				for i, fp := range filePaths {
 					if url, ok := fp["url"].(string); ok {
@@ -237,6 +124,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 	}
 
 	log.Printf("Getting tasks Success")
+	// Return paginated response
 	return c.JSON(models.PaginatedResponse{
 		Success: true,
 		Data:    tasks,
@@ -267,7 +155,7 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 	var task models.TaskWithDetails
 	var issueTypeName string
 	err = db.DB.QueryRow(`
-		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), IFNULL(t.system_id, 0), IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), IFNULL(t.text, ''), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), IFNULL(t.status, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, ''), IFNULL(t.file_paths, '[]')
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), IFNULL(t.system_id, 0), IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), IFNULL(t.text, ''), IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), IFNULL(t.status, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, ''), IFNULL(t.file_paths, '[]')
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
@@ -275,7 +163,7 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 		LEFT JOIN systems_program s ON t.system_id = s.id
 		LEFT JOIN issue_types it ON t.issue_type = it.id
 		WHERE t.id = ?
-	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.IssueTypeID, &task.IssueElse, &issueTypeName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.Assignto, &task.ReportedBy, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
+	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.IssueTypeID, &task.IssueElse, &issueTypeName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.AssignedtoID, &task.Assignto, &task.ReportedBy, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
 
 	if task.SystemID > 0 {
 		task.SystemType = issueTypeName
@@ -318,7 +206,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 	var req models.TaskRequest
 	var uploadedFiles []fiber.Map
 	// Get latest ID and add 1 for ticket number
-	ticketno := generateticketno()
+	ticketno := common.Generateticketno()
 
 	form, err := c.MultipartForm()
 	if err != nil {
@@ -342,7 +230,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		uploadedFiles, _ = handleFileUploads(allFiles, ticketno)
+		uploadedFiles, _ = common.HandleFileUploads(allFiles, ticketno)
 
 		// Convert string form values to int for multipart data
 		if phoneIDStr := c.FormValue("phone_id"); phoneIDStr != "" && phoneIDStr != "0" {
@@ -426,6 +314,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, issue_type, issue_else, department_id, text, reported_by, status, created_by) VALUES (?, ?, 0, ?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy)
 		}
 	}
+
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert task"})
 	}
@@ -500,12 +389,12 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 					photoURLs = append(photoURLs, url)
 				}
 			}
-			messageID, messageName, err = SendTelegram(req, photoURLs...)
+			messageID, messageName, err = common.SendTelegram(req, photoURLs...)
 			if err != nil {
 				log.Printf("❌ Error sending Telegram: %v", err)
 			}
 		} else {
-			messageID, messageName, err = SendTelegram(req)
+			messageID, messageName, err = common.SendTelegram(req)
 			if err != nil {
 				log.Printf("❌ Error sending Telegram: %v", err)
 			}
@@ -593,7 +482,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		uploadedFiles, _ = handleFileUploads(allFiles, ticketno)
+		uploadedFiles, _ = common.HandleFileUploads(allFiles, ticketno)
 	}
 
 	// Convert string form values to int for multipart data
@@ -645,14 +534,10 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			return c.Status(400).JSON(fiber.Map{"error": "Task not found"})
 		}
 	}
+	var createdAtStr string
 	var CreatedAt time.Time
-	err = db.DB.QueryRow(`SELECT created_at FROM tasks WHERE id = ?`, id).Scan(&CreatedAt)
 
-	if err != nil {
-		log.Println("Error fetching created_at:", err)
-	}
-
-	log.Printf("Updating task ID: %s", CreatedAt.Format("2006-01-02 15:04:05"))
+	log.Printf("Updating task ID: %s", id)
 
 	// Handle file uploads
 	if len(uploadedFiles) > 0 {
@@ -670,7 +555,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 							parts := strings.Split(url, "prefix=")
 							if len(parts) > 1 {
 								objectName := parts[1]
-								deleteImage(objectName)
+								common.DeleteImage(objectName)
 							}
 						}
 					}
@@ -726,12 +611,8 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
 	}
-	err = godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
 	var Urlenv string
-	env := os.Getenv("env")
+	env := config.AppConfig.Environment
 	if env == "dev" {
 		Urlenv = "http://helpdesk-dev.nopadol.com/tasks/show/" + id
 	} else {
@@ -753,7 +634,18 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
 		LEFT JOIN responsibilities rs ON t.assignto_id = rs.id
 		WHERE t.id = ?
-		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON, &telegramUser, &assigntoID, &CreatedAt, &telegramID, &ResolvedAt)
+		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON, &telegramUser, &assigntoID, &createdAtStr, &telegramID, &ResolvedAt)
+
+	// Parse created_at string to time
+	if createdAtStr != "" {
+		CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
+		if err != nil {
+			log.Printf("Error parsing created_at: %v", err)
+			CreatedAt = time.Now() // fallback
+		}
+	} else {
+		CreatedAt = time.Now() // fallback
+	}
 
 	log.Printf("Query result - err: %v, messageID: %d, telegramID: %d", err, messageID, telegramID)
 
@@ -834,16 +726,16 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			var oldNotificationID int
 			db.DB.QueryRow(`SELECT IFNULL(assignto_id, 0) FROM telegram_chat WHERE id = ?`, telegramID).Scan(&oldNotificationID)
 			if oldNotificationID > 0 {
-				_, _ = DeleteTelegram(oldNotificationID)
+				_, _ = common.DeleteTelegram(oldNotificationID)
 			}
 		}
 
 		// ส่งหลายไฟล์
 		var notificationResp int
 		if len(photoURLs) > 0 {
-			notificationResp, _ = UpdateTelegram(telegramReq, photoURLs...)
+			notificationResp, _ = common.UpdateTelegram(telegramReq, photoURLs...)
 		} else {
-			notificationResp, _ = UpdateTelegram(telegramReq)
+			notificationResp, _ = common.UpdateTelegram(telegramReq)
 		}
 
 		_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, notificationResp, telegramID)
@@ -852,12 +744,68 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		} else {
 			log.Printf("✅ Assignto ID updated successfully in database")
 		}
+
+		// ใช้ UpdatereplyToSpecificMessage เมื่อมีการอัปเดต assignto
+		if previousAssignto != currentAssignto {
+			// ดึงข้อมูลจาก resolutions table
+			var resolutionID sql.NullInt64
+			var solutionMessageID int
+			db.DB.QueryRow(`SELECT solution_id FROM tasks WHERE id = ?`, id).Scan(&resolutionID)
+			db.DB.QueryRow(`SELECT IFNULL(solution_id, 0) FROM telegram_chat WHERE id = ?`, telegramID).Scan(&solutionMessageID)
+
+			if resolutionID.Valid && solutionMessageID > 0 {
+				var resolutionText string
+				var resolutionFilePathsJSON string
+				var resolutionResolvedAt string
+				err = db.DB.QueryRow(`
+					SELECT IFNULL(text, ''), IFNULL(file_paths, '[]'), 
+					DATE_FORMAT(resolved_at, '%d/%m/%Y %H:%i:%s') 
+					FROM resolutions WHERE id = ?
+				`, resolutionID.Int64).Scan(&resolutionText, &resolutionFilePathsJSON, &resolutionResolvedAt)
+
+				if err == nil {
+					// สร้าง ResolutionReq
+					resolutionReq := models.ResolutionReq{
+						Solution:     resolutionText,
+						TelegramUser: telegramUser,
+						MessageID:    messageID,
+						Url:          Urlenv,
+						Assignto:     currentAssignto,
+						TicketNo:     ticketno,
+						CreatedAt:    CreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05"),
+						ResolvedAt:   resolutionResolvedAt,
+					}
+
+					// ดึง photo URLs จาก resolution files
+					var resolutionPhotoURLs []string
+					if resolutionFilePathsJSON != "" && resolutionFilePathsJSON != "[]" {
+						var resolutionFiles []fiber.Map
+						if err := json.Unmarshal([]byte(resolutionFilePathsJSON), &resolutionFiles); err == nil {
+							for _, file := range resolutionFiles {
+								if url, ok := file["url"].(string); ok {
+									resolutionPhotoURLs = append(resolutionPhotoURLs, url)
+								}
+							}
+						}
+					}
+
+					// เรียกใช้ UpdatereplyToSpecificMessage
+					newSolutionMessageID, err := common.UpdatereplyToSpecificMessage(solutionMessageID, resolutionReq, resolutionPhotoURLs...)
+					if err != nil {
+						log.Printf("❌ Failed to update resolution message: %v", err)
+					} else {
+						// อัปเดต solution_id ใน telegram_chat
+						_, err = db.DB.Exec(`UPDATE telegram_chat SET solution_id = ? WHERE id = ?`, newSolutionMessageID, telegramID)
+						if err != nil {
+							log.Printf("❌ Failed to update solution_id: %v", err)
+						} else {
+							log.Printf("✅ Resolution message updated successfully")
+						}
+					}
+				}
+			}
+		}
 	}
-	var currentAssignto string
-	if req.Assignto != nil {
-		currentAssignto = *req.Assignto
-	}
-	log.Printf("Previous assignto: %s, Current assignto: %s", previousAssignto, currentAssignto)
 	log.Printf("Updating task ID: %s", id)
 	return c.JSON(fiber.Map{"success": true})
 }
@@ -912,7 +860,7 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 							parts := strings.Split(url, "prefix=")
 							if len(parts) > 1 {
 								objectName := parts[1]
-								deleteImage(objectName)
+								common.DeleteImage(objectName)
 								log.Printf("Deleted resolution file: %s", objectName)
 							}
 						}
@@ -932,7 +880,7 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 						parts := strings.Split(url, "prefix=")
 						if len(parts) > 1 {
 							objectName := parts[1]
-							deleteImage(objectName)
+							common.DeleteImage(objectName)
 						}
 					}
 				}
@@ -941,7 +889,7 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 	}
 	log.Printf("Deleting Telegram message ID: %d", assigntoID)
 	if assigntoID > 0 {
-		_, _ = DeleteTelegram(assigntoID)
+		_, _ = common.DeleteTelegram(assigntoID)
 	}
 	// Delete resolution if exists
 	if solutionID != nil {
@@ -968,10 +916,10 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 
 	// Delete Telegram messages if they exist
 	if messageID > 0 {
-		_, _ = DeleteTelegram(messageID)
+		_, _ = common.DeleteTelegram(messageID)
 	}
 	if solutionMessageID > 0 {
-		_, _ = DeleteTelegram(solutionMessageID)
+		_, _ = common.DeleteTelegram(solutionMessageID)
 	}
 
 	log.Printf("Deleted task ID: %d", id)
@@ -1065,13 +1013,25 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 		decodedQuery = query
 	}
 
-	// Clean query
+	// Clean and validate query
 	decodedQuery = strings.TrimSpace(decodedQuery)
+	if len(decodedQuery) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "Search query cannot be empty"})
+	}
+	if len(decodedQuery) > 100 {
+		return c.Status(400).JSON(fiber.Map{"error": "Search query too long"})
+	}
+
+	// Clean query - remove SQL wildcards and quotes
 	decodedQuery = strings.ReplaceAll(decodedQuery, "  ", " ")
 	decodedQuery = strings.ReplaceAll(decodedQuery, "%", "")
 	decodedQuery = strings.ReplaceAll(decodedQuery, "_", "")
 	decodedQuery = strings.ReplaceAll(decodedQuery, "'", "")
 	decodedQuery = strings.ReplaceAll(decodedQuery, "\"", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, ";", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "--", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "/*", "")
+	decodedQuery = strings.ReplaceAll(decodedQuery, "*/", "")
 
 	searchPattern := "%" + decodedQuery + "%"
 
@@ -1236,103 +1196,66 @@ func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
 	// Declare total variable for pagination
 	var total int
 
+	// Column mapping to prevent SQL injection
+	columnMap := map[string]string{
+		"phone_id":        "t.phone_id",
+		"issue_type":      "t.issue_type",
+		"system_id":       "t.system_id",
+		"department_id":   "t.department_id",
+		"branch_id":       "d.branch_id",
+		"status":          "t.status",
+		"created_by":      "t.created_by",
+		"updated_by":      "t.updated_by",
+		"telegram_id":     "t.telegram_id",
+		"phone_name":      "p.name",
+		"number":          "p.number",
+		"system_name":     "s.name",
+		"department_name": "d.name",
+		"branch_name":     "b.name",
+		"solution":        "t.solution",
+		"reported_by":     "t.reported_by",
+		"ticket_no":       "t.ticket_no",
+		"issue_else":      "t.issue_else",
+		"text":            "t.text",
+		"assignto":        "t.assignto",
+	}
+
+	sqlColumn, exists := columnMap[column]
+	if !exists {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid column name"})
+	}
+
+	baseQuery := `FROM tasks t
+		LEFT JOIN ip_phones p ON t.phone_id = p.id
+		LEFT JOIN departments d ON t.department_id = d.id
+		LEFT JOIN branches b ON d.branch_id = b.id
+		LEFT JOIN systems_program s ON t.system_id = s.id
+		LEFT JOIN issue_types it ON t.issue_type = it.id`
+
+	selectFields := `t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), 
+		t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), 
+		IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), 
+		IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at`
+
 	// Build query based on column type
 	if intColumns[column] {
-		// For integer columns, use exact match
-		var sqlColumn string
-		switch column {
-		case "phone_id":
-			sqlColumn = "t.phone_id"
-		case "issue_type":
-			sqlColumn = "t.issue_type"
-		case "system_id":
-			sqlColumn = "t.system_id"
-		case "department_id":
-			sqlColumn = "t.department_id"
-		case "branch_id":
-			sqlColumn = "d.branch_id"
-		case "status":
-			sqlColumn = "t.status"
-		case "created_by":
-			sqlColumn = "t.created_by"
-		case "updated_by":
-			sqlColumn = "t.updated_by"
-		case "telegram_id":
-			sqlColumn = "t.telegram_id"
-		}
-
 		// Get total count for pagination
-		countQuery := `SELECT COUNT(*) FROM tasks t
-			LEFT JOIN ip_phones p ON t.phone_id = p.id
-			LEFT JOIN departments d ON t.department_id = d.id
-			LEFT JOIN branches b ON d.branch_id = b.id
-			LEFT JOIN systems_program s ON t.system_id = s.id
-			LEFT JOIN issue_types it ON t.issue_type = it.id
-			WHERE ` + sqlColumn + ` = ?`
+		countQuery := fmt.Sprintf("SELECT COUNT(*) %s WHERE %s = ?", baseQuery, sqlColumn)
 		db.DB.QueryRow(countQuery, queryParam).Scan(&total)
 
-		queryStr = `
-		       SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), 
-		              t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), 
-		              IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), 
-		              IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
-		       FROM tasks t
-		       LEFT JOIN ip_phones p ON t.phone_id = p.id
-		       LEFT JOIN departments d ON t.department_id = d.id
-		       LEFT JOIN branches b ON d.branch_id = b.id
-		       LEFT JOIN systems_program s ON t.system_id = s.id
-		       LEFT JOIN issue_types it ON t.issue_type = it.id
-		       WHERE ` + sqlColumn + ` = ?
-		       ORDER BY t.id DESC
-		       LIMIT ? OFFSET ?`
+		queryStr = fmt.Sprintf("SELECT %s %s WHERE %s = ? ORDER BY t.id DESC LIMIT ? OFFSET ?",
+			selectFields, baseQuery, sqlColumn)
 		rows, err = db.DB.Query(queryStr, queryParam, pagination.Limit, offset)
 	} else {
 		// For string columns, use LIKE search
 		searchPattern := "%" + query + "%"
-		var sqlColumn string
-		switch column {
-		case "phone_name":
-			sqlColumn = "p.name"
-		case "number":
-			sqlColumn = "p.number"
-		case "system_name":
-			sqlColumn = "s.name"
-		case "department_name":
-			sqlColumn = "d.name"
-		case "branch_name":
-			sqlColumn = "b.name"
-		case "solution":
-			sqlColumn = "t.solution"
-		case "reported_by":
-			sqlColumn = "t.reported_by"
-		default:
-			sqlColumn = "t." + column
-		}
 
 		// Get total count for pagination
-		countQuery := `SELECT COUNT(*) FROM tasks t
-			LEFT JOIN ip_phones p ON t.phone_id = p.id
-			LEFT JOIN departments d ON t.department_id = d.id
-			LEFT JOIN branches b ON d.branch_id = b.id
-			LEFT JOIN systems_program s ON t.system_id = s.id
-			LEFT JOIN issue_types it ON t.issue_type = it.id
-			WHERE ` + sqlColumn + ` LIKE ?`
+		countQuery := fmt.Sprintf("SELECT COUNT(*) %s WHERE %s LIKE ?", baseQuery, sqlColumn)
 		db.DB.QueryRow(countQuery, searchPattern).Scan(&total)
 
-		queryStr = `
-		       SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), 
-		              t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), 
-		              IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), 
-		              IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
-		       FROM tasks t
-		       LEFT JOIN ip_phones p ON t.phone_id = p.id
-		       LEFT JOIN departments d ON t.department_id = d.id
-		       LEFT JOIN branches b ON d.branch_id = b.id
-		       LEFT JOIN systems_program s ON t.system_id = s.id
-		       LEFT JOIN issue_types it ON t.issue_type = it.id
-		       WHERE ` + sqlColumn + ` LIKE ?
-		       ORDER BY t.id DESC
-		       LIMIT ? OFFSET ?`
+		queryStr = fmt.Sprintf("SELECT %s %s WHERE %s LIKE ? ORDER BY t.id DESC LIMIT ? OFFSET ?",
+			selectFields, baseQuery, sqlColumn)
 		rows, err = db.DB.Query(queryStr, searchPattern, pagination.Limit, offset)
 	}
 
@@ -1406,20 +1329,10 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 	if id == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "Task ID is required"})
 	}
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
 	var Urlenv string
-	env := os.Getenv("env")
+	env := config.AppConfig.Environment
 
-	var req struct {
-		AssignedtoID   int    `json:"assignedto_id"`
-		Assignto       string `json:"assign_to"`
-		UpdatedBy      int    `json:"updated_by"`
-		UpdateTelegram bool   `json:"update_telegram"`
-	}
+	var req models.AssignRequest
 
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
@@ -1427,7 +1340,7 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 
 	var messageID int
 
-	err = db.DB.QueryRow(`
+	err := db.DB.QueryRow(`
 		SELECT IFNULL(tc.assignto_id, 0) as assignto_id
 		FROM tasks t
 		LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
@@ -1438,7 +1351,7 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 	}
 
 	if messageID > 0 {
-		_, _ = DeleteTelegram(messageID)
+		_, _ = common.DeleteTelegram(messageID)
 	}
 
 	_, err = db.DB.Exec(`UPDATE tasks SET assignto_id = ?, assignto = ?, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.AssignedtoID, req.Assignto, req.UpdatedBy, id)
@@ -1516,9 +1429,9 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 			}
 			var notificationResp int
 			if len(photoURLs) > 0 {
-				notificationResp, _ = UpdateTelegram(telegramReq, photoURLs...)
+				notificationResp, _ = common.UpdateTelegram(telegramReq, photoURLs...)
 			} else {
-				notificationResp, _ = UpdateTelegram(telegramReq)
+				notificationResp, _ = common.UpdateTelegram(telegramReq)
 			}
 			_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, notificationResp, telegramID)
 			if err != nil {

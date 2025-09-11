@@ -1,27 +1,27 @@
 # Reports API - Project Overview
 
-## ภาพรวมโปรเจค
-Reports API เป็นระบบ Backend API ที่พัฒนาด้วย Go (Golang) และ Fiber Framework สำหรับจัดการระบบรายงานปัญหา (Problem Reporting System) ในองค์กร โดยมีการเชื่อมต่อกับฐานข้อมูล MySQL และระบบแจ้งเตือนผ่าน Telegram
+## Project Overview
+Reports API is a Backend API system developed with Go (Golang) and Fiber Framework for managing organizational Problem Reporting System. It features MySQL database integration and Telegram notification system.
 
-## เทคโนโลยีที่ใช้
+## Technologies Used
 - **Backend**: Go 1.22 + Fiber Framework v2
 - **Database**: MySQL
 - **Authentication**: Session-based + JWT Token
 - **Notification**: Telegram Bot API
 - **Deployment**: Docker + Docker Compose
 
-## โครงสร้างโปรเจค
+## Project Structure
 
 ### 1. Main Application (`main.go`)
-- รองรับ Environment แบบ dev/prod/default
-- การจัดการ Memory และ CPU optimization
+- Supports dev/prod/default environments
+- Memory and CPU optimization management
 - CORS configuration
 - Static file serving
 - Custom logging system
 
 ### 2. Database Layer (`db/`)
-- **db.go**: การเชื่อมต่อ MySQL พร้อม Connection Pool
-- รองรับ Environment Variables สำหรับ Database Config
+- **db.go**: MySQL connection with Connection Pool
+- Supports Environment Variables for Database Config
 - Connection pooling optimization
 
 ### 3. Models (`models/`)
@@ -48,7 +48,7 @@ Reports API เป็นระบบ Backend API ที่พัฒนาด้�
 
 ### 5. Routes (`routes/`)
 - **routes.go**: API routes registration
-- แยก Authentication routes และ Business logic routes
+- Separate Authentication routes and Business logic routes
 
 ### 6. Utils (`utils/`)
 - **pagination.go**: Pagination utilities
@@ -60,23 +60,23 @@ Reports API เป็นระบบ Backend API ที่พัฒนาด้�
 - Handler testing
 - Pagination testing
 
-## ฟีเจอร์หลัก
+## Main Features
 
 ### 1. Task/Problem Management
-- สร้าง/แก้ไข/ลบ Task
-- ระบบ Ticket Number แบบ Auto-generate
-- การค้นหา Task แบบ Full-text search
+- Create/Edit/Delete Tasks
+- Auto-generate Ticket Number system
+- Full-text search for Tasks
 - Pagination support
 - Status tracking (0=Open, 1=In Progress, 2=Closed)
 - Overdue calculation
 
 ### 2. IP Phone Management
-- จัดการข้อมูล IP Phone
-- เชื่อมโยงกับ Department
-- Search และ Filter
+- Manage IP Phone data
+- Link with Department
+- Search and Filter
 
 ### 3. Department & Branch Management
-- จัดการ Department และ Branch
+- Manage Department and Branch
 - Hierarchical structure (Branch -> Department)
 - Department scoring system
 
@@ -87,19 +87,19 @@ Reports API เป็นระบบ Backend API ที่พัฒนาด้�
 - Password management
 
 ### 5. Telegram Integration
-- แจ้งเตือนเมื่อมี Task ใหม่
-- Update status ผ่าน Telegram
+- Notification when new Task is created
+- Update status via Telegram
 - Delete notification
 
 ### 6. Dashboard & Reporting
 - Dashboard data aggregation
 - Department performance scoring
-- Statistics และ Analytics
+- Statistics and Analytics
 
 ### 7. Scoring System
-- คำนวณคะแนน Department ตาม Task count
+- Calculate Department score based on Task count
 - Monthly scoring
-- Auto-deduction เมื่อ Task > 3 ต่อเดือน
+- Auto-deduction when Task > 3 per month
 
 ## API Endpoints
 
@@ -172,7 +172,7 @@ DELETE /api/v1/scores/delete/:id      - Delete score
 GET    /api/v1/users                  - Get users list
 ```
 
-## Database Schema (หลัก)
+## Database Schema (Main)
 
 ### tasks table
 - id, ticket_no, phone_id, system_id, department_id
@@ -202,30 +202,30 @@ GET    /api/v1/users                  - Get users list
 ### scores table
 - id, department_id, year, month, score
 
-## การทำงานของระบบ
+## System Workflow
 
 ### 1. Task Creation Flow
-1. รับข้อมูล Task จาก Frontend
-2. Generate Ticket Number แบบ Auto
-3. บันทึกลง Database
+1. Receive Task data from Frontend
+2. Auto-generate Ticket Number
+3. Save to Database
 4. Update Department Score
-5. ส่ง Notification ผ่าน Telegram (ถ้าเปิดใช้)
+5. Send Notification via Telegram (if enabled)
 
 ### 2. Telegram Integration
-- ส่งข้อความเมื่อมี Task ใหม่
-- Update ข้อความเมื่อแก้ไข Task
-- ลบข้อความเมื่อลบ Task
-- เก็บ message_id สำหรับ Update/Delete
+- Send message when new Task is created
+- Update message when Task is edited
+- Delete message when Task is deleted
+- Store message_id for Update/Delete
 
 ### 3. Scoring System
-- คำนวณคะแนนรายเดือนต่อ Department
-- เริ่มต้นที่ 100 คะแนน
-- ลดคะแนน 1 คะแนนเมื่อมี Task > 3 ต่อเดือน
+- Calculate monthly score per Department
+- Start with 100 points
+- Deduct 1 point when Task > 3 per month
 
 ### 4. Pagination System
-- รองรับ Query Parameters: page, limit
+- Supports Query Parameters: page, limit
 - Default: page=1, limit=10
-- Response รวม pagination metadata
+- Response includes pagination metadata
 
 ## Environment Configuration
 
@@ -249,7 +249,7 @@ DB_PASS=prod_password
 DB_NAME=report_db
 ```
 
-## การ Deploy
+## Deployment
 
 ### Docker
 ```bash
@@ -291,13 +291,13 @@ go run main.go prod
 - Mock testing
 - Performance testing
 
-## การใช้งานกับ ChatGPT
-เมื่อต้องการให้ ChatGPT ช่วยพัฒนาหรือแก้ไขโค้ด ให้อ้างอิงไฟล์นี้เพื่อ:
-1. เข้าใจโครงสร้างโปรเจค
-2. ทราบ API endpoints ที่มีอยู่
-3. เข้าใจ Database schema
-4. ทราบ Business logic และ Flow การทำงาน
-5. เข้าใจ Technology stack ที่ใช้
+## Usage with ChatGPT
+When you need ChatGPT to help develop or modify code, reference this file to:
+1. Understand project structure
+2. Know existing API endpoints
+3. Understand Database schema
+4. Know Business logic and workflow
+5. Understand Technology stack used
 
 ## Version History
 - v1.7.0: Telegram update และ Assign_to feature

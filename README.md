@@ -1,7 +1,30 @@
 # Reports API
 
+![Reports API](https://raw.githubusercontent.com/PanithanPK/reports-api/refs/heads/develop/dockergo.png)
+
 <div align="center">
-  <img src="/dockergo.png" alt="Reports API Logo" width="600">
+  <img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go">
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
+  <img src="https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL">
+  <img src="https://img.shields.io/badge/Fiber-00ACD7?style=for-the-badge&logo=go&logoColor=white" alt="Fiber">
+  <img src="https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black" alt="Swagger">
+  <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js">
+</div>
+
+<div align="center">
+  <a href="https://github.com/PanithanPK/reports-api">
+    <img src="https://img.shields.io/github/stars/PanithanPK/reports-api?style=social" alt="GitHub Stars">
+  </a>
+  <a href="https://github.com/GearRata/reports-ui">
+    <img src="https://img.shields.io/github/stars/GearRata/reports-ui?style=social" alt="UI GitHub Stars">
+  </a>
+  <br>
+  <a href="https://hub.docker.com/r/lovee12345e/reports-api">
+    <img src="https://img.shields.io/docker/pulls/lovee12345e/reports-api?style=flat-square&logo=docker" alt="API Docker Pulls">
+  </a>
+  <a href="https://hub.docker.com/r/gearmcc/reports-ui">
+    <img src="https://img.shields.io/docker/pulls/gearmcc/reports-ui?style=flat-square&logo=docker" alt="UI Docker Pulls">
+  </a>
 </div>
 
 This project is a backend API built with Go for managing a problem reporting system. While a detailed description was not initially provided, this README aims to provide comprehensive information based on the available details and project structure.
