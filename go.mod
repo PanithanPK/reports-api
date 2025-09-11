@@ -8,6 +8,7 @@ require (
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/gofiber/fiber/v2 v2.52.5
+	github.com/gofiber/storage/memory/v2 v2.0.0
 	github.com/joho/godotenv v1.5.1
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/swaggo/fiber-swagger v1.3.0
