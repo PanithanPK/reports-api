@@ -5,6 +5,7 @@ type ResolutionReq struct {
 	FilePaths    map[string]string `json:"file_paths"`
 	ImageURLs    []string          `json:"image_urls"`
 	TelegramID   int               `json:"telegram_id"`
+	TelegramUser string            `json:"telegram_user"`
 	MessageID    int               `json:"message_id"`
 	Url          string            `json:"url"`
 	Assignto     string            `json:"assignto"`

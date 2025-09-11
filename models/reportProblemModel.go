@@ -77,3 +77,10 @@ type TaskWithDetails struct {
 	UpdatedAt      string            `json:"updated_at"`
 	Overdue        interface{}       `json:"overdue"`
 }
+
+type AssignRequest struct {
+	AssignedtoID   int    `json:"assignedto_id"`
+	Assignto       string `json:"assign_to"`
+	UpdatedBy      int    `json:"updated_by"`
+	UpdateTelegram bool   `json:"update_telegram"`
+}

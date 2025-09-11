@@ -2,342 +2,39 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/csv"
 	"fmt"
-	"log"
 	"reports-api/db"
 	"reports-api/models"
-	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/xuri/excelize/v2"
 )
 
-func ExportToExcel(c *fiber.Ctx) error {
-	f := excelize.NewFile()
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Println("Error closing Excel file:", err)
-		}
-	}()
+func ExportToCSV(c *fiber.Ctx) error {
+	tableName := c.Query("table", "tasks")
 
-	// สร้าง styles ที่จะใช้
-	err := createExcelStyles(f)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create styles: " + err.Error()})
-	}
-
-	tables := []string{"tasks", "issue_types", "systems_program", "branches", "departments", "ip_phones", "resolutions", "responsibilities"}
-
-	for i, table := range tables {
-		if i == 0 {
-			f.SetSheetName("Sheet1", table)
-		} else {
-			_, err := f.NewSheet(table)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create sheet: " + err.Error()})
-			}
-		}
-
-		err := exportTableToSheet(f, db.DB, table)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to export table " + table + ": " + err.Error()})
-		}
-	}
-
-	filename := fmt.Sprintf("Report_db_datasummary_%s.xlsx", time.Now().Add(7*time.Hour).Format("20060102_150405"))
-	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	filename := fmt.Sprintf("Report_%s_%s.csv", tableName, time.Now().Add(7*time.Hour).Format("20060102_150405"))
+	c.Set("Content-Type", "text/csv; charset=utf-8")
 	c.Set("Content-Disposition", "attachment; filename="+filename)
 
-	if err := f.Write(c.Response().BodyWriter()); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to write Excel file: " + err.Error()})
+	// เขียน BOM สำหรับ UTF-8 เพื่อให้ Excel รองรับภาษาไทย
+	c.Response().BodyWriter().Write([]byte{0xEF, 0xBB, 0xBF})
+
+	writer := csv.NewWriter(c.Response().BodyWriter())
+	defer writer.Flush()
+
+	err := exportTableToCSV(writer, db.DB, tableName)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to export table " + tableName + ": " + err.Error()})
 	}
 
 	return nil
 }
 
-func createExcelStyles(f *excelize.File) error {
-	// 1. Header Style (สีน้ำเงินเข้ม - Professional Blue)
-	_, err := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Bold:   true,
-			Size:   12,
-			Color:  "FFFFFF",
-			Family: "Calibri",
-		},
-		Fill: excelize.Fill{
-			Type:    "pattern",
-			Color:   []string{"1F4E79"}, // Dark Blue
-			Pattern: 1,
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "center",
-			Vertical:   "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "FFFFFF", Style: 2},
-			{Type: "right", Color: "FFFFFF", Style: 2},
-			{Type: "top", Color: "FFFFFF", Style: 2},
-			{Type: "bottom", Color: "FFFFFF", Style: 2},
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	// 2. Data Style แถวคี่ (Light Blue)
-	_, err = f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Size:   10,
-			Color:  "333333",
-			Family: "Calibri",
-		},
-		Fill: excelize.Fill{
-			Type:    "pattern",
-			Color:   []string{"E7F3FF"}, // Light Blue
-			Pattern: 1,
-		},
-		Alignment: &excelize.Alignment{
-			Vertical: "center",
-			WrapText: true,
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "B8CCE4", Style: 1},
-			{Type: "right", Color: "B8CCE4", Style: 1},
-			{Type: "top", Color: "B8CCE4", Style: 1},
-			{Type: "bottom", Color: "B8CCE4", Style: 1},
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	// 3. Data Style แถวคู่ (White)
-	_, err = f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Size:   10,
-			Color:  "333333",
-			Family: "Calibri",
-		},
-		Fill: excelize.Fill{
-			Type:    "pattern",
-			Color:   []string{"FFFFFF"}, // White
-			Pattern: 1,
-		},
-		Alignment: &excelize.Alignment{
-			Vertical: "center",
-			WrapText: true,
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "B8CCE4", Style: 1},
-			{Type: "right", Color: "B8CCE4", Style: 1},
-			{Type: "top", Color: "B8CCE4", Style: 1},
-			{Type: "bottom", Color: "B8CCE4", Style: 1},
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	// 4. Status Style - เสร็จสิ้น (Green Success)
-	_, err = f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Bold:   true,
-			Size:   10,
-			Color:  "FFFFFF",
-			Family: "Calibri",
-		},
-		Fill: excelize.Fill{
-			Type:    "pattern",
-			Color:   []string{"28A745"}, // Success Green
-			Pattern: 1,
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "center",
-			Vertical:   "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "1E7E34", Style: 1},
-			{Type: "right", Color: "1E7E34", Style: 1},
-			{Type: "top", Color: "1E7E34", Style: 1},
-			{Type: "bottom", Color: "1E7E34", Style: 1},
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	// 5. Status Style - รอดำเนินการ (Orange Warning)
-	_, err = f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Bold:   true,
-			Size:   10,
-			Color:  "FFFFFF",
-			Family: "Calibri",
-		},
-		Fill: excelize.Fill{
-			Type:    "pattern",
-			Color:   []string{"FD7E14"}, // Orange Warning
-			Pattern: 1,
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "center",
-			Vertical:   "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "E55100", Style: 1},
-			{Type: "right", Color: "E55100", Style: 1},
-			{Type: "top", Color: "E55100", Style: 1},
-			{Type: "bottom", Color: "E55100", Style: 1},
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	// 6. Priority High Style (Red)
-	_, err = f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Bold:   true,
-			Size:   10,
-			Color:  "FFFFFF",
-			Family: "Calibri",
-		},
-		Fill: excelize.Fill{
-			Type:    "pattern",
-			Color:   []string{"DC3545"}, // Danger Red
-			Pattern: 1,
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "center",
-			Vertical:   "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "BD2130", Style: 1},
-			{Type: "right", Color: "BD2130", Style: 1},
-			{Type: "top", Color: "BD2130", Style: 1},
-			{Type: "bottom", Color: "BD2130", Style: 1},
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	// 7. Priority Medium Style (Yellow)
-	_, err = f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Bold:   true,
-			Size:   10,
-			Color:  "333333",
-			Family: "Calibri",
-		},
-		Fill: excelize.Fill{
-			Type:    "pattern",
-			Color:   []string{"FFC107"}, // Warning Yellow
-			Pattern: 1,
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "center",
-			Vertical:   "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "E0A800", Style: 1},
-			{Type: "right", Color: "E0A800", Style: 1},
-			{Type: "top", Color: "E0A800", Style: 1},
-			{Type: "bottom", Color: "E0A800", Style: 1},
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	// 8. Priority Low Style (Light Green)
-	_, err = f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Bold:   true,
-			Size:   10,
-			Color:  "FFFFFF",
-			Family: "Calibri",
-		},
-		Fill: excelize.Fill{
-			Type:    "pattern",
-			Color:   []string{"6F42C1"}, // Purple Info
-			Pattern: 1,
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "center",
-			Vertical:   "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "5A32A3", Style: 1},
-			{Type: "right", Color: "5A32A3", Style: 1},
-			{Type: "top", Color: "5A32A3", Style: 1},
-			{Type: "bottom", Color: "5A32A3", Style: 1},
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	// 9. Date/Time Style (Light Gray)
-	_, err = f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Size:   9,
-			Color:  "495057",
-			Family: "Calibri",
-		},
-		Fill: excelize.Fill{
-			Type:    "pattern",
-			Color:   []string{"F8F9FA"}, // Light Gray
-			Pattern: 1,
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "center",
-			Vertical:   "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "DEE2E6", Style: 1},
-			{Type: "right", Color: "DEE2E6", Style: 1},
-			{Type: "top", Color: "DEE2E6", Style: 1},
-			{Type: "bottom", Color: "DEE2E6", Style: 1},
-		},
-		NumFmt: 22, // Date format
-	})
-	if err != nil {
-		return err
-	}
-
-	// 10. Number/ID Style (Light Blue Background)
-	_, err = f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Bold:   true,
-			Size:   10,
-			Color:  "0D47A1",
-			Family: "Calibri",
-		},
-		Fill: excelize.Fill{
-			Type:    "pattern",
-			Color:   []string{"E3F2FD"}, // Light Blue Background
-			Pattern: 1,
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "center",
-			Vertical:   "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "90CAF9", Style: 1},
-			{Type: "right", Color: "90CAF9", Style: 1},
-			{Type: "top", Color: "90CAF9", Style: 1},
-			{Type: "bottom", Color: "90CAF9", Style: 1},
-		},
-	})
-
-	return err
-}
-
-func exportTableToSheet(f *excelize.File, db *sql.DB, tableName string) error {
+func exportTableToCSV(writer *csv.Writer, db *sql.DB, tableName string) error {
 	var query string
-	var columns []string
+	var headers []string
 
 	if tableName == "tasks" {
 		query = `
@@ -374,13 +71,13 @@ func exportTableToSheet(f *excelize.File, db *sql.DB, tableName string) error {
 		LEFT JOIN resolutions res ON t.solution_id = res.id
 		WHERE t.deleted_at IS NULL`
 
-		columns = []string{
+		headers = []string{
 			"ID", "Ticket No", "Phone Name", "Issue Type", "System/Issue",
 			"Branch", "Department", "Description", "Reported By", "Assigned To",
 			"Solution", "Status", "Created At", "Updated At", "Resolved At",
 		}
 	} else {
-		query, columns = buildFilteredQuery(tableName)
+		query, headers = buildFilteredQuery(tableName)
 	}
 
 	rows, err := db.Query(query)
@@ -389,20 +86,12 @@ func exportTableToSheet(f *excelize.File, db *sql.DB, tableName string) error {
 	}
 	defer rows.Close()
 
-	// ตั้งค่า Header
-	for i, col := range columns {
-		cell := fmt.Sprintf("%s1", string(rune('A'+i)))
-		f.SetCellValue(tableName, cell, col)
+	// Write headers
+	if err := writer.Write(headers); err != nil {
+		return err
 	}
 
-	// Apply Header Style
-	headerRange := fmt.Sprintf("A1:%s1", string(rune('A'+len(columns)-1)))
-	f.SetCellStyle(tableName, "A1", headerRange, 1) // Style ID 1 = Header Style
-
-	// Set row height for header
-	f.SetRowHeight(tableName, 1, 30)
-
-	rowNum := 2
+	// Write data rows
 	for rows.Next() {
 		if tableName == "tasks" {
 			var task models.DataTask
@@ -451,48 +140,18 @@ func exportTableToSheet(f *excelize.File, db *sql.DB, tableName string) error {
 				statusText = *task.StatusText
 			}
 
-			values := []interface{}{task.ID, ticketNo, phoneName, issueTypeName,
+			record := []string{
+				fmt.Sprintf("%d", task.ID), ticketNo, phoneName, issueTypeName,
 				systemName, branchName, departmentName, text,
 				reportedBy, assigntoName, solutionText, statusText,
-				createdAtStr, updatedAtStr, resolvedAtStr.String}
+				createdAtStr, updatedAtStr, resolvedAtStr.String,
+			}
 
-			for i, val := range values {
-				cell := fmt.Sprintf("%s%d", string(rune('A'+i)), rowNum)
-				if val != nil {
-					f.SetCellValue(tableName, cell, val)
-				}
-
-				// Apply styling based on column type and content
-				switch i {
-				case 0: // ID Column
-					f.SetCellStyle(tableName, cell, cell, 10) // Number/ID style
-				case 11: // Status column
-					statusVal := fmt.Sprintf("%v", val)
-					if strings.Contains(statusVal, "เสร็จสิ้นแล้ว") {
-						f.SetCellStyle(tableName, cell, cell, 4) // Green style
-					} else if strings.Contains(statusVal, "รอดำเนินการ") {
-						f.SetCellStyle(tableName, cell, cell, 5) // Orange style
-					} else {
-						// Apply alternating row colors for unknown status
-						if rowNum%2 == 0 {
-							f.SetCellStyle(tableName, cell, cell, 3) // White
-						} else {
-							f.SetCellStyle(tableName, cell, cell, 2) // Light Blue
-						}
-					}
-				case 12, 13, 14: // Date columns
-					f.SetCellStyle(tableName, cell, cell, 9) // Date style
-				default:
-					// Apply alternating row colors
-					if rowNum%2 == 0 {
-						f.SetCellStyle(tableName, cell, cell, 3) // White
-					} else {
-						f.SetCellStyle(tableName, cell, cell, 2) // Light Blue
-					}
-				}
+			if err := writer.Write(record); err != nil {
+				return err
 			}
 		} else {
-			var values []interface{}
+			var record []string
 			switch tableName {
 			case "issue_types":
 				var item models.DataIssueType
@@ -501,7 +160,7 @@ func exportTableToSheet(f *excelize.File, db *sql.DB, tableName string) error {
 				if err != nil {
 					return err
 				}
-				values = []interface{}{item.ID, item.Name, createdAtStr}
+				record = []string{fmt.Sprintf("%d", item.ID), item.Name, createdAtStr}
 			case "systems_program":
 				var item models.DataSystemProgram
 				var createdAtStr, updatedAtStr string
@@ -518,7 +177,7 @@ func exportTableToSheet(f *excelize.File, db *sql.DB, tableName string) error {
 				if item.Priority != nil {
 					priority = *item.Priority
 				}
-				values = []interface{}{item.ID, name, priority, typeName.String, createdAtStr, updatedAtStr}
+				record = []string{fmt.Sprintf("%d", item.ID), name, fmt.Sprintf("%d", priority), typeName.String, createdAtStr, updatedAtStr}
 			case "branches":
 				var item models.DataBranch
 				var createdAtStr, updatedAtStr string
@@ -530,7 +189,7 @@ func exportTableToSheet(f *excelize.File, db *sql.DB, tableName string) error {
 				if item.Name != nil {
 					name = *item.Name
 				}
-				values = []interface{}{item.ID, name, createdAtStr, updatedAtStr}
+				record = []string{fmt.Sprintf("%d", item.ID), name, createdAtStr, updatedAtStr}
 			case "departments":
 				var item models.DataDepartment
 				var createdAtStr, updatedAtStr string
@@ -543,7 +202,7 @@ func exportTableToSheet(f *excelize.File, db *sql.DB, tableName string) error {
 				if item.Name != nil {
 					name = *item.Name
 				}
-				values = []interface{}{item.ID, name, branchName.String, createdAtStr, updatedAtStr}
+				record = []string{fmt.Sprintf("%d", item.ID), name, branchName.String, createdAtStr, updatedAtStr}
 			case "ip_phones":
 				var item models.DataIPPhone
 				var createdAtStr, updatedAtStr string
@@ -559,7 +218,7 @@ func exportTableToSheet(f *excelize.File, db *sql.DB, tableName string) error {
 				if item.Name != nil {
 					name = *item.Name
 				}
-				values = []interface{}{item.ID, number, name, departmentName.String, branchName.String, createdAtStr, updatedAtStr}
+				record = []string{fmt.Sprintf("%d", item.ID), number, name, departmentName.String, branchName.String, createdAtStr, updatedAtStr}
 			case "resolutions":
 				var item models.DataResolution
 				var resolvedAtStr sql.NullString
@@ -573,7 +232,7 @@ func exportTableToSheet(f *excelize.File, db *sql.DB, tableName string) error {
 				if item.Text != nil {
 					text = *item.Text
 				}
-				values = []interface{}{item.ID, ticketNo.String, text, resolvedAtStr.String, updatedAtStr}
+				record = []string{fmt.Sprintf("%d", item.ID), ticketNo.String, text, resolvedAtStr.String, updatedAtStr}
 			case "responsibilities":
 				var item models.DataResponsibility
 				var createdAtStr, updatedAtStr string
@@ -588,111 +247,28 @@ func exportTableToSheet(f *excelize.File, db *sql.DB, tableName string) error {
 				if item.Name != nil {
 					name = *item.Name
 				}
-				values = []interface{}{item.ID, telegramUsername, name, createdAtStr, updatedAtStr}
+				record = []string{fmt.Sprintf("%d", item.ID), telegramUsername, name, createdAtStr, updatedAtStr}
 			default:
-				values = make([]interface{}, len(columns))
-				valuePtrs := make([]interface{}, len(columns))
+				values := make([]interface{}, len(headers))
+				valuePtrs := make([]interface{}, len(headers))
 				for i := range values {
 					valuePtrs[i] = &values[i]
 				}
 				if err := rows.Scan(valuePtrs...); err != nil {
 					return err
 				}
-			}
-
-			// Apply styling for non-task tables
-			for i, val := range values {
-				cell := fmt.Sprintf("%s%d", string(rune('A'+i)), rowNum)
-				if val != nil {
-					f.SetCellValue(tableName, cell, val)
-				}
-
-				// Apply specific styling based on column content
-				colName := strings.ToLower(columns[i])
-				switch {
-				case i == 0: // ID column
-					f.SetCellStyle(tableName, cell, cell, 10) // Number/ID style
-				case strings.Contains(colName, "priority"):
-					// Apply priority colors for systems_program table
-					if tableName == "systems_program" {
-						priorityVal := fmt.Sprintf("%v", val)
-						switch priorityVal {
-						case "1", "高": // High priority
-							f.SetCellStyle(tableName, cell, cell, 6) // Red
-						case "2", "中": // Medium priority
-							f.SetCellStyle(tableName, cell, cell, 7) // Yellow
-						case "3", "低": // Low priority
-							f.SetCellStyle(tableName, cell, cell, 8) // Purple
-						default:
-							// Apply normal alternating colors
-							if rowNum%2 == 0 {
-								f.SetCellStyle(tableName, cell, cell, 3) // White
-							} else {
-								f.SetCellStyle(tableName, cell, cell, 2) // Light Blue
-							}
-						}
-					}
-				case strings.Contains(colName, "created") || strings.Contains(colName, "updated") || strings.Contains(colName, "resolved"):
-					f.SetCellStyle(tableName, cell, cell, 9) // Date style
-				default:
-					// Apply alternating row colors
-					if rowNum%2 == 0 {
-						f.SetCellStyle(tableName, cell, cell, 3) // White
-					} else {
-						f.SetCellStyle(tableName, cell, cell, 2) // Light Blue
+				record = make([]string, len(values))
+				for i, val := range values {
+					if val != nil {
+						record[i] = fmt.Sprintf("%v", val)
 					}
 				}
 			}
+
+			if err := writer.Write(record); err != nil {
+				return err
+			}
 		}
-
-		// Set row height
-		f.SetRowHeight(tableName, rowNum, 20)
-		rowNum++
-	}
-
-	// Auto-adjust column widths และ freeze panes
-	for i, col := range columns {
-		colLetter := string(rune('A' + i))
-
-		// กำหนดความกว้างคอลัมน์ตามประเภทข้อมูล
-		var width float64
-		switch {
-		case strings.Contains(strings.ToLower(col), "id"):
-			width = 10
-		case strings.Contains(strings.ToLower(col), "ticket"):
-			width = 18
-		case strings.Contains(strings.ToLower(col), "description") || strings.Contains(strings.ToLower(col), "text") || strings.Contains(strings.ToLower(col), "solution"):
-			width = 45
-		case strings.Contains(strings.ToLower(col), "name"):
-			width = 25
-		case strings.Contains(strings.ToLower(col), "status"):
-			width = 18
-		case strings.Contains(strings.ToLower(col), "priority"):
-			width = 12
-		case strings.Contains(strings.ToLower(col), "date") || strings.Contains(strings.ToLower(col), "at"):
-			width = 20
-		case strings.Contains(strings.ToLower(col), "number"):
-			width = 15
-		default:
-			width = 18
-		}
-		f.SetColWidth(tableName, colLetter, colLetter, width)
-	}
-
-	// Freeze first row
-	f.SetPanes(tableName, &excelize.Panes{
-		Freeze:      true,
-		Split:       false,
-		XSplit:      0,
-		YSplit:      1,
-		TopLeftCell: "A2",
-		ActivePane:  "bottomLeft",
-	})
-
-	// Add Auto Filter
-	if len(columns) > 0 {
-		dataRange := fmt.Sprintf("A1:%s%d", string(rune('A'+len(columns)-1)), rowNum-1)
-		f.AutoFilter(tableName, dataRange, []excelize.AutoFilterOptions{})
 	}
 
 	return nil

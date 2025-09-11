@@ -6,17 +6,16 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
+	"reports-api/config"
+	"reports-api/handlers/common"
 	"reports-api/models"
 	"strconv"
 	"strings"
 
-	"github.com/joho/godotenv"
-
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func escapeMarkdown(text string) string {
+func EscapeMarkdown(text string) string {
 	replacer := strings.NewReplacer(
 		"_", "\\_",
 		"*", "\\*",
@@ -40,7 +39,7 @@ func escapeMarkdown(text string) string {
 	return replacer.Replace(text)
 }
 
-func formatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
+func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 
 	var Program string
 	if req.SystemID > 0 {
@@ -95,12 +94,12 @@ func formatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 			}
 			// Escape underscore in telegram username for Markdown
 			telegramTag = strings.ReplaceAll(telegramTag, "_", "\\_")
-			newMessage += "\n👤 *ผู้รับผิดชอบ:* " + escapeMarkdown(req.Assignto) + " " + telegramTag
+			newMessage += "\n👤 *ผู้รับผิดชอบ:* " + EscapeMarkdown(req.Assignto) + " " + telegramTag
 		} else {
-			newMessage += "\n👤 *ผู้รับผิดชอบ:* " + escapeMarkdown(req.Assignto)
+			newMessage += "\n👤 *ผู้รับผิดชอบ:* " + EscapeMarkdown(req.Assignto)
 		}
 	}
-	newMessage += "\n" + statusIcon + " *สถานะ:* " + escapeMarkdown(statusText) + "\n"
+	newMessage += "\n" + statusIcon + " *สถานะ:* " + EscapeMarkdown(statusText) + "\n"
 	if req.Status == 1 {
 		newMessage += "📅 *วันที่แก้ไขเสร็จ:* " + req.UpdatedAt + "\n"
 	}
@@ -130,13 +129,8 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 	// chatIDStr := os.Getenv("CHAT_ID")
 
 	// chatID, _ := strconv.ParseInt(chatIDStr, 10, 64)
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
-
-	botToken := os.Getenv("BOT_TOKEN")
-	chatIDStr := os.Getenv("CHAT_ID")
+	botToken := config.AppConfig.BotToken
+	chatIDStr := config.AppConfig.ChatID
 
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
@@ -150,7 +144,7 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 
 	bot.Debug = false
 	// สร้างข้อความตามสถานะ
-	msg := formatRepostMessage(req, photoURL...)
+	msg := FormatRepostMessage(req, photoURL...)
 
 	var sentMsg tgbotapi.Message
 	if len(photoURL) > 0 && photoURL[0] != "" {
@@ -208,49 +202,63 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 }
 
 func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
+	log.Printf("UpdateTelegram called - MessageID: %d, Status: %d, Assignto: %s", req.MessageID, req.Status, req.Assignto)
+	log.Printf("UpdateTelegram - PhotoURLs: %v", photoURL)
+
 	// Helper function to escape Markdown characters
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
-
-	botToken := os.Getenv("BOT_TOKEN")
-	chatIDStr := os.Getenv("CHAT_ID")
+	botToken := config.AppConfig.BotToken
+	chatIDStr := config.AppConfig.ChatID
 
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
+		log.Printf("UpdateTelegram - Invalid CHAT_ID format: %v", err)
 		log.Fatal("Invalid CHAT_ID format:", err)
 	}
 	messageID := req.MessageID
 
-	newMessage := formatRepostMessage(req, photoURL...)
+	log.Printf("UpdateTelegram - Bot config: chatID=%d, messageID=%d", chatID, messageID)
+
+	newMessage := FormatRepostMessage(req, photoURL...)
+	log.Printf("UpdateTelegram - Formatted message length: %d characters", len(newMessage))
 
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
+		log.Printf("UpdateTelegram - Failed to create Telegram bot: %v", err)
 		log.Panic("Failed to create Telegram bot:", err)
 	}
 	bot.Debug = false
 
 	// Edit photo caption if photoURL is provided, otherwise edit text message
 	if len(photoURL) > 0 && photoURL[0] != "" {
+		log.Printf("UpdateTelegram - Editing message caption for messageID: %d", messageID)
 		editMsg := tgbotapi.NewEditMessageCaption(chatID, messageID, newMessage)
 		editMsg.ParseMode = "Markdown"
-		_, err = bot.Send(editMsg)
+		resp, err := bot.Send(editMsg)
+		if err != nil {
+			log.Printf("UpdateTelegram - Error editing message caption: %v", err)
+			return 0, err
+		}
+		log.Printf("UpdateTelegram - Caption edit response: %+v", resp)
 	} else {
+		log.Printf("UpdateTelegram - Editing message text for messageID: %d", messageID)
 		editMsg := tgbotapi.NewEditMessageText(chatID, messageID, newMessage)
 		editMsg.ParseMode = "Markdown"
-		_, err = bot.Send(editMsg)
+		_, err := bot.Send(editMsg)
+		if err != nil {
+			log.Printf("UpdateTelegram - Error editing message text: %v", err)
+			return 0, err
+		}
 	}
 
-	if err != nil {
-		log.Printf("Error editing message: %v", err)
-		return 0, err
-	}
+	log.Printf("UpdateTelegram - Message edit successful")
 
 	// ส่งการแจ้งเตือนเฉพาะเมื่อมีการเปลี่ยนผู้รับผิดชอบ
 	var notificationID int
+	log.Printf("UpdateTelegram - Checking notification: TelegramUser='%s', PreviousAssignto='%s', CurrentAssignto='%s'",
+		req.TelegramUser, req.PreviousAssignto, req.Assignto)
+
 	if req.TelegramUser != "" && req.PreviousAssignto != req.Assignto {
+		log.Printf("UpdateTelegram - Sending notification for assignee change")
 		telegramTag := req.TelegramUser
 		if !strings.HasPrefix(telegramTag, "@") {
 			telegramTag = "@" + telegramTag
@@ -259,11 +267,13 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		var notificationMsg string
 		switch req.Status {
 		case 0:
-			notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", escapeMarkdown(telegramTag), req.Ticket, req.Url)
+			notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
 		case 1:
-
+			// ไม่มี case 1 ใน original code
 		}
+
 		if notificationMsg != "" {
+			log.Printf("UpdateTelegram - Sending notification message")
 			notifyMsg := tgbotapi.NewMessage(chatID, notificationMsg)
 			notifyMsg.ParseMode = "Markdown"
 			notifyMsg.ReplyToMessageID = messageID
@@ -272,26 +282,26 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 				log.Printf("Warning: Failed to send notification: %v", err)
 			} else {
 				notificationID = notificationResp.MessageID
+				log.Printf("UpdateTelegram - Notification sent with ID: %d", notificationID)
 			}
+		} else {
+			log.Printf("UpdateTelegram - No notification message for status: %d", req.Status)
 		}
+	} else {
+		log.Printf("UpdateTelegram - No notification needed")
 	}
 
 	log.Printf("Message ID %d edited successfully!", messageID)
 	if notificationID > 0 {
 		return notificationID, nil
 	}
-	return notificationID, nil
+	return 0, nil // เปลี่ยนจาก notificationID เป็น 0 เพื่อความชัดเจน
 }
 
 func UpdateAssignedtoMsg(messageID int, req models.TaskRequest) (int, error) {
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
-
-	botToken := os.Getenv("BOT_TOKEN")
-	chatIDStr := os.Getenv("CHAT_ID")
+	botToken := config.AppConfig.BotToken
+	chatIDStr := config.AppConfig.ChatID
 
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
@@ -311,9 +321,9 @@ func UpdateAssignedtoMsg(messageID int, req models.TaskRequest) (int, error) {
 	var notificationMsg string
 	switch req.Status {
 	case 0:
-		notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", escapeMarkdown(telegramTag), req.Ticket, req.Url)
+		notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
 	case 1:
-		notificationMsg = fmt.Sprintf("✅ *งานเสร็จสิ้นแล้ว* ✅\n━━━━━━━━━━━━━━\n👋 %s\n📋 งานที่คุณรับผิดชอบเสร็จสิ้นแล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", escapeMarkdown(telegramTag), req.Ticket, req.Url)
+		notificationMsg = fmt.Sprintf("✅ *งานเสร็จสิ้นแล้ว* ✅\n━━━━━━━━━━━━━━\n👋 %s\n📋 งานที่คุณรับผิดชอบเสร็จสิ้นแล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
 	}
 
 	if messageID > 0 {
@@ -341,13 +351,8 @@ func DeleteTelegram(messageID int) (bool, error) {
 		return false, nil
 	}
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
-
-	botToken := os.Getenv("BOT_TOKEN")
-	chatIDStr := os.Getenv("CHAT_ID")
+	botToken := config.AppConfig.BotToken
+	chatIDStr := config.AppConfig.ChatID
 
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
@@ -376,48 +381,16 @@ func DeleteTelegram(messageID int) (bool, error) {
 	return true, nil
 }
 
-func formatSolutionMessage(req models.ResolutionReq, photoURLs ...string) string {
-	replyText := "🔧 *วิธีการแก้ไข* 🔧\n"
-	replyText += "━━━━━━━━━━━━━━\n"
-	replyText += "🎫 *Ticket No:* `" + req.TicketNo + "`\n"
-	replyText += "👤 *ผู้รับผิดชอบ:* `" + req.Assignto + "`\n"
-	replyText += "📅 *วันที่แจ้ง:* `" + req.CreatedAt + "`\n"
-	replyText += "📅 *วันที่แก้ไข:* `" + req.ResolvedAt + "`\n"
-	replyText += "━━━━━━━━━━━━━━\n"
-
-	replyText += "📝 *รายละเอียดการแก้ไข:*\n"
-	replyText += "```\n" + req.Solution + "\n```"
-
-	// Add photo links if available
-	if len(photoURLs) > 0 {
-		replyText += "\n━━━━━━━━━━━━━━"
-		for i := 0; i < len(photoURLs); i++ {
-			if photoURLs[i] != "" {
-				replyText += fmt.Sprintf("\n🖼️ [ดูรูปการแก้ไข %d](%s)", i+1, photoURLs[i])
-			}
-		}
-	}
-	replyText += "\n━━━━━━━━━━━━━━"
-	replyText += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")"
-
-	return replyText
-}
-
 func replyToSpecificMessage(req models.ResolutionReq, photoURLs ...string) (int, error) {
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
-
-	botToken := os.Getenv("BOT_TOKEN")
-	chatIDStr := os.Getenv("CHAT_ID")
+	botToken := config.AppConfig.BotToken
+	chatIDStr := config.AppConfig.ChatID
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
 		return 0, err
 	}
 
 	// Format solution message
-	replyText := formatSolutionMessage(req, photoURLs...)
+	replyText := common.FormatSolutionMessage(req, photoURLs...)
 
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
@@ -490,20 +463,16 @@ func replyToSpecificMessage(req models.ResolutionReq, photoURLs ...string) (int,
 }
 
 func UpdatereplyToSpecificMessage(messageID int, req models.ResolutionReq, photoURLs ...string) (int, error) {
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
 
-	botToken := os.Getenv("BOT_TOKEN")
-	chatIDStr := os.Getenv("CHAT_ID")
+	botToken := config.AppConfig.BotToken
+	chatIDStr := config.AppConfig.ChatID
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
 		return 0, err
 	}
 
 	// Format solution message
-	replyText := formatSolutionMessage(req, photoURLs...)
+	replyText := common.FormatSolutionMessage(req, photoURLs...)
 
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {

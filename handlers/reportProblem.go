@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,8 +8,9 @@ import (
 	"mime/multipart"
 	"net/url"
 	"os"
-	"path/filepath"
+	"reports-api/config"
 	"reports-api/db"
+	"reports-api/handlers/common"
 	"reports-api/models"
 	"reports-api/utils"
 	"strconv"
@@ -18,133 +18,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/joho/godotenv"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
-
-func generateticketno() string {
-	// create ticket as TK-DDMMYYYY-no using the latest number of that month/year + 1
-	now := time.Now().Add(7 * time.Hour)
-	dateStr := now.Format("02012006") // วันเดือนปี
-	year := now.Year()
-	month := int(now.Month())
-
-	// get last ticket number for this month/year
-	var lastNo int
-	err := db.DB.QueryRow(`SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_no, LENGTH(ticket_no)-4, 5) AS UNSIGNED)), 0) FROM tasks WHERE YEAR(created_at) = ? AND MONTH(created_at) = ?`, year, month).Scan(&lastNo)
-	if err != nil {
-		log.Printf("Error getting last ticket no for month/year: %v", err)
-		lastNo = 0
-	}
-	// increment by 1
-	ticketNo := lastNo + 1
-	ticket := fmt.Sprintf("TK-%s-%05d", dateStr, ticketNo)
-	return ticket
-}
-
-func deleteImage(objectName string) error {
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
-	// MinIO configuration
-	endpoint := os.Getenv("End_POINT")
-	accessKeyID := os.Getenv("ACCESS_KEY")
-	secretAccessKey := os.Getenv("SECRET_ACCESSKEY")
-	useSSL := false
-	bucketName := os.Getenv("BUCKET_NAME")
-
-	// Initialize MinIO client
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
-		Secure: useSSL,
-	})
-	if err != nil {
-		return err
-	}
-
-	// Delete the object
-	err = minioClient.RemoveObject(context.Background(), bucketName, objectName, minio.RemoveObjectOptions{})
-	if err != nil {
-		log.Printf("Failed to delete %s: %v", objectName, err)
-		return err
-	}
-
-	log.Printf("Successfully deleted %s", objectName)
-	return nil
-}
-
-func handleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.Map, []string) {
-	var uploadedFiles []fiber.Map
-	var errors []string
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
-	// MinIO configuration
-	endpoint := os.Getenv("End_POINT")
-	accessKeyID := os.Getenv("ACCESS_KEY")
-	secretAccessKey := os.Getenv("SECRET_ACCESSKEY")
-	useSSL := false
-	bucketName := os.Getenv("BUCKET_NAME")
-
-	// Initialize MinIO client
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
-		Secure: useSSL,
-	})
-	if err != nil {
-		log.Printf("Failed to create MinIO client: %v", err)
-		return uploadedFiles, []string{"Failed to initialize storage client"}
-	}
-
-	// loop through files and upload to MinIO
-	for i, file := range files {
-		// Load file image
-		src, err := file.Open()
-		// Check file type file image
-		contentType := "image/jpeg"
-		if filepath.Ext(file.Filename) == ".png" {
-			contentType = "image/png"
-		}
-		if err != nil {
-			log.Printf("Failed to open %s: %v", file.Filename, err)
-			errors = append(errors, fmt.Sprintf("Failed to open %s: %v", file.Filename, err))
-			continue
-		}
-		// Name Object
-		dateStr := time.Now().Add(7 * time.Hour).Format("01022006")
-		filenameSafe := strings.ReplaceAll(file.Filename, " ", "-")
-		objectName := fmt.Sprintf("%s-%02d-%s-%s", ticketno, i+1, dateStr, filenameSafe)
-
-		// Upload to MinIO
-		_, err = minioClient.PutObject(
-			context.Background(),
-			bucketName,
-			objectName,
-			src,
-			file.Size,
-			minio.PutObjectOptions{ContentType: contentType},
-		)
-		src.Close()
-		if err != nil {
-			log.Printf("Failed to upload %s: %v", file.Filename, err)
-			errors = append(errors, fmt.Sprintf("Failed to upload %s: %v", file.Filename, err))
-			continue
-		}
-
-		// Return URL for get file path
-		fileURL := fmt.Sprintf("https://minio.sys9.co/api/v1/buckets/%s/objects/download?preview=true&prefix=%s", bucketName, objectName)
-		uploadedFiles = append(uploadedFiles, fiber.Map{
-			"url": fileURL,
-		})
-	}
-
-	return uploadedFiles, errors
-}
 
 // GetTasksHandler returns a handler for listing all tasks with details and pagination
 // @Summary Get all problems
@@ -332,7 +206,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 	var req models.TaskRequest
 	var uploadedFiles []fiber.Map
 	// Get latest ID and add 1 for ticket number
-	ticketno := generateticketno()
+	ticketno := common.Generateticketno()
 
 	form, err := c.MultipartForm()
 	if err != nil {
@@ -356,7 +230,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		uploadedFiles, _ = handleFileUploads(allFiles, ticketno)
+		uploadedFiles, _ = common.HandleFileUploads(allFiles, ticketno)
 
 		// Convert string form values to int for multipart data
 		if phoneIDStr := c.FormValue("phone_id"); phoneIDStr != "" && phoneIDStr != "0" {
@@ -440,6 +314,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, issue_type, issue_else, department_id, text, reported_by, status, created_by) VALUES (?, ?, 0, ?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy)
 		}
 	}
+
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert task"})
 	}
@@ -607,7 +482,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		uploadedFiles, _ = handleFileUploads(allFiles, ticketno)
+		uploadedFiles, _ = common.HandleFileUploads(allFiles, ticketno)
 	}
 
 	// Convert string form values to int for multipart data
@@ -659,14 +534,10 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			return c.Status(400).JSON(fiber.Map{"error": "Task not found"})
 		}
 	}
+	var createdAtStr string
 	var CreatedAt time.Time
-	err = db.DB.QueryRow(`SELECT created_at FROM tasks WHERE id = ?`, id).Scan(&CreatedAt)
 
-	if err != nil {
-		log.Println("Error fetching created_at:", err)
-	}
-
-	log.Printf("Updating task ID: %s", CreatedAt.Format("2006-01-02 15:04:05"))
+	log.Printf("Updating task ID: %s", id)
 
 	// Handle file uploads
 	if len(uploadedFiles) > 0 {
@@ -684,7 +555,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 							parts := strings.Split(url, "prefix=")
 							if len(parts) > 1 {
 								objectName := parts[1]
-								deleteImage(objectName)
+								common.DeleteImage(objectName)
 							}
 						}
 					}
@@ -740,12 +611,8 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
 	}
-	err = godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
 	var Urlenv string
-	env := os.Getenv("env")
+	env := config.AppConfig.Environment
 	if env == "dev" {
 		Urlenv = "http://helpdesk-dev.nopadol.com/tasks/show/" + id
 	} else {
@@ -767,7 +634,18 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
 		LEFT JOIN responsibilities rs ON t.assignto_id = rs.id
 		WHERE t.id = ?
-		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON, &telegramUser, &assigntoID, &CreatedAt, &telegramID, &ResolvedAt)
+		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON, &telegramUser, &assigntoID, &createdAtStr, &telegramID, &ResolvedAt)
+
+	// Parse created_at string to time
+	if createdAtStr != "" {
+		CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
+		if err != nil {
+			log.Printf("Error parsing created_at: %v", err)
+			CreatedAt = time.Now() // fallback
+		}
+	} else {
+		CreatedAt = time.Now() // fallback
+	}
 
 	log.Printf("Query result - err: %v, messageID: %d, telegramID: %d", err, messageID, telegramID)
 
@@ -926,7 +804,7 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 							parts := strings.Split(url, "prefix=")
 							if len(parts) > 1 {
 								objectName := parts[1]
-								deleteImage(objectName)
+								common.DeleteImage(objectName)
 								log.Printf("Deleted resolution file: %s", objectName)
 							}
 						}
@@ -946,7 +824,7 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 						parts := strings.Split(url, "prefix=")
 						if len(parts) > 1 {
 							objectName := parts[1]
-							deleteImage(objectName)
+							common.DeleteImage(objectName)
 						}
 					}
 				}
@@ -1395,20 +1273,10 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 	if id == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "Task ID is required"})
 	}
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
 	var Urlenv string
-	env := os.Getenv("env")
+	env := config.AppConfig.Environment
 
-	var req struct {
-		AssignedtoID   int    `json:"assignedto_id"`
-		Assignto       string `json:"assign_to"`
-		UpdatedBy      int    `json:"updated_by"`
-		UpdateTelegram bool   `json:"update_telegram"`
-	}
+	var req models.AssignRequest
 
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
@@ -1416,7 +1284,7 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 
 	var messageID int
 
-	err = db.DB.QueryRow(`
+	err := db.DB.QueryRow(`
 		SELECT IFNULL(tc.assignto_id, 0) as assignto_id
 		FROM tasks t
 		LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id

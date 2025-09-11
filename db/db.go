@@ -31,7 +31,7 @@ func InitDB() error {
 		dbPass := os.Getenv("DB_PASS")
 		if dbPass == "" {
 			dbPass = "123456"
-			log.Println("⚠️ Using default DB_PASS: 123456")
+			log.Println("⚠️ Using default DB_PASS: PASS")
 		} else {
 			log.Println("✅ Using DB_PASS from environment")
 		}
