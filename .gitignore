@@ -11,7 +11,8 @@
 *.sh
 /tests
 tests
-
+/mysql-data
 PROJECT_OVERVIEW.md
 CHATGPT_CONTEXT.md
 
+docker-compose.yml

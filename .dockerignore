@@ -1,5 +1,7 @@
 .dockerignore
 node_modules
+/mysql-data
+mysql-data/
 npm-debug.log
 README.md
 .next
@@ -7,3 +9,5 @@ README.md
 *.sh
 tests
 /tests
+
+docker-compose.yml
