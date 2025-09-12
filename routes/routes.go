@@ -35,6 +35,7 @@ func problemRoutes(r *fiber.App) {
 	r.Get("/api/v1/problem/list", handlers.GetTasksHandler)
 	r.Get("/api/v1/problem/list/:query", handlers.GetTasksWithQueryHandler)
 	r.Get("/api/v1/problem/list/:column/:query", handlers.GetTasksWithColumnQueryHandler)
+	r.Get("/api/v1/problem/list/sort/:column/:query", handlers.GetTaskSort)
 	r.Post("/api/v1/problem/create", handlers.CreateTaskHandler)
 	r.Get("/api/v1/problem/:id", handlers.GetTaskDetailHandler)
 	r.Put("/api/v1/problem/update/:id", handlers.UpdateTaskHandler)

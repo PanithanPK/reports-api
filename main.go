@@ -9,6 +9,7 @@ import (
 	"time"
 
 	_ "reports-api/docs"
+	"reports-api/middleware"
 	"reports-api/routes"
 	"runtime"
 	"runtime/debug"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/joho/godotenv"
 	fiberSwagger "github.com/swaggo/fiber-swagger"
 )
@@ -147,15 +149,26 @@ func main() {
 	}))
 	logger.Info.Println("🌐 CORS enabled using Fiber built-in middleware")
 
-	// Add custom header middleware
+	// Add Session middleware
+	store := session.New(session.Config{
+		KeyLookup:      "cookie:session_id",
+		CookieDomain:   "",
+		CookiePath:     "/",
+		CookieSecure:   CurrentEnvironment == "prod",
+		CookieHTTPOnly: true,
+		CookieSameSite: "Lax",
+		Expiration:     time.Hour * 24,
+	})
 	app.Use(func(c *fiber.Ctx) error {
-		c.Set("Content-Type", "application/json")
-		c.Set("X-Content-Type-Options", "nosniff")
-		c.Set("X-Frame-Options", "DENY")
-		c.Set("X-XSS-Protection", "1; mode=block")
+		c.Locals("session", store)
 		return c.Next()
 	})
-	logger.Info.Println("✅ HeaderMiddleware added for common response headers")
+	logger.Info.Println("🍪 Session middleware configured")
+
+	// Add middleware
+	// app.Use(middleware.HeaderMiddleware())
+	app.Use(middleware.RateLimiter())
+	logger.Info.Println("✅ Middleware added")
 
 	// Serve static files
 	app.Static("/static", "./fontend")

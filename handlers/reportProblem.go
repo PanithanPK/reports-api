@@ -1443,3 +1443,120 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"success": true, "message": "Assigned person updated successfully"})
 }
+
+func GetTaskSort(c *fiber.Ctx) error {
+	column := c.Params("column")
+	query := c.Params("query")
+
+	if column == "" || query == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Column and query parameters are required"})
+	}
+
+	pagination := utils.GetPaginationParams(c)
+	offset := utils.CalculateOffset(pagination.Page, pagination.Limit)
+
+	intColumns := map[string]bool{
+		"phone_id": true, "issue_type": true, "system_id": true, "department_id": true,
+		"branch_id": true, "status": true, "created_by": true, "updated_by": true, "telegram_id": true,
+	}
+
+	stringColumns := map[string]bool{
+		"ticket_no": true, "number": true, "phone_name": true, "system_name": true,
+		"issue_else": true, "department_name": true, "branch_name": true, "text": true,
+		"assignto": true, "reported_by": true, "solution": true,
+	}
+
+	if !intColumns[column] && !stringColumns[column] {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid column name"})
+	}
+
+	var queryParam interface{}
+	if intColumns[column] {
+		intVal, err := strconv.Atoi(query)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("Invalid value for column %s: must be integer", column)})
+		}
+		queryParam = intVal
+	} else {
+		queryParam = query
+	}
+
+	columnMap := map[string]string{
+		"phone_id": "t.phone_id", "issue_type": "t.issue_type", "system_id": "t.system_id",
+		"department_id": "t.department_id", "branch_id": "d.branch_id", "status": "t.status",
+		"created_by": "t.created_by", "updated_by": "t.updated_by", "telegram_id": "t.telegram_id",
+		"phone_name": "p.name", "number": "p.number", "system_name": "s.name",
+		"department_name": "d.name", "branch_name": "b.name", "solution": "t.solution",
+		"reported_by": "t.reported_by", "ticket_no": "t.ticket_no", "issue_else": "t.issue_else",
+		"text": "t.text", "assignto": "t.assignto",
+	}
+
+	sqlColumn, exists := columnMap[column]
+	if !exists {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid column name"})
+	}
+
+	baseQuery := `FROM tasks t
+		LEFT JOIN ip_phones p ON t.phone_id = p.id
+		LEFT JOIN departments d ON t.department_id = d.id
+		LEFT JOIN branches b ON d.branch_id = b.id
+		LEFT JOIN systems_program s ON t.system_id = s.id
+		LEFT JOIN issue_types it ON t.issue_type = it.id`
+
+	selectFields := `t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''),
+		t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''),
+		IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0),
+		IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at`
+
+	var total int
+	db.DB.QueryRow(fmt.Sprintf("SELECT COUNT(*) %s", baseQuery)).Scan(&total)
+
+	orderBy := fmt.Sprintf("ORDER BY CASE WHEN %s = ? THEN 0 ELSE 1 END, t.id DESC", sqlColumn)
+	queryStr := fmt.Sprintf("SELECT %s %s %s LIMIT ? OFFSET ?", selectFields, baseQuery, orderBy)
+	rows, err := db.DB.Query(queryStr, queryParam, pagination.Limit, offset)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to query tasks"})
+	}
+	defer rows.Close()
+
+	var tasks []models.TaskWithDetails
+	for rows.Next() {
+		var t models.TaskWithDetails
+		var issueTypeName string
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+		if err != nil {
+			continue
+		}
+		t.SystemType = issueTypeName
+		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
+		if err == nil {
+			createdAt = createdAt.Add(7 * time.Hour)
+			now := time.Now().Add(7 * time.Hour)
+			duration := now.Sub(createdAt)
+			if createdAt.Format("2006-01-02") == now.Format("2006-01-02") {
+				hours := int(duration.Hours())
+				minutes := int(duration.Minutes()) % 60
+				seconds := int(duration.Seconds()) % 60
+				t.Overdue = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+			} else {
+				days := int(duration.Hours() / 24)
+				if days == 0 {
+					days = 1
+				}
+				t.Overdue = days
+			}
+		}
+		tasks = append(tasks, t)
+	}
+
+	return c.JSON(models.PaginatedResponse{
+		Success: true,
+		Data:    tasks,
+		Pagination: models.PaginationResponse{
+			Page:       pagination.Page,
+			Limit:      pagination.Limit,
+			Total:      total,
+			TotalPages: utils.CalculateTotalPages(total, pagination.Limit),
+		},
+	})
+}

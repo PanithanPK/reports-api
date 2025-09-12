@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var sessions = map[string]string{}
@@ -50,7 +51,7 @@ func LoginHandler(c *fiber.Ctx) error {
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid username or password"})
 	}
 
-	if credentials.Password != password {
+	if err := bcrypt.CompareHashAndPassword([]byte(password), []byte(credentials.Password)); err != nil {
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid username or password"})
 	}
 	sessionID := generateSessionID()
@@ -101,11 +102,18 @@ func RegisterHandler(role string) fiber.Handler {
 			return c.Status(409).JSON(fiber.Map{"error": "Username already exists"})
 		}
 
-		_, err = db.DB.Exec(
-			"INSERT INTO users (username, password, role, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
-			req.Username, req.Password, role, req.CreatedBy, time.Now(),
-		)
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to hash password"})
+		}
+
+		_, err = db.DB.Exec(
+			"INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+			req.Username, string(hashedPassword), role,
+		)
+
+		if err != nil {
+			log.Printf("Registering user %v", err)
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to register user"})
 		}
 
