@@ -663,8 +663,8 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			Assignto:         "",
 			PreviousAssignto: previousAssignto,
 			MessageID:        messageID,
-
-			Ticket: ticketno,
+			IssueElse:        req.IssueElse,
+			Ticket:           ticketno,
 		}
 
 		// Get additional data for Telegram
@@ -693,10 +693,6 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		} else {
 			telegramReq.UpdatedAt = ""
 		}
-		telegramReq.Ticket = ticketno
-		telegramReq.ReportedBy = reported
-		telegramReq.TelegramUser = telegramUser
-		telegramReq.AssigntoID = assigntoID
 		if req.Assignto != nil {
 			telegramReq.Assignto = *req.Assignto
 		}
