@@ -20,6 +20,56 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+// parseFilePaths แปลง JSON file paths เป็น map
+func parseFilePaths(filePathsJSON string) map[string]string {
+	fileMap := make(map[string]string)
+	if filePathsJSON != "" && filePathsJSON != "[]" {
+		var filePaths []fiber.Map
+		if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
+			for i, fp := range filePaths {
+				if url, ok := fp["url"].(string); ok {
+					fileMap[fmt.Sprintf("image_%d", i)] = url
+				}
+			}
+		}
+	}
+	return fileMap
+}
+
+// getPhotoURLs ดึง URLs จาก file paths JSON
+func getPhotoURLs(filePathsJSON string) []string {
+	var photoURLs []string
+	if filePathsJSON != "" && filePathsJSON != "[]" {
+		var files []fiber.Map
+		if err := json.Unmarshal([]byte(filePathsJSON), &files); err == nil {
+			for _, file := range files {
+				if url, ok := file["url"].(string); ok {
+					photoURLs = append(photoURLs, url)
+				}
+			}
+		}
+	}
+	return photoURLs
+}
+
+// getTelegramData ดึงข้อมูลสำหรับ Telegram
+func getTelegramData(phoneID *int, systemID, departmentID int, taskID string) (phoneNumber int, departmentName, branchName, programName string) {
+	if phoneID != nil {
+		db.DB.QueryRow(`SELECT p.number, d.name, b.name FROM ip_phones p JOIN departments d ON p.department_id = d.id JOIN branches b ON d.branch_id = b.id WHERE p.id = ?`, *phoneID).Scan(&phoneNumber, &departmentName, &branchName)
+	} else {
+		db.DB.QueryRow(`SELECT d.name, b.name FROM departments d JOIN branches b ON d.branch_id = b.id WHERE d.id = ?`, departmentID).Scan(&departmentName, &branchName)
+	}
+
+	if systemID != 0 {
+		db.DB.QueryRow(`SELECT name FROM systems_program WHERE id = ?`, systemID).Scan(&programName)
+	} else if taskID != "" {
+		var issueElse string
+		db.DB.QueryRow(`SELECT IFNULL(issue_else, '') FROM tasks WHERE id = ?`, taskID).Scan(&issueElse)
+		programName = issueElse
+	}
+	return
+}
+
 // GetTasksHandler returns a handler for listing all tasks with details and pagination
 // @Summary Get all problems
 // @Description Get list of all problems with pagination
@@ -79,41 +129,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 		}
 
 		// Parse file_paths JSON
-		fileMap := make(map[string]string)
-		// Check file Path
-		if filePathsJSON != "" && filePathsJSON != "[]" {
-			var filePaths []fiber.Map
-			// Parse JSON array file paths
-			if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
-				for i, fp := range filePaths {
-					if url, ok := fp["url"].(string); ok {
-						fileMap[fmt.Sprintf("image_%d", i)] = url
-					}
-				}
-			}
-		}
-		// Set FilePaths as map instead of array
-		t.FilePaths = fileMap
-
-		// Calculate overdue
-		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
-		if err == nil {
-			createdAt = createdAt.Add(7 * time.Hour)
-			now := time.Now().Add(7 * time.Hour)
-			duration := now.Sub(createdAt)
-			if createdAt.Format("2006-01-02") == now.Format("2006-01-02") {
-				hours := int(duration.Hours())
-				minutes := int(duration.Minutes()) % 60
-				seconds := int(duration.Seconds()) % 60
-				t.Overdue = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
-			} else {
-				days := int(duration.Hours() / 24)
-				if days == 0 {
-					days = 1
-				}
-				t.Overdue = days
-			}
-		}
+		t.FilePaths = parseFilePaths(filePathsJSON)
 
 		tasks = append(tasks, t)
 	}
@@ -176,19 +192,7 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 	}
 
 	// Parse file_paths JSON and convert to image_{index} format
-	fileMap := make(map[string]string)
-	if filePathsJSON != "" && filePathsJSON != "[]" {
-		var filePaths []fiber.Map
-		if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil {
-			for i, fp := range filePaths {
-				if url, ok := fp["url"].(string); ok {
-					fileMap[fmt.Sprintf("image_%d", i)] = url
-				}
-			}
-		}
-	}
-	// Set FilePaths as map instead of array
-	task.FilePaths = fileMap
+	task.FilePaths = parseFilePaths(filePathsJSON)
 
 	log.Printf("Getting task ID: %d details", id)
 	return c.JSON(fiber.Map{"success": true, "data": task})
@@ -338,36 +342,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 	if req.Telegram {
 		log.Printf("🚀 Preparing to send Telegram notification for task ID: %d", id)
 		// Get additional data for Telegram
-		var phoneNumber int
-		var departmentName, branchName string
-		var programName string
-
-		if req.PhoneID != nil {
-			// Get data from phone if phone_id exists
-			db.DB.QueryRow(`
-				SELECT p.number, d.name, b.name 
-				FROM ip_phones p 
-				JOIN departments d ON p.department_id = d.id 
-				JOIN branches b ON d.branch_id = b.id 
-				WHERE p.id = ?
-			`, *req.PhoneID).Scan(&phoneNumber, &departmentName, &branchName)
-		} else {
-			// Get data from department_id if no phone_id
-			db.DB.QueryRow(`
-				SELECT d.name, b.name 
-				FROM departments d 
-				JOIN branches b ON d.branch_id = b.id 
-				WHERE d.id = ?
-			`, req.DepartmentID).Scan(&departmentName, &branchName)
-		}
-
-		if req.SystemID != 0 {
-			db.DB.QueryRow(`
-				SELECT name
-				FROM systems_program
-				WHERE id = ?
-			`, req.SystemID).Scan(&programName)
-		}
+		phoneNumber, departmentName, branchName, programName := getTelegramData(req.PhoneID, req.SystemID, req.DepartmentID, "")
 
 		req.PhoneNumber = phoneNumber
 		req.DepartmentName = departmentName
@@ -383,12 +358,8 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		// Send with photo if files were uploaded
 		if len(uploadedFiles) > 0 {
 			// Get all image URLs
-			var photoURLs []string
-			for _, file := range uploadedFiles {
-				if url, ok := file["url"].(string); ok {
-					photoURLs = append(photoURLs, url)
-				}
-			}
+			filePathsBytes, _ := json.Marshal(uploadedFiles)
+			photoURLs := getPhotoURLs(string(filePathsBytes))
 			messageID, messageName, err = common.SendTelegram(req, photoURLs...)
 			if err != nil {
 				log.Printf("❌ Error sending Telegram: %v", err)
@@ -512,7 +483,9 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	if reportedByStr := c.FormValue("reported_by"); reportedByStr != "" {
 		req.ReportedBy = &reportedByStr
 	}
-	var previousAssigntoNull sql.NullString // เพิ่มตัวแปรเก็บ assignto เดิม
+
+	// เก็บ assignto เดิมก่อนการอัปเดต
+	var previousAssigntoNull sql.NullString
 	err = db.DB.QueryRow(`SELECT assignto FROM tasks WHERE id = ?`, id).Scan(&previousAssigntoNull)
 	if err != nil {
 		log.Println("Error fetching previous_assignto:", err)
@@ -521,6 +494,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	if previousAssigntoNull.Valid {
 		previousAssignto = previousAssigntoNull.String
 	}
+
 	// Get department_id from phone_id if phone_id exists and is valid
 	if req.PhoneID != nil {
 		err := db.DB.QueryRow("SELECT department_id FROM ip_phones WHERE id = ?", *req.PhoneID).Scan(&req.DepartmentID)
@@ -534,6 +508,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			return c.Status(400).JSON(fiber.Map{"error": "Task not found"})
 		}
 	}
+
 	var createdAtStr string
 	var CreatedAt time.Time
 
@@ -611,6 +586,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
 	}
+
 	var Urlenv string
 	env := config.AppConfig.Environment
 	if env == "dev" {
@@ -618,6 +594,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	} else {
 		Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + id
 	}
+
 	// Get message_id and update Telegram if exists
 	var messageID int
 	var reported string
@@ -650,6 +627,12 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	log.Printf("Query result - err: %v, messageID: %d, telegramID: %d", err, messageID, telegramID)
 
 	if err == nil && messageID > 0 {
+		// สร้าง currentAssignto
+		var currentAssignto string
+		if req.Assignto != nil {
+			currentAssignto = *req.Assignto
+		}
+
 		// Create TaskRequest from TaskRequestUpdate for Telegram
 		telegramReq := models.TaskRequest{
 			PhoneID:          req.PhoneID,
@@ -698,25 +681,10 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		}
 
 		// Get first image URL from existing files for Telegram
-		var photoURLs []string
-		if existingFilePathsJSON != "" && existingFilePathsJSON != "[]" {
-			var existingFiles []fiber.Map
-			if err := json.Unmarshal([]byte(existingFilePathsJSON), &existingFiles); err == nil && len(existingFiles) > 0 {
-				for _, file := range existingFiles {
-					if url, ok := file["url"].(string); ok {
-						photoURLs = append(photoURLs, url)
-					}
-				}
-			}
-		}
+		photoURLs := getPhotoURLs(existingFilePathsJSON)
 		log.Printf("Previous assignto: %s, New assignto: %v", previousAssignto, req.Assignto)
 
-		// ตรวจสอบการเปลี่ยนผู้รับผิดชอบ
-		var currentAssignto string
-		if req.Assignto != nil {
-			currentAssignto = *req.Assignto
-		}
-
+		// ตรวจสอบการเปลี่ยนผู้รับผิดชอบเพื่อลบ notification message เก่า
 		if previousAssignto != currentAssignto && previousAssignto != "" {
 			// ลบ notification message เก่าถ้ามีการเปลี่ยนผู้รับผิดชอบ
 			var oldNotificationID int
@@ -726,83 +694,89 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		// ส่งหลายไฟล์
-		var notificationResp int
+		// ส่งหรืออัปเดต main task message
 		if len(photoURLs) > 0 {
-			notificationResp, _ = common.UpdateTelegram(telegramReq, photoURLs...)
+			_, err = common.UpdateTelegram(telegramReq, photoURLs...)
 		} else {
-			notificationResp, _ = common.UpdateTelegram(telegramReq)
+			_, err = common.UpdateTelegram(telegramReq)
 		}
 
-		_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, notificationResp, telegramID)
 		if err != nil {
-			log.Printf("❌ Failed to update assignto_id: %v", err)
+			log.Printf("❌ Failed to update main telegram message: %v", err)
 		} else {
-			log.Printf("✅ Assignto ID updated successfully in database")
+			log.Printf("✅ Main telegram message updated successfully")
 		}
 
-		// ใช้ UpdatereplyToSpecificMessage เมื่อมีการอัปเดต assignto
-		if previousAssignto != currentAssignto {
-			// ดึงข้อมูลจาก resolutions table
-			var resolutionID sql.NullInt64
-			var solutionMessageID int
-			db.DB.QueryRow(`SELECT solution_id FROM tasks WHERE id = ?`, id).Scan(&resolutionID)
-			db.DB.QueryRow(`SELECT IFNULL(solution_id, 0) FROM telegram_chat WHERE id = ?`, telegramID).Scan(&solutionMessageID)
+		// อัปเดต solution message (เสมอ ไม่ขึ้นกับการเปลี่ยน assignto)
+		var resolutionID sql.NullInt64
+		var solutionMessageID int
+		db.DB.QueryRow(`SELECT solution_id FROM tasks WHERE id = ?`, id).Scan(&resolutionID)
+		db.DB.QueryRow(`SELECT IFNULL(solution_id, 0) FROM telegram_chat WHERE id = ?`, telegramID).Scan(&solutionMessageID)
 
-			if resolutionID.Valid && solutionMessageID > 0 {
-				var resolutionText string
-				var resolutionFilePathsJSON string
-				var resolutionResolvedAt string
-				err = db.DB.QueryRow(`
-					SELECT IFNULL(text, ''), IFNULL(file_paths, '[]'), 
-					DATE_FORMAT(resolved_at, '%d/%m/%Y %H:%i:%s') 
-					FROM resolutions WHERE id = ?
-				`, resolutionID.Int64).Scan(&resolutionText, &resolutionFilePathsJSON, &resolutionResolvedAt)
+		log.Printf("Resolution check - resolutionID: %v, solutionMessageID: %d", resolutionID, solutionMessageID)
 
-				if err == nil {
-					// สร้าง ResolutionReq
-					resolutionReq := models.ResolutionReq{
-						Solution:     resolutionText,
-						TelegramUser: telegramUser,
-						MessageID:    messageID,
-						Url:          Urlenv,
-						Assignto:     currentAssignto,
-						TicketNo:     ticketno,
-						CreatedAt:    CreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05"),
-						ResolvedAt:   resolutionResolvedAt,
-					}
+		if resolutionID.Valid && resolutionID.Int64 > 0 && solutionMessageID > 0 {
+			var resolutionText string
+			var resolutionFilePathsJSON string
+			var resolutionResolvedAt string
+			err = db.DB.QueryRow(`
+				SELECT IFNULL(text, ''), IFNULL(file_paths, '[]'), DATE_FORMAT(resolved_at, '%d/%m/%Y %H:%i:%s')
+				FROM resolutions WHERE id = ?
+			`, resolutionID.Int64).Scan(&resolutionText, &resolutionFilePathsJSON, &resolutionResolvedAt)
 
-					// ดึง photo URLs จาก resolution files
-					var resolutionPhotoURLs []string
-					if resolutionFilePathsJSON != "" && resolutionFilePathsJSON != "[]" {
-						var resolutionFiles []fiber.Map
-						if err := json.Unmarshal([]byte(resolutionFilePathsJSON), &resolutionFiles); err == nil {
-							for _, file := range resolutionFiles {
-								if url, ok := file["url"].(string); ok {
-									resolutionPhotoURLs = append(resolutionPhotoURLs, url)
-								}
+			if err == nil {
+				// สร้าง ResolutionReq
+				resolutionReq := models.ResolutionReq{
+					Solution:         resolutionText,
+					TelegramUser:     telegramUser,
+					MessageID:        messageID,
+					Url:              Urlenv,
+					Assignto:         currentAssignto,
+					PreviousAssignto: previousAssignto,
+					TicketNo:         ticketno,
+					CreatedAt:        CreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05"),
+					ResolvedAt:       resolutionResolvedAt,
+				}
+
+				// ดึง photo URLs จาก resolution files
+				var resolutionPhotoURLs []string
+				if resolutionFilePathsJSON != "" && resolutionFilePathsJSON != "[]" {
+					var resolutionFiles []fiber.Map
+					if err := json.Unmarshal([]byte(resolutionFilePathsJSON), &resolutionFiles); err == nil {
+						for _, file := range resolutionFiles {
+							if url, ok := file["url"].(string); ok {
+								resolutionPhotoURLs = append(resolutionPhotoURLs, url)
 							}
 						}
 					}
-
-					// เรียกใช้ UpdatereplyToSpecificMessage
-					newSolutionMessageID, err := common.UpdatereplyToSpecificMessage(solutionMessageID, resolutionReq, resolutionPhotoURLs...)
-					if err != nil {
-						log.Printf("❌ Failed to update resolution message: %v", err)
-					} else {
-						// อัปเดต solution_id ใน telegram_chat
-						_, err = db.DB.Exec(`UPDATE telegram_chat SET solution_id = ? WHERE id = ?`, newSolutionMessageID, telegramID)
-						if err != nil {
-							log.Printf("❌ Failed to update solution_id: %v", err)
-						} else {
-							log.Printf("✅ Resolution message updated successfully")
-						}
-					}
 				}
+
+				log.Printf("Attempting to update solution message with ID: %d", solutionMessageID)
+
+				// อัปเดต solution message
+				newSolutionMessageID, err := common.UpdatereplyToSpecificMessage(solutionMessageID, resolutionReq, resolutionPhotoURLs...)
+				if err != nil {
+					log.Printf("❌ Failed to update resolution message: %v", err)
+				} else if newSolutionMessageID > 0 {
+					// อัปเดต solution_id ใน telegram_chat
+					_, err = db.DB.Exec(`UPDATE telegram_chat SET solution_id = ? WHERE id = ?`, newSolutionMessageID, telegramID)
+					if err != nil {
+						log.Printf("❌ Failed to update solution_id in database: %v", err)
+					} else {
+						log.Printf("✅ Resolution message updated successfully with new ID: %d", newSolutionMessageID)
+					}
+				} else {
+					log.Printf("⚠️ UpdatereplyToSpecificMessage returned ID 0")
+				}
+			} else {
+				log.Printf("❌ Failed to fetch resolution data: %v", err)
 			}
+		} else {
+			log.Printf("ℹ️ No solution message to update - resolutionID valid: %v, solutionMessageID: %d", resolutionID.Valid, solutionMessageID)
 		}
 	}
-	log.Printf("Updating task ID: %s", id)
+
+	log.Printf("Task update completed for ID: %s", id)
 	return c.JSON(fiber.Map{"success": true})
 }
 
@@ -1078,25 +1052,7 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 		} else {
 			t.SystemType = issueTypeName
 		}
-		// Calculate overdue
-		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
-		if err == nil {
-			createdAt = createdAt.Add(7 * time.Hour)
-			now := time.Now().Add(7 * time.Hour)
-			duration := now.Sub(createdAt)
-			if createdAt.Format("2006-01-02") == now.Format("2006-01-02") {
-				hours := int(duration.Hours())
-				minutes := int(duration.Minutes()) % 60
-				seconds := int(duration.Seconds()) % 60
-				t.Overdue = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
-			} else {
-				days := int(duration.Hours() / 24)
-				if days == 0 {
-					days = 1
-				}
-				t.Overdue = days
-			}
-		}
+
 		tasks = append(tasks, t)
 	}
 
@@ -1274,26 +1230,6 @@ func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
 		}
 
 		t.SystemType = issueTypeName
-
-		// Calculate overdue
-		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
-		if err == nil {
-			createdAt = createdAt.Add(7 * time.Hour)
-			now := time.Now().Add(7 * time.Hour)
-			duration := now.Sub(createdAt)
-			if createdAt.Format("2006-01-02") == now.Format("2006-01-02") {
-				hours := int(duration.Hours())
-				minutes := int(duration.Minutes()) % 60
-				seconds := int(duration.Seconds()) % 60
-				t.Overdue = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
-			} else {
-				days := int(duration.Hours() / 24)
-				if days == 0 {
-					days = 1
-				}
-				t.Overdue = days
-			}
-		}
 		tasks = append(tasks, t)
 	}
 
@@ -1524,24 +1460,7 @@ func GetTaskSort(c *fiber.Ctx) error {
 			continue
 		}
 		t.SystemType = issueTypeName
-		createdAt, err := time.Parse(time.RFC3339, t.CreatedAt)
-		if err == nil {
-			createdAt = createdAt.Add(7 * time.Hour)
-			now := time.Now().Add(7 * time.Hour)
-			duration := now.Sub(createdAt)
-			if createdAt.Format("2006-01-02") == now.Format("2006-01-02") {
-				hours := int(duration.Hours())
-				minutes := int(duration.Minutes()) % 60
-				seconds := int(duration.Seconds()) % 60
-				t.Overdue = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
-			} else {
-				days := int(duration.Hours() / 24)
-				if days == 0 {
-					days = 1
-				}
-				t.Overdue = days
-			}
-		}
+
 		tasks = append(tasks, t)
 	}
 

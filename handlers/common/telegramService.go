@@ -296,8 +296,6 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		switch req.Status {
 		case 0:
 			notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
-		case 1:
-			// ไม่มี case 1 ใน original code
 		}
 
 		if notificationMsg != "" {
@@ -350,8 +348,6 @@ func UpdateAssignedtoMsg(messageID int, req models.TaskRequest) (int, error) {
 	switch req.Status {
 	case 0:
 		notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
-	case 1:
-		notificationMsg = fmt.Sprintf("✅ *งานเสร็จสิ้นแล้ว* ✅\n━━━━━━━━━━━━━━\n👋 %s\n📋 งานที่คุณรับผิดชอบเสร็จสิ้นแล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
 	}
 
 	if messageID > 0 {
@@ -492,94 +488,106 @@ func ReplyToSpecificMessage(req models.ResolutionReq, photoURLs ...string) (int,
 }
 
 func UpdatereplyToSpecificMessage(messageID int, req models.ResolutionReq, photoURLs ...string) (int, error) {
+	log.Printf("🔄 Starting UpdatereplyToSpecificMessage for messageID: %d", messageID)
 
 	botToken := config.AppConfig.BotToken
 	chatIDStr := config.AppConfig.ChatID
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("invalid chat ID: %v", err)
+	}
+
+	bot, err := tgbotapi.NewBotAPI(botToken)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create bot: %v", err)
+	}
+
+	// ลองลบ message เก่า (ไม่ถือเป็น error ร้ายแรงถ้าลบไม่ได้)
+	log.Printf("🗑️ Attempting to delete message ID: %d", messageID)
+	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
+	resp, err := bot.Request(deleteMsg)
+	if err != nil {
+		log.Printf("⚠️ Cannot delete message ID %d: %v (continuing anyway)", messageID, err)
+	} else if !resp.Ok {
+		log.Printf("⚠️ Delete message failed for ID %d: %s (continuing anyway)", messageID, resp.Description)
+	} else {
+		log.Printf("✅ Successfully deleted message ID: %d", messageID)
 	}
 
 	// Format solution message
 	replyText := FormatSolutionMessage(req, photoURLs...)
-
-	bot, err := tgbotapi.NewBotAPI(botToken)
-	if err != nil {
-		return 0, err
-	}
-
-	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
-	resp, err := bot.Request(deleteMsg)
-	if err != nil {
-		log.Printf("Cannot delete message ID %d: %v", messageID, err)
-		return 0, nil // Return nil error to prevent cascade failures
-	}
-	if !resp.Ok {
-		log.Printf("Delete message failed for ID %d: %s", messageID, resp.Description)
-		return 0, nil
-	}
+	log.Printf("📝 Formatted message length: %d characters", len(replyText))
 
 	var sentMsg tgbotapi.Message
 
-	// ส่งรูปแรกพร้อมข้อความ ถ้ามีรูป
+	// ส่ง message ใหม่
 	if len(photoURLs) > 0 && photoURLs[0] != "" {
-		resp, err := http.Get(photoURLs[0])
-		if err != nil {
-			log.Printf("Error fetching photo: %v", err)
-			// ส่งเป็นข้อความแทน
-			message := tgbotapi.NewMessage(chatID, replyText)
-			message.ParseMode = "Markdown"
-			message.ReplyToMessageID = req.MessageID
-			sentMsg, err = bot.Send(message)
-			if err != nil {
-				return 0, err
-			}
-		} else {
-			defer resp.Body.Close()
-			var buf bytes.Buffer
-			_, err = io.Copy(&buf, resp.Body)
-			if err != nil {
-				// ส่งเป็นข้อความแทน
-				message := tgbotapi.NewMessage(chatID, replyText)
-				message.ParseMode = "Markdown"
-				message.ReplyToMessageID = req.MessageID
-				sentMsg, err = bot.Send(message)
-				if err != nil {
-					return 0, err
-				}
-			} else {
-				// ส่งรูปพร้อม caption
-				photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileReader{
-					Name:   photoURLs[0],
-					Reader: &buf,
-				})
-				photoMsg.Caption = replyText
-				photoMsg.ParseMode = "Markdown"
-				photoMsg.ReplyToMessageID = req.MessageID
-				sentMsg, err = bot.Send(photoMsg)
-				if err != nil {
-					log.Printf("❌ ส่งภาพไม่สำเร็จ ส่งเป็นข้อความแทน: %v", err)
-					message := tgbotapi.NewMessage(chatID, replyText)
-					message.ParseMode = "Markdown"
-					message.ReplyToMessageID = req.MessageID
-					sentMsg, err = bot.Send(message)
-					if err != nil {
-						return 0, err
-					}
-				}
-			}
-		}
+		log.Printf("📸 Sending photo message with URL: %s", photoURLs[0])
+		sentMsg, err = sendPhotoMessage(bot, chatID, photoURLs[0], replyText, req.MessageID)
 	} else {
-		// ส่งเฉพาะข้อความ
-		message := tgbotapi.NewMessage(chatID, replyText)
-		message.ParseMode = "Markdown"
-		message.ReplyToMessageID = req.MessageID
-		sentMsg, err = bot.Send(message)
-		if err != nil {
-			return 0, err
-		}
+		log.Printf("📄 Sending text message")
+		sentMsg, err = sendTextMessage(bot, chatID, replyText, req.MessageID)
 	}
 
-	log.Printf("Solution edit sent successfully for message ID: %d", sentMsg.MessageID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to send message: %v", err)
+	}
+
+	log.Printf("✅ Solution message sent successfully with new ID: %d", sentMsg.MessageID)
 	return sentMsg.MessageID, nil
+}
+
+// Helper functions
+func sendPhotoMessage(bot *tgbotapi.BotAPI, chatID int64, photoURL, caption string, replyToMessageID int) (tgbotapi.Message, error) {
+	log.Printf("🔄 Fetching photo from: %s", photoURL)
+
+	resp, err := http.Get(photoURL)
+	if err != nil {
+		log.Printf("⚠️ Error fetching photo: %v, sending as text instead", err)
+		return sendTextMessage(bot, chatID, caption, replyToMessageID)
+	}
+	defer resp.Body.Close()
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, resp.Body)
+	if err != nil {
+		log.Printf("⚠️ Error reading photo: %v, sending as text instead", err)
+		return sendTextMessage(bot, chatID, caption, replyToMessageID)
+	}
+
+	log.Printf("📸 Photo downloaded successfully, size: %d bytes", buf.Len())
+
+	photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileReader{
+		Name:   photoURL,
+		Reader: &buf,
+	})
+	photoMsg.Caption = caption
+	photoMsg.ParseMode = "Markdown"
+	photoMsg.ReplyToMessageID = replyToMessageID
+
+	sentMsg, err := bot.Send(photoMsg)
+	if err != nil {
+		log.Printf("⚠️ Failed to send photo: %v, sending as text instead", err)
+		return sendTextMessage(bot, chatID, caption, replyToMessageID)
+	}
+
+	log.Printf("✅ Photo message sent successfully")
+	return sentMsg, nil
+}
+
+func sendTextMessage(bot *tgbotapi.BotAPI, chatID int64, text string, replyToMessageID int) (tgbotapi.Message, error) {
+	log.Printf("📄 Sending text message")
+
+	message := tgbotapi.NewMessage(chatID, text)
+	message.ParseMode = "Markdown"
+	message.ReplyToMessageID = replyToMessageID
+
+	sentMsg, err := bot.Send(message)
+	if err != nil {
+		log.Printf("❌ Failed to send text message: %v", err)
+		return sentMsg, err
+	}
+
+	log.Printf("✅ Text message sent successfully")
+	return sentMsg, nil
 }
