@@ -41,7 +41,7 @@ func EscapeMarkdown(text string) string {
 func FormatSolutionMessage(req models.ResolutionReq, photoURLs ...string) string {
 	replyText := "🔧 *การแก้ไขปัญหา* 🔧\n"
 	replyText += "━━━━━━━━━━━━━━\n"
-	replyText += "🎫 *Ticket No:* " + req.TicketNo + "\n"
+	replyText += "🎫 *Ticket No:* [" + req.TicketNo + "](" + req.Url + ")\n"
 
 	if req.TelegramUser != "" {
 		replyText += "👤 *ผู้รับผิดชอบ:* " + req.Assignto + " " + EscapeMarkdown(req.TelegramUser) + "\n"
@@ -96,7 +96,7 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 	newMessage += "━━━━━━━━━━━━━━\n"
 
 	if req.Ticket != "" {
-		newMessage += "🎫 *Ticket No:* " + req.Ticket + "\n"
+		newMessage += "🎫 *Ticket No:* [" + req.Ticket + "](" + req.Url + ")\n"
 	}
 	if req.BranchName != "" {
 		newMessage += "🏢 *สาขา:* " + req.BranchName + "\n"

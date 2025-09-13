@@ -31,19 +31,24 @@ func GetResolvedAtSafely(db *sql.DB, resolutionID int) (time.Time, error) {
 func Generateticketno() string {
 	// create ticket as TK-DDMMYYYY-no using the latest number of that month/year + 1
 	now := time.Now().Add(7 * time.Hour)
-	dateStr := now.Format("02012006") // วันเดือนปี
+	dateStr := now.Format("20060102") // วันเดือนปี
 	year := now.Year()
 	month := int(now.Month())
 
 	// get last ticket number for this month/year
-	var lastNo int
-	err := db.DB.QueryRow(`SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_no, LENGTH(ticket_no)-4, 5) AS UNSIGNED)), 0) FROM tasks WHERE YEAR(created_at) = ? AND MONTH(created_at) = ?`, year, month).Scan(&lastNo)
+	var lastNo sql.NullInt64
+	err := db.DB.QueryRow(`
+		SELECT MAX(CAST(RIGHT(ticket_no, 4) AS UNSIGNED)) 
+		FROM tasks 
+		WHERE YEAR(created_at) = ? AND MONTH(created_at) = ? 
+		AND ticket_no REGEXP '^TK-[0-9]{8}-[0-9]{4}$'`, year, month).Scan(&lastNo)
+
+	ticketNo := 1 // default to 1 if no records found
 	if err != nil {
 		log.Printf("Error getting last ticket no for month/year: %v", err)
-		lastNo = 0
+	} else if lastNo.Valid {
+		ticketNo = int(lastNo.Int64) + 1
 	}
-	// increment by 1
-	ticketNo := lastNo + 1
-	ticket := fmt.Sprintf("TK-%s-%05d", dateStr, ticketNo)
+	ticket := fmt.Sprintf("TK-%s-%04d", dateStr, ticketNo)
 	return ticket
 }
