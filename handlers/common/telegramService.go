@@ -90,6 +90,10 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 		statusIcon = "✅"
 		statusText = "เสร็จสิ้น"
 		headerColor = "✅ *งานเสร็จสิ้นแล้ว* ✅"
+	case 2:
+		statusIcon = "🟡"
+		statusText = "กำลังดำเนินการ"
+		headerColor = "🔄 *กำลังดำเนินการแก้ไข* 🔄"
 	}
 
 	newMessage := headerColor + "\n"

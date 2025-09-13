@@ -1352,7 +1352,7 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 		_, _ = common.DeleteTelegram(messageID)
 	}
 
-	_, err = db.DB.Exec(`UPDATE tasks SET assignto_id = ?, assignto = ?, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.AssignedtoID, req.Assignto, req.UpdatedBy, id)
+	_, err = db.DB.Exec(`UPDATE tasks SET assignto_id = ?, assignto = ?, status = 2, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.AssignedtoID, req.Assignto, req.UpdatedBy, id)
 	if err != nil {
 		log.Printf("Database error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update assigned person"})

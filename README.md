@@ -125,6 +125,12 @@ This API includes comprehensive Swagger/OpenAPI documentation for all endpoints.
 - **Interactive Testing:** Use Swagger UI to test API endpoints directly
 - **API Reference:** Complete endpoint documentation with request/response examples
 
+#### Status Values
+The system uses the following status values for problem tracking:
+- `0` - รอดำเนินการ (Pending)
+- `1` - เสร็จสิ้น (Resolved)  
+- `2` - กำลังดำเนินการ (In Progress)
+
 ## Configuration Options
 
 The application can be configured using environment variables.  Based on the `Dockerfile` and other files, it looks for `.env` files:
