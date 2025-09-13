@@ -581,6 +581,12 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 
 	if req.Status == 1 {
 		_, err = db.DB.Exec(`UPDATE tasks SET resolved_at=CURRENT_TIMESTAMP WHERE id=?`, id)
+
+	}
+
+	if req.Status == 0 {
+		_, err = db.DB.Exec(`UPDATE tasks SET resolved_at=NULL WHERE id=?`, id)
+
 	}
 
 	if err != nil {
@@ -601,17 +607,17 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	var existingFilePathsJSON string
 	var telegramUser string
 	var assigntoID int
-	var ResolvedAt sql.NullTime
+	var ResolvedAt string
 	var telegramID int
 
 	err = db.DB.QueryRow(`
 		SELECT IFNULL(t.ticket_no, ''),IFNULL(tc.report_id, 0), IFNULL(t.reported_by, ''), 
-		IFNULL(t.file_paths, '[]'), IFNULL(rs.telegram_username, ''), IFNULL(tc.assignto_id, 0), t.created_at, IFNULL(t.telegram_id, 0), t.resolved_at
+		IFNULL(t.file_paths, '[]'), IFNULL(rs.telegram_username, ''), IFNULL(tc.assignto_id, 0), t.created_at, IFNULL(t.telegram_id, 0)
 		FROM tasks t
 		LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
 		LEFT JOIN responsibilities rs ON t.assignto_id = rs.id
 		WHERE t.id = ?
-		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON, &telegramUser, &assigntoID, &createdAtStr, &telegramID, &ResolvedAt)
+		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON, &telegramUser, &assigntoID, &createdAtStr, &telegramID)
 
 	// Parse created_at string to time
 	if createdAtStr != "" {
@@ -643,7 +649,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			ReportedBy:       reported,
 			TelegramUser:     telegramUser,
 			AssigntoID:       assigntoID,
-			Assignto:         "",
+			Assignto:         *req.Assignto,
 			PreviousAssignto: previousAssignto,
 			MessageID:        messageID,
 			IssueElse:        req.IssueElse,
@@ -664,6 +670,12 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			db.DB.QueryRow(`SELECT name FROM systems_program WHERE id = ?`, req.SystemID).Scan(&programName)
 		}
 
+		if req.Status > 0 {
+			db.DB.QueryRow(`SELECT IFNULL(resolved_at, "") FROM tasks WHERE id = ?`, id).Scan(&ResolvedAt)
+		}
+
+		resolvedAtnow, _ := time.Parse("2006-01-02 15:04:05", ResolvedAt)
+
 		telegramReq.PhoneNumber = phoneNumber
 		telegramReq.DepartmentName = departmentName
 		telegramReq.BranchName = branchName
@@ -671,14 +683,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		telegramReq.Url = Urlenv
 		telegramReq.PreviousAssignto = previousAssignto
 		telegramReq.CreatedAt = CreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
-		if ResolvedAt.Valid {
-			telegramReq.UpdatedAt = ResolvedAt.Time.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
-		} else {
-			telegramReq.UpdatedAt = ""
-		}
-		if req.Assignto != nil {
-			telegramReq.Assignto = *req.Assignto
-		}
+		telegramReq.ResolvedAt = resolvedAtnow.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
 
 		// Get first image URL from existing files for Telegram
 		photoURLs := getPhotoURLs(existingFilePathsJSON)
@@ -694,11 +699,46 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			}
 		}
 
+		// ส่ง assignto notification ใหม่เมื่อมีการเปลี่ยน assignto และไม่ใช่ status = 1
+		// if currentAssignto != "" && telegramUser != "" && req.Status != 1 && previousAssignto != currentAssignto {
+		// 	// สร้าง notification message สำหรับผู้รับผิดชอบใหม่
+		// 	assigntoReq := telegramReq
+		// 	assigntoReq.Text = fmt.Sprintf("📋 *คุณได้รับมอบหมายงานใหม่*\n\n🎫 *Ticket:* %s\n📝 *รายละเอียด:* %s", telegramReq.Ticket, telegramReq.Text)
+
+		// 	var assigntoNotificationID int
+		// 	if len(photoURLs) > 0 {
+		// 		assigntoNotificationID, _, _ = common.SendTelegram(assigntoReq, photoURLs...)
+		// 	} else {
+		// 		assigntoNotificationID, _, _ = common.SendTelegram(assigntoReq)
+		// 	}
+		// 	log.Printf("assigntoNotificationID : %d", assigntoNotificationID)
+
+		// 	if assigntoNotificationID > 0 {
+		// 		// อัปเดต assignto_id ใน telegram_chat
+		// 		_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, assigntoNotificationID, telegramID)
+		// 		if err != nil {
+		// 			log.Printf("❌ Failed to update assignto_id: %v", err)
+		// 		} else {
+		// 			log.Printf("✅ Assignto notification sent and ID updated: %d", assigntoNotificationID)
+		// 		}
+		// 	}
+		// }
+		var assigntoNotificationID int
 		// ส่งหรืออัปเดต main task message
 		if len(photoURLs) > 0 {
-			_, err = common.UpdateTelegram(telegramReq, photoURLs...)
+			assigntoNotificationID, err = common.UpdateTelegram(telegramReq, photoURLs...)
 		} else {
-			_, err = common.UpdateTelegram(telegramReq)
+			assigntoNotificationID, err = common.UpdateTelegram(telegramReq)
+		}
+
+		if assigntoNotificationID > 0 {
+			// อัปเดต assignto_id ใน telegram_chat
+			_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, assigntoNotificationID, telegramID)
+			if err != nil {
+				log.Printf("❌ Failed to update assignto_id: %v", err)
+			} else {
+				log.Printf("✅ Assignto notification sent and ID updated: %d", assigntoNotificationID)
+			}
 		}
 
 		if err != nil {
@@ -710,8 +750,31 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		// อัปเดต solution message (เสมอ ไม่ขึ้นกับการเปลี่ยน assignto)
 		var resolutionID sql.NullInt64
 		var solutionMessageID int
+		var assignedID int
 		db.DB.QueryRow(`SELECT solution_id FROM tasks WHERE id = ?`, id).Scan(&resolutionID)
-		db.DB.QueryRow(`SELECT IFNULL(solution_id, 0) FROM telegram_chat WHERE id = ?`, telegramID).Scan(&solutionMessageID)
+		db.DB.QueryRow(`SELECT IFNULL(solution_id, 0), IFNULL(assignto_id, 0) FROM telegram_chat WHERE id = ?`, telegramID).Scan(&solutionMessageID, &assignedID)
+		log.Printf("📊 Debug - telegramID: %d, solutionMessageID: %d, assignedID: %d", telegramID, solutionMessageID, assignedID)
+
+		// เมื่อ Status เป็น 1 (เสร็จสิ้น) ให้ลบการแจ้งเตือนของผู้รับผิดชอบ
+		if req.Status == 1 {
+			if assignedID > 0 {
+				// ลบ telegram message ของผู้รับผิดชอบ
+				_, err = common.DeleteTelegram(assignedID)
+				if err != nil {
+					log.Printf("❌ Error deleting assignto telegram message (ID: %d): %v", assignedID, err)
+				} else {
+					log.Printf("✅ Successfully deleted assignto telegram message (ID: %d)", assignedID)
+				}
+
+				// อัปเดต assignto_id ใน telegram_chat ให้เป็น NULL
+				_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = NULL WHERE id = ?`, telegramID)
+				if err != nil {
+					log.Printf("❌ Error updating telegram_chat assignto_id: %v", err)
+				} else {
+					log.Printf("✅ Successfully cleared assignto_id in telegram_chat")
+				}
+			}
+		}
 
 		log.Printf("Resolution check - resolutionID: %v, solutionMessageID: %d", resolutionID, solutionMessageID)
 
@@ -720,9 +783,11 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			var resolutionFilePathsJSON string
 			var resolutionResolvedAt string
 			err = db.DB.QueryRow(`
-				SELECT IFNULL(text, ''), IFNULL(file_paths, '[]'), DATE_FORMAT(resolved_at, '%d/%m/%Y %H:%i:%s')
+				SELECT IFNULL(text, ''), IFNULL(file_paths, '[]'), resolved_at
 				FROM resolutions WHERE id = ?
 			`, resolutionID.Int64).Scan(&resolutionText, &resolutionFilePathsJSON, &resolutionResolvedAt)
+
+			resolvedAt, _ := time.Parse("2006-01-02 15:04:05", resolutionResolvedAt)
 
 			if err == nil {
 				// สร้าง ResolutionReq
@@ -735,7 +800,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 					PreviousAssignto: previousAssignto,
 					TicketNo:         ticketno,
 					CreatedAt:        CreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05"),
-					ResolvedAt:       resolutionResolvedAt,
+					ResolvedAt:       resolvedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05"),
 				}
 
 				// ดึง photo URLs จาก resolution files
@@ -1187,7 +1252,7 @@ func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
 	selectFields := `t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), 
 		t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), 
 		IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), 
-		IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at`
+		IFNULL(b.name, ''), IFNULL(t.reported_by, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')`
 
 	// Build query based on column type
 	if intColumns[column] {
@@ -1221,14 +1286,15 @@ func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
 	for rows.Next() {
 		var t models.TaskWithDetails
 		var issueTypeName string
+		var filePathsJSON string
 		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName,
 			&t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName,
-			&t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+			&t.BranchID, &t.BranchName, &t.ReportedBy, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue
 		}
-
+		t.FilePaths = parseFilePaths(filePathsJSON)
 		t.SystemType = issueTypeName
 		tasks = append(tasks, t)
 	}
@@ -1359,17 +1425,10 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 				CreatedAt:      createdAt,
 				UpdatedAt:      updatedAt,
 			}
-			var notificationResp int
 			if len(photoURLs) > 0 {
-				notificationResp, _ = common.UpdateTelegram(telegramReq, photoURLs...)
+				_, _ = common.UpdateTelegram(telegramReq, photoURLs...)
 			} else {
-				notificationResp, _ = common.UpdateTelegram(telegramReq)
-			}
-			_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, notificationResp, telegramID)
-			if err != nil {
-				log.Printf("❌ Failed to update assignto_id: %v", err)
-			} else {
-				log.Printf("✅ Assignto ID updated successfully in database")
+				_, _ = common.UpdateTelegram(telegramReq)
 			}
 		}
 	}
@@ -1438,7 +1497,7 @@ func GetTaskSort(c *fiber.Ctx) error {
 	selectFields := `t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''),
 		t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''),
 		IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0),
-		IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at`
+		IFNULL(b.name, ''), t.text, IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')`
 
 	var total int
 	db.DB.QueryRow(fmt.Sprintf("SELECT COUNT(*) %s", baseQuery)).Scan(&total)
@@ -1455,11 +1514,22 @@ func GetTaskSort(c *fiber.Ctx) error {
 	for rows.Next() {
 		var t models.TaskWithDetails
 		var issueTypeName string
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+		var filePathsJSON string
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.AssignedtoID, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
 		if err != nil {
+			log.Printf("Error scanning task: %v", err)
 			continue
 		}
-		t.SystemType = issueTypeName
+
+		// Set SystemType based on SystemID
+		if t.SystemID > 0 {
+			t.SystemType = issueTypeName
+		} else {
+			t.SystemType = issueTypeName
+		}
+
+		// Parse file_paths JSON
+		t.FilePaths = parseFilePaths(filePathsJSON)
 
 		tasks = append(tasks, t)
 	}

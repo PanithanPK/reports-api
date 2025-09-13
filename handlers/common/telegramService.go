@@ -132,7 +132,7 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 	}
 	newMessage += "\n" + statusIcon + " *สถานะ:* " + EscapeMarkdown(statusText) + "\n"
 	if req.Status == 1 {
-		newMessage += "📅 *วันที่แก้ไขเสร็จ:* " + req.UpdatedAt + "\n"
+		newMessage += "📅 *วันที่แก้ไขเสร็จ:* " + req.ResolvedAt + "\n"
 	}
 
 	newMessage += "━━━━━━━━━━━━━━\n"

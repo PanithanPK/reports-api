@@ -15,12 +15,12 @@ type TaskRequest struct {
 	Status           int    `json:"status"`
 	CreatedBy        int    `json:"created_by"`
 	UpdatedBy        int    `json:"updated_by"`
+	ResolvedAt       string `json:"resolved_at"`
 	Telegram         bool   `json:"telegram"`
 	TelegramUser     string `json:"telegram_user"`
 	MessageID        int    `json:"message_id"`
 	UpdatedAt        string `json:"updated_at"`
 	PreviousAssignto string `json:"previous_assignto"`
-	telegramDisblen  bool   `json:"-"`
 	AssigntoID       int    `json:"-"`
 	PhoneNumber      int    `json:"-"`
 	DepartmentName   string `json:"-"`
