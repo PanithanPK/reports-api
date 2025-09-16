@@ -203,7 +203,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	resolutionID, _ := res.LastInsertId()
 
 	// อัพเดต solution_id ใน tasks
-	_, err = db.DB.Exec(`UPDATE tasks SET solution_id = ?, status = 1, resolved_at=CURRENT_TIMESTAMP WHERE id = ?`, resolutionID, id)
+	_, err = db.DB.Exec(`UPDATE tasks SET solution_id = ?, status = 2, resolved_at=CURRENT_TIMESTAMP WHERE id = ?`, resolutionID, id)
 	if err != nil {
 		log.Printf("Failed to update solution_id in tasks: %q", err)
 	}
@@ -291,7 +291,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 			ReportedBy:     reportedby,
 			CreatedAt:      req.CreatedAt,
 			UpdatedAt:      req.ResolvedAt,
-			Status:         1,
+			Status:         2,
 			Url:            req.Url,
 			PhoneNumber:    phoneNumber,
 			DepartmentName: departmentName,
@@ -731,7 +731,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		ReportedBy:     reportedby,
 		CreatedAt:      req.CreatedAt,
 		UpdatedAt:      req.ResolvedAt,
-		Status:         1,
+		Status:         2,
 		Url:            req.Url,
 		PhoneNumber:    phoneNumber,
 		DepartmentName: departmentName,

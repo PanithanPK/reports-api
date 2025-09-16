@@ -579,7 +579,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	if req.Status == 1 {
+	if req.Status == 2 {
 		_, err = db.DB.Exec(`UPDATE tasks SET resolved_at=CURRENT_TIMESTAMP WHERE id=?`, id)
 
 	}
@@ -670,7 +670,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			db.DB.QueryRow(`SELECT name FROM systems_program WHERE id = ?`, req.SystemID).Scan(&programName)
 		}
 
-		if req.Status > 0 {
+		if req.Status == 2 {
 			db.DB.QueryRow(`SELECT IFNULL(resolved_at, "") FROM tasks WHERE id = ?`, id).Scan(&ResolvedAt)
 		}
 
@@ -756,7 +756,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		log.Printf("📊 Debug - telegramID: %d, solutionMessageID: %d, assignedID: %d", telegramID, solutionMessageID, assignedID)
 
 		// เมื่อ Status เป็น 1 (เสร็จสิ้น) ให้ลบการแจ้งเตือนของผู้รับผิดชอบ
-		if req.Status == 1 {
+		if req.Status == 2 {
 			if assignedID > 0 {
 				// ลบ telegram message ของผู้รับผิดชอบ
 				_, err = common.DeleteTelegram(assignedID)
@@ -1352,7 +1352,7 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 		_, _ = common.DeleteTelegram(messageID)
 	}
 
-	_, err = db.DB.Exec(`UPDATE tasks SET assignto_id = ?, assignto = ?, status = 2, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.AssignedtoID, req.Assignto, req.UpdatedBy, id)
+	_, err = db.DB.Exec(`UPDATE tasks SET assignto_id = ?, assignto = ?, status = 1, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.AssignedtoID, req.Assignto, req.UpdatedBy, id)
 	if err != nil {
 		log.Printf("Database error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update assigned person"})
