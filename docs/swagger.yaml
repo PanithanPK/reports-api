@@ -1785,6 +1785,84 @@ paths:
       summary: Update program
       tags:
       - programs
+  /api/v1/progress/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get all progress entries for a specific task
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get progress entries for task
+      tags:
+      - progress
+  /api/v1/progress/create/{id}:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Add a new progress entry to a specific task
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Progress text
+        in: formData
+        name: text
+        required: true
+        type: string
+      - description: Progress image files
+        in: formData
+        name: image
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create progress entry for task
+      tags:
+      - progress
   /api/v1/resolution/{id}:
     get:
       consumes:
