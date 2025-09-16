@@ -44,9 +44,9 @@ func FormatSolutionMessage(req models.ResolutionReq, photoURLs ...string) string
 	replyText += "🎫 *Ticket No:* [" + req.TicketNo + "](" + req.Url + ")\n"
 
 	if req.TelegramUser != "" {
-		replyText += "👤 *ผู้รับผิดชอบ:* " + req.Assignto + " " + EscapeMarkdown(req.TelegramUser) + "\n"
+		replyText += "👥 *ผู้รับผิดชอบ:* " + req.Assignto + " " + EscapeMarkdown(req.TelegramUser) + "\n"
 	} else {
-		replyText += "👤 *ผู้รับผิดชอบ:* " + req.Assignto + "\n"
+		replyText += "👥 *ผู้รับผิดชอบ:* " + req.Assignto + "\n"
 	}
 	replyText += "📅 *วันที่แจ้ง:* " + req.CreatedAt + "\n"
 	replyText += "📅 *วันที่แก้ไข:* " + req.ResolvedAt + "\n"
@@ -87,7 +87,7 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 		statusText = "รอดำเนินการ"
 		headerColor = "🚨 *แจ้งเตือนปัญหาระบบ* 🚨"
 	case 1:
-		statusIcon = "🟡"
+		statusIcon = "🔵"
 		statusText = "กำลังดำเนินการ"
 		headerColor = "🔄 *กำลังดำเนินการแก้ไข* 🔄"
 	case 2:
@@ -104,13 +104,13 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 		newMessage += "🎫 *Ticket No:* [" + req.Ticket + "](" + req.Url + ")\n"
 	}
 	if req.BranchName != "" {
-		newMessage += "🏢 *สาขา:* " + req.BranchName + "\n"
+		newMessage += "🏭 *สาขา:* " + req.BranchName + "\n"
 	}
 	if req.DepartmentName != "" {
-		newMessage += "🏛️ *แผนก:* " + req.DepartmentName + "\n"
+		newMessage += "🏢 *แผนก:* " + req.DepartmentName + "\n"
 	}
 	if req.PhoneNumber > 0 {
-		newMessage += fmt.Sprintf("📞 *เบอร์โทร:* %d\n", req.PhoneNumber)
+		newMessage += fmt.Sprintf("📠 *เบอร์โทร:* %d\n", req.PhoneNumber)
 	}
 	if Program != "" {
 		newMessage += "💻 *โปรแกรม:* " + Program + "\n"
@@ -130,13 +130,16 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 			}
 			// Escape underscore in telegram username for Markdown
 			telegramTag = strings.ReplaceAll(telegramTag, "_", "\\_")
-			newMessage += "\n👤 *ผู้รับผิดชอบ:* " + EscapeMarkdown(req.Assignto) + " " + telegramTag
+			newMessage += "\n👥 *ผู้รับผิดชอบ:* " + EscapeMarkdown(req.Assignto) + " " + telegramTag
 		} else {
-			newMessage += "\n👤 *ผู้รับผิดชอบ:* " + EscapeMarkdown(req.Assignto)
+			newMessage += "\n👥 *ผู้รับผิดชอบ:* " + EscapeMarkdown(req.Assignto)
 		}
 	}
 	newMessage += "\n" + statusIcon + " *สถานะ:* " + EscapeMarkdown(statusText) + "\n"
 	if req.Status == 1 {
+		newMessage += "📆 *กำลังดำเนินการ:* " + req.UpdatedAt + "\n"
+	}
+	if req.Status == 2 {
 		newMessage += "📅 *วันที่แก้ไขเสร็จ:* " + req.ResolvedAt + "\n"
 	}
 
@@ -301,6 +304,8 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		switch req.Status {
 		case 0:
 			notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
+		case 1:
+			notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
 		}
 
 		if notificationMsg != "" {
@@ -352,6 +357,8 @@ func UpdateAssignedtoMsg(messageID int, req models.TaskRequest) (int, error) {
 	var notificationMsg string
 	switch req.Status {
 	case 0:
+		notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
+	case 1:
 		notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
 	}
 

@@ -100,7 +100,6 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	var assignto string
 	var reportedby string
 	var telegramID int
-	var createdAt time.Time
 	var AssignedtoID int
 
 	if solutionByStr := c.FormValue("solution"); solutionByStr != "" {
@@ -147,17 +146,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	}
 
 	var createdAtStr string
-	err = db.DB.QueryRow(`SELECT created_at FROM tasks WHERE id = ?`, id).Scan(&createdAtStr)
-	if err != nil {
-		log.Println("Error fetching created_at:", err)
-		createdAt = time.Now() // fallback
-	} else {
-		createdAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
-		if err != nil {
-			log.Println("Error parsing created_at:", err)
-			createdAt = time.Now() // fallback
-		}
-	}
+	CreatedAt := common.Fixtimefeature(createdAtStr)
 
 	// ลองแยกการ parse ข้อมูล
 	form, err := c.MultipartForm()
@@ -225,9 +214,9 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 
 	// เตรียมข้อมูล response
 	req.TicketNo = ticketno
-	req.CreatedAt = createdAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
+	req.CreatedAt = CreatedAt
 	req.Url = Urlenv
-	req.ResolvedAt = resolvedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
+	req.ResolvedAt = resolvedAt.Add(7 * time.Hour).Format("2006/01/02/ 15:04:05")
 
 	var assignmsgID int
 	// ส่ง solution ไปยัง Telegram ถ้ามี reportID
@@ -403,7 +392,6 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	var text string
 	var reportID int
 	var ticketno, assignto, reportedby string
-	var createdAt time.Time
 	var taskID, assigntoID int
 	var createdAtStr string
 
@@ -482,15 +470,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	}
 
 	// Parse created_at string to time
-	if createdAtStr != "" {
-		createdAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
-		if err != nil {
-			log.Printf("Error parsing created_at: %v", err)
-			createdAt = time.Now() // fallback
-		}
-	} else {
-		createdAt = time.Now() // fallback
-	}
+	CreatedAt := common.Fixtimefeature(createdAtStr)
 
 	// Parse ข้อมูลจาก request
 	var keepImageURLs []string
@@ -567,7 +547,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 						if req.Assignto == "" {
 							req.Assignto = assignto
 						}
-						req.CreatedAt = createdAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
+						req.CreatedAt = CreatedAt
 						resolvedAt, err := common.GetResolvedAtSafely(db.DB, resolutions)
 						if err != nil {
 							log.Printf("Failed to get resolved_at: %v", err)
@@ -714,7 +694,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	} else {
 		Assignto = req.Assignto
 	}
-	req.CreatedAt = createdAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
+	req.CreatedAt = CreatedAt
 	req.Url = Urlenv
 	req.ResolvedAt = resolvedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
 	req.TelegramUser = telegramUser
@@ -789,7 +769,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		if req.Assignto == "" {
 			req.Assignto = Assignto
 		}
-		req.CreatedAt = createdAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
+		req.CreatedAt = CreatedAt
 		req.Url = Urlenv
 
 		var messageID int
@@ -957,7 +937,6 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 
 	// ดึงข้อมูล task สำหรับอัปเดต Telegram
 	var ticketno, assignto, reportedby string
-	var taskCreatedAt time.Time
 	var phoneID *int
 	var systemID, departmentID int
 	var text string
@@ -976,12 +955,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 	}
 
 	// แปลง string เป็น time.Time
-	taskCreatedAt, err = time.Parse("2006-01-02 15:04:05", taskCreatedAtStr)
-	if err != nil {
-		log.Printf("Failed to parse created_at time '%s': %v", taskCreatedAtStr, err)
-		taskCreatedAt = time.Now() // ใช้เวลาปัจจุบันถ้า parse ไม่ได้
-	}
-
+	CreatedAt := common.Fixtimefeature(taskCreatedAtStr)
 	log.Printf("Task details: ticket=%s, assignto=%s, reportedby=%s, phoneID=%v, systemID=%d, departmentID=%d, assigntoID=%d, createdAt=%s",
 		ticketno, assignto, reportedby, phoneID, systemID, departmentID, assigntoID, taskCreatedAtStr)
 
@@ -1054,7 +1028,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 		Ticket:         ticketno,
 		Assignto:       assignto,
 		ReportedBy:     reportedby,
-		CreatedAt:      taskCreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05"),
+		CreatedAt:      CreatedAt,
 		UpdatedAt:      "",
 		Status:         0, // เปลี่ยนกลับเป็น "รอดำเนินการ"
 		Url:            Urlenv,

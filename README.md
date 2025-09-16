@@ -128,8 +128,8 @@ This API includes comprehensive Swagger/OpenAPI documentation for all endpoints.
 #### Status Values
 The system uses the following status values for problem tracking:
 - `0` - รอดำเนินการ (Pending)
-- `1` - เสร็จสิ้น (Resolved)  
-- `2` - กำลังดำเนินการ (In Progress)
+- `1` - กำลังดำเนินการ (In Progress)
+- `2` - เสร็จสิ้น (Resolved)
 
 ## Configuration Options
 

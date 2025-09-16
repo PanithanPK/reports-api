@@ -291,7 +291,8 @@ func exportTableToCSV(writer *csv.Writer, db *sql.DB, tableName string) error {
 			res.text as solution_text,
 			CASE 
 				WHEN t.status = 0 THEN 'รอดำเนินการ'
-				WHEN t.status = 1 THEN 'เสร็จสิ้นแล้ว'
+				WHEN t.status = 1 THEN 'กำลังดำเนินการ'
+				WHEN t.status = 2 THEN 'เสร็จสิ้นแล้ว'
 				ELSE 'ไม่ระบุ'
 			END as status_text,
 			DATE_ADD(t.created_at, INTERVAL 7 HOUR) as created_at,

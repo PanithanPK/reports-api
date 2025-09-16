@@ -510,7 +510,6 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	}
 
 	var createdAtStr string
-	var CreatedAt time.Time
 
 	log.Printf("Updating task ID: %s", id)
 
@@ -589,6 +588,16 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 
 	}
 
+	var solutionChack int
+	_ = db.DB.QueryRow(`SELECT IFNULL(solution_id, 0) FROM tasks WHERE id = ?`, id).Scan(&solutionChack)
+
+	if req.Status != 2 {
+		if req.Assignto != nil && *req.Assignto != "" && req.AssignedtoID != 0 {
+			_, err = db.DB.Exec(`UPDATE tasks SET status = 1 WHERE id=?`, id)
+			req.Status = 1
+		}
+	}
+
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update task"})
 	}
@@ -620,15 +629,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON, &telegramUser, &assigntoID, &createdAtStr, &telegramID)
 
 	// Parse created_at string to time
-	if createdAtStr != "" {
-		CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
-		if err != nil {
-			log.Printf("Error parsing created_at: %v", err)
-			CreatedAt = time.Now() // fallback
-		}
-	} else {
-		CreatedAt = time.Now() // fallback
-	}
+	CreatedAt := common.Fixtimefeature(createdAtStr)
 
 	log.Printf("Query result - err: %v, messageID: %d, telegramID: %d", err, messageID, telegramID)
 
@@ -649,7 +650,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			ReportedBy:       reported,
 			TelegramUser:     telegramUser,
 			AssigntoID:       assigntoID,
-			Assignto:         *req.Assignto,
+			Assignto:         currentAssignto,
 			PreviousAssignto: previousAssignto,
 			MessageID:        messageID,
 			IssueElse:        req.IssueElse,
@@ -674,7 +675,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			db.DB.QueryRow(`SELECT IFNULL(resolved_at, "") FROM tasks WHERE id = ?`, id).Scan(&ResolvedAt)
 		}
 
-		resolvedAtnow, _ := time.Parse("2006-01-02 15:04:05", ResolvedAt)
+		resolvedAtnow := common.Fixtimefeature(ResolvedAt)
 
 		telegramReq.PhoneNumber = phoneNumber
 		telegramReq.DepartmentName = departmentName
@@ -682,8 +683,8 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		telegramReq.ProgramName = programName
 		telegramReq.Url = Urlenv
 		telegramReq.PreviousAssignto = previousAssignto
-		telegramReq.CreatedAt = CreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
-		telegramReq.ResolvedAt = resolvedAtnow.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
+		telegramReq.CreatedAt = CreatedAt
+		telegramReq.ResolvedAt = resolvedAtnow
 
 		// Get first image URL from existing files for Telegram
 		photoURLs := getPhotoURLs(existingFilePathsJSON)
@@ -755,7 +756,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		db.DB.QueryRow(`SELECT IFNULL(solution_id, 0), IFNULL(assignto_id, 0) FROM telegram_chat WHERE id = ?`, telegramID).Scan(&solutionMessageID, &assignedID)
 		log.Printf("📊 Debug - telegramID: %d, solutionMessageID: %d, assignedID: %d", telegramID, solutionMessageID, assignedID)
 
-		// เมื่อ Status เป็น 1 (เสร็จสิ้น) ให้ลบการแจ้งเตือนของผู้รับผิดชอบ
+		// เมื่อ Status เป็น 2 (เสร็จสิ้น) ให้ลบการแจ้งเตือนของผู้รับผิดชอบ
 		if req.Status == 2 {
 			if assignedID > 0 {
 				// ลบ telegram message ของผู้รับผิดชอบ
@@ -787,7 +788,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 				FROM resolutions WHERE id = ?
 			`, resolutionID.Int64).Scan(&resolutionText, &resolutionFilePathsJSON, &resolutionResolvedAt)
 
-			resolvedAt, _ := time.Parse("2006-01-02 15:04:05", resolutionResolvedAt)
+			resolvedAt := common.Fixtimefeature(resolutionResolvedAt)
 
 			if err == nil {
 				// สร้าง ResolutionReq
@@ -799,8 +800,8 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 					Assignto:         currentAssignto,
 					PreviousAssignto: previousAssignto,
 					TicketNo:         ticketno,
-					CreatedAt:        CreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05"),
-					ResolvedAt:       resolvedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05"),
+					CreatedAt:        CreatedAt,
+					ResolvedAt:       resolvedAt,
 				}
 
 				// ดึง photo URLs จาก resolution files
@@ -1392,6 +1393,9 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 			Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + id
 		}
 
+		CreatedAt := common.Fixtimefeature(createdAt)
+		UpdatedAt := common.Fixtimefeature(updatedAt)
+
 		if err == nil {
 			// Parse file_paths JSON
 			var photoURLs []string
@@ -1422,8 +1426,8 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 				PhoneNumber:    phoneNumber,
 				ProgramName:    programName,
 				Url:            Urlenv,
-				CreatedAt:      createdAt,
-				UpdatedAt:      updatedAt,
+				CreatedAt:      CreatedAt,
+				UpdatedAt:      UpdatedAt,
 			}
 			if len(photoURLs) > 0 {
 				_, _ = common.UpdateTelegram(telegramReq, photoURLs...)

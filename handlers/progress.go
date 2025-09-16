@@ -206,6 +206,7 @@ func GetProgressHandler(c *fiber.Ctx) error {
 	defer rows.Close()
 
 	var progressEntries []models.ProgressEntry
+
 	for rows.Next() {
 		var entry models.ProgressEntry
 		var progressText string
@@ -255,4 +256,227 @@ func GetProgressHandler(c *fiber.Ctx) error {
 		"data":    progressEntries,
 		"count":   len(progressEntries),
 	})
+}
+
+// @Summary Update progress entry
+// @Description Update an existing progress entry with new text and/or images
+// @Tags progress
+// @Accept multipart/form-data
+// @Produce json
+// @Param id path string true "Task ID"
+// @Param pgid path string true "Progress ID"
+// @Param text formData string false "Updated progress text"
+// @Param image_urls formData string false "JSON array of image URLs to keep"
+// @Param image formData file false "New image files"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/progress/update/{id}/{pgid} [put]
+func UpdateProgressHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
+	progressid := c.Params("pgid")
+	var req models.ProgressEntry
+	var existingProgressText string
+	var uploadedFiles []fiber.Map
+	var ticketno string
+
+	log.Printf("Looking for task with ID: %s", id)
+	err := db.DB.QueryRow("SELECT ticket_no FROM tasks WHERE id = ?", id).Scan(&ticketno)
+	if err != nil {
+		log.Printf("Task not found error: %v", err)
+		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
+	}
+	log.Printf("Found task with ticket_no: %s", ticketno)
+
+	err = db.DB.QueryRow(`
+		SELECT progress_text
+		FROM progress WHERE id = ?
+	`, progressid).Scan(&existingProgressText)
+
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Progress not found"})
+	}
+
+	var keepImageURLs []string
+	form, err := c.MultipartForm()
+	if err != nil {
+		// Handle JSON request
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request format"})
+		}
+		keepImageURLs = req.ImageURLs
+	} else {
+		// Handle multipart form request
+		req.Text = c.FormValue("text")
+
+		// รับ URL รูปเก่าที่ต้องการเก็บไว้
+		imageURLsStr := c.FormValue("image_urls")
+		if imageURLsStr != "" {
+			if err := json.Unmarshal([]byte(imageURLsStr), &keepImageURLs); err != nil {
+				log.Printf("Error parsing image_urls: %v", err)
+			}
+		}
+
+		// จัดการไฟล์ใหม่
+		var allFiles []*multipart.FileHeader
+		for key, files := range form.File {
+			if strings.HasPrefix(key, "image_") || key == "image" {
+				allFiles = append(allFiles, files...)
+			}
+		}
+
+		// ตรวจสอบว่า ImageURLs ที่ส่งมาตรงกับที่มีอยู่แล้วหรือไม่
+		if len(allFiles) == 0 && len(keepImageURLs) > 0 {
+			var existingURLs []string
+			var progressData map[string]interface{}
+
+			if err := json.Unmarshal([]byte(existingProgressText), &progressData); err == nil {
+				if fileList, ok := progressData["files"].([]interface{}); ok {
+					for _, file := range fileList {
+						if fileMap, ok := file.(map[string]interface{}); ok {
+							if url, ok := fileMap["url"].(string); ok {
+								existingURLs = append(existingURLs, url)
+							}
+						}
+					}
+				}
+			}
+
+			// ถ้า URLs ตรงกันทั้งหมด และไม่มีไฟล์ใหม่
+			if len(existingURLs) == len(keepImageURLs) {
+				allMatch := true
+				for _, keepURL := range keepImageURLs {
+					found := false
+					for _, existingURL := range existingURLs {
+						if keepURL == existingURL {
+							found = true
+							break
+						}
+					}
+					if !found {
+						allMatch = false
+						break
+					}
+				}
+				if allMatch {
+					// URLs ตรงกันทั้งหมด ใช้ text เดิมถ้าไม่ได้ส่งมาใหม่
+					if req.Text == "" {
+						if text, ok := progressData["text"].(string); ok {
+							req.Text = text
+						} else {
+							req.Text = existingProgressText
+						}
+					}
+					// อัปเดตเฉพาะ progress_text
+					_, err = db.DB.Exec(`UPDATE progress SET progress_text = ? WHERE id = ?`, req.Text, progressid)
+					if err != nil {
+						return c.Status(500).JSON(fiber.Map{"error": "Failed to update progress"})
+					}
+
+					return c.JSON(fiber.Map{"success": true, "message": "Progress updated successfully"})
+				}
+			}
+		}
+
+		// ลบรูปเก่าที่ไม่ต้องการเก็บไว้
+		var progressData map[string]interface{}
+		if err := json.Unmarshal([]byte(existingProgressText), &progressData); err == nil {
+			if fileList, ok := progressData["files"].([]interface{}); ok {
+				for _, file := range fileList {
+					if fileMap, ok := file.(map[string]interface{}); ok {
+						if url, ok := fileMap["url"].(string); ok {
+							// ถ้าไม่ได้ส่ง image_urls มา ให้ลบทั้งหมด
+							if len(keepImageURLs) == 0 {
+								if strings.Contains(url, "prefix=") {
+									parts := strings.Split(url, "prefix=")
+									if len(parts) > 1 {
+										objectName := parts[1]
+										common.DeleteImage(objectName)
+									}
+								}
+							} else {
+								// ตรวจสอบว่า URL นี้อยู่ในรายการที่ต้องการเก็บไว้หรือไม่
+								keepImage := false
+								for _, keepURL := range keepImageURLs {
+									if url == keepURL {
+										keepImage = true
+										break
+									}
+								}
+								// ถ้าไม่ต้องการเก็บ ให้ลบออกจาก MinIO
+								if !keepImage {
+									if strings.Contains(url, "prefix=") {
+										parts := strings.Split(url, "prefix=")
+										if len(parts) > 1 {
+											objectName := parts[1]
+											common.DeleteImage(objectName)
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// อัปโหลดไฟล์ใหม่ถ้ามี
+		if len(allFiles) > 0 {
+			var uploadErrors []string
+			uploadedFiles, uploadErrors = common.HandleFileUploadsProgress(allFiles, ticketno)
+			if len(uploadErrors) > 0 {
+				log.Printf("File upload errors: %v", uploadErrors)
+				// Continue with partial success, but log the errors
+			}
+		}
+
+		// รวมรูปเก่าที่เก็บไว้กับรูปใหม่
+		for _, keepURL := range keepImageURLs {
+			uploadedFiles = append(uploadedFiles, fiber.Map{"url": keepURL})
+		}
+	}
+
+	// ใช้ text เดิมถ้าไม่ได้ส่งมาใหม่
+	if req.Text == "" {
+		// ดึง text จาก progress_text เดิม
+		var progressData map[string]interface{}
+		if err := json.Unmarshal([]byte(existingProgressText), &progressData); err == nil {
+			if text, ok := progressData["text"].(string); ok {
+				req.Text = text
+			}
+		} else {
+			req.Text = existingProgressText
+		}
+	}
+
+	// เตรียม progress text ใหม่
+	var finalProgressText string
+	if len(uploadedFiles) > 0 {
+		// มีไฟล์ใหม่ สร้าง JSON ที่มี text และ files
+		progressData := fiber.Map{
+			"text":  req.Text,
+			"files": uploadedFiles,
+		}
+		progressDataBytes, err := json.Marshal(progressData)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to marshal progress data"})
+		}
+		finalProgressText = string(progressDataBytes)
+	} else {
+		// ไม่มีไฟล์ ใช้แค่ text อย่างเดียว
+		finalProgressText = req.Text
+	}
+
+	// อัปเดต progress
+	_, err = db.DB.Exec(`UPDATE progress SET progress_text = ? WHERE id = ?`, finalProgressText, progressid)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update progress"})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Progress updated successfully",
+	})
+
 }
