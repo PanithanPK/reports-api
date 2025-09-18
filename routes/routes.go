@@ -56,6 +56,7 @@ func progressRoutes(r *fiber.App) {
 	r.Get("/api/v1/progress/:id", handlers.GetProgressHandler)
 	r.Post("/api/v1/progress/create/:id", handlers.CreateProgressHandler)
 	r.Put("/api/v1/progress/update/:id/:pgid", handlers.UpdateProgressHandler)
+	r.Delete("/api/v1/progress/delete/:id/:pgid", handlers.DeleteProgressHandler)
 }
 
 // ipphoneRoutes registers all IP phone-related routes

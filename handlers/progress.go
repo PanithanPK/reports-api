@@ -3,16 +3,177 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"mime/multipart"
 	"reports-api/db"
 	"reports-api/handlers/common"
 	"reports-api/models"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
+
+// parseProgressText parses progress_text and populates ProgressEntry text field
+// Now progress_text contains only text, files are stored separately in file_paths
+func parseProgressText(progressText string, entry *models.ProgressEntry) {
+	var progressData map[string]any
+	if err := json.Unmarshal([]byte(progressText), &progressData); err == nil {
+		// Check if it's old format with files included
+		if text, ok := progressData["text"].(string); ok {
+			entry.Text = text
+		}
+		// Handle legacy format that might still have files in progress_text
+		if fileList, ok := progressData["files"].([]any); ok {
+			if entry.FilePaths == nil {
+				entry.FilePaths = make(map[string]string)
+			}
+			for i, file := range fileList {
+				if fileMap, ok := file.(map[string]any); ok {
+					if url, ok := fileMap["url"].(string); ok {
+						entry.FilePaths[strconv.Itoa(i)] = url
+					}
+				}
+			}
+		}
+	} else {
+		// Not JSON, treat as plain text
+		entry.Text = progressText
+	}
+}
+
+// parseProgressFilePaths parses file_paths JSON array and populates ProgressEntry FilePaths
+func parseProgressFilePaths(filePathsJSON sql.NullString, entry *models.ProgressEntry) {
+	if filePathsJSON.Valid && filePathsJSON.String != "" {
+		// Try to parse as array of objects [{"url": "..."}]
+		var fileObjects []map[string]any
+		if err := json.Unmarshal([]byte(filePathsJSON.String), &fileObjects); err == nil {
+			if entry.FilePaths == nil {
+				entry.FilePaths = make(map[string]string)
+			}
+			for i, fileObj := range fileObjects {
+				if url, ok := fileObj["url"].(string); ok {
+					entry.FilePaths[fmt.Sprintf("image_%d", i)] = url
+				}
+			}
+		} else {
+			// Fallback: try to parse as array of strings (legacy format)
+			var fileURLs []string
+			if err := json.Unmarshal([]byte(filePathsJSON.String), &fileURLs); err == nil {
+				if entry.FilePaths == nil {
+					entry.FilePaths = make(map[string]string)
+				}
+				for i, url := range fileURLs {
+					entry.FilePaths[fmt.Sprintf("image_%d", i)] = url
+				}
+			}
+		}
+	}
+}
+
+// parseProgressTextAndDeleteFiles parses progress_text and deletes files from MinIO (legacy format)
+func parseProgressTextAndDeleteFiles(progressText string, entry *models.ProgressEntry) {
+	var progressData map[string]any
+	if err := json.Unmarshal([]byte(progressText), &progressData); err == nil {
+		// Successfully parsed as JSON, extract text and files
+		if text, ok := progressData["text"].(string); ok {
+			entry.Text = text
+		}
+		if fileList, ok := progressData["files"].([]any); ok {
+			// Convert files to map[string]string format expected by FilePaths
+			entry.FilePaths = make(map[string]string)
+
+			// ลบไฟล์จาก MinIO และ populate FilePaths
+			for i, file := range fileList {
+				if fileMap, ok := file.(map[string]any); ok {
+					if url, ok := fileMap["url"].(string); ok {
+						// Add to FilePaths for response
+						entry.FilePaths[strconv.Itoa(i)] = url
+
+						// Delete from MinIO
+						if strings.Contains(url, "prefix=") {
+							parts := strings.Split(url, "prefix=")
+							if len(parts) > 1 {
+								objectName := parts[1]
+								if deleteErr := common.DeleteImage(objectName); deleteErr != nil {
+									log.Printf("Warning: Failed to delete file from MinIO: %s, error: %v", objectName, deleteErr)
+								} else {
+									log.Printf("Successfully deleted file from MinIO: %s", objectName)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	} else {
+		// Not JSON, treat as plain text
+		entry.Text = progressText
+	}
+}
+
+// parseFilePathsAndDelete parses file_paths from database and deletes files from MinIO
+func parseFilePathsAndDelete(filePathsJSON sql.NullString, entry *models.ProgressEntry) {
+	if filePathsJSON.Valid && filePathsJSON.String != "" {
+		// Try to parse as array of objects [{"url": "..."}]
+		var fileObjects []map[string]any
+		if err := json.Unmarshal([]byte(filePathsJSON.String), &fileObjects); err == nil {
+			if entry.FilePaths == nil {
+				entry.FilePaths = make(map[string]string)
+			}
+
+			for i, fileObj := range fileObjects {
+				if url, ok := fileObj["url"].(string); ok {
+					// Add to FilePaths for response
+					entry.FilePaths[strconv.Itoa(i)] = url
+
+					// Delete from MinIO
+					if strings.Contains(url, "prefix=") {
+						parts := strings.Split(url, "prefix=")
+						if len(parts) > 1 {
+							objectName := parts[1]
+							if deleteErr := common.DeleteImage(objectName); deleteErr != nil {
+								log.Printf("Warning: Failed to delete file from MinIO: %s, error: %v", objectName, deleteErr)
+							} else {
+								log.Printf("Successfully deleted file from MinIO: %s", objectName)
+							}
+						}
+					}
+				}
+			}
+		} else {
+			// Fallback: try to parse as array of strings (legacy format)
+			var fileURLs []string
+			if err := json.Unmarshal([]byte(filePathsJSON.String), &fileURLs); err == nil {
+				if entry.FilePaths == nil {
+					entry.FilePaths = make(map[string]string)
+				}
+
+				for i, url := range fileURLs {
+					// Add to FilePaths for response
+					entry.FilePaths[strconv.Itoa(i)] = url
+
+					// Delete from MinIO
+					if strings.Contains(url, "prefix=") {
+						parts := strings.Split(url, "prefix=")
+						if len(parts) > 1 {
+							objectName := parts[1]
+							if deleteErr := common.DeleteImage(objectName); deleteErr != nil {
+								log.Printf("Warning: Failed to delete file from MinIO: %s, error: %v", objectName, deleteErr)
+							} else {
+								log.Printf("Successfully deleted file from MinIO: %s", objectName)
+							}
+						}
+					}
+				}
+			} else {
+				log.Printf("Warning: Failed to parse file_paths JSON: %v", err)
+			}
+		}
+	}
+}
 
 // ProgressEntry represents a single progress entry
 
@@ -36,15 +197,31 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid task ID"})
 	}
 
-	// ตรวจสอบว่า task_id มีอยู่ในตาราง tasks หรือไม่ และดึง ticket_no
+	// ตรวจสอบว่า task_id มีอยู่ในตาราง tasks หรือไม่ และดึง ticket_no และ status
 	var ticketNo string
-	err = db.DB.QueryRow("SELECT IFNULL(ticket_no, '') FROM tasks WHERE id = ? AND deleted_at IS NULL", taskID).Scan(&ticketNo)
+	var status int
+	err = db.DB.QueryRow("SELECT IFNULL(ticket_no, ''), IFNULL(status, 0) FROM tasks WHERE id = ?", taskID).Scan(&ticketNo, &status)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
 		}
 		log.Printf("Error checking task existence: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+	}
+
+	// ตรวจสอบว่า task เสร็จสิ้นแล้วหรือไม่ (status = 2)
+	if status == 2 {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Cannot add progress to completed task",
+		})
+	}
+
+	if status != 2 {
+		_, err = db.DB.Exec(`UPDATE tasks SET status = 1 WHERE id = ?`, idStr)
+		if err != nil {
+			log.Printf("Database error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to update status progress"})
+		}
 	}
 
 	var uploadedFiles []fiber.Map
@@ -79,6 +256,8 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 		}
 
 		// Upload files if any were provided
+		log.Printf("progress ticketNo : %s", idStr)
+		log.Printf("progress ticketNo : %s", ticketNo)
 		if len(allFiles) > 0 {
 			uploadedFiles, _ = common.HandleFileUploadsProgress(allFiles, ticketNo)
 			log.Printf("Uploaded %d files for progress entry", len(uploadedFiles))
@@ -90,23 +269,28 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Progress text is required"})
 	}
 
-	// Prepare the final progress text with file information if files were uploaded
-	finalProgressText := progressText
+	// Prepare file paths JSON if files were uploaded
+	var filePathsJSON string
 	if len(uploadedFiles) > 0 {
-		// Create a structured progress entry with text and files
-		progressData := fiber.Map{
-			"text":  progressText,
-			"files": uploadedFiles,
-		}
-		progressDataBytes, _ := json.Marshal(progressData)
-		finalProgressText = string(progressDataBytes)
+		// Keep the original format with url objects: [{"url": "..."}]
+		filePathsBytes, _ := json.Marshal(uploadedFiles)
+		filePathsJSON = string(filePathsBytes)
+		log.Printf("filePathsJSON : %s", filePathsJSON)
 	}
 
 	// บันทึกข้อมูลลงในตาราง progress
-	result, err := db.DB.Exec(
-		"INSERT INTO progress (task_id, progress_text, created_at, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-		taskID, finalProgressText,
-	)
+	var result sql.Result
+	if filePathsJSON != "" {
+		result, err = db.DB.Exec(
+			"INSERT INTO progress (task_id, progress_text, file_paths, created_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+			taskID, progressText, filePathsJSON,
+		)
+	} else {
+		result, err = db.DB.Exec(
+			"INSERT INTO progress (task_id, progress_text, created_at, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+			taskID, progressText,
+		)
+	}
 	if err != nil {
 		log.Printf("Error inserting progress: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to create progress entry"})
@@ -123,10 +307,11 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 	// ดึงข้อมูลที่เพิ่งสร้างเพื่อส่งกลับในรูปแบบ ProgressEntry
 	var createdEntry models.ProgressEntry
 	var createdAt, updatedAt string
+	var retrievedFilePathsJSON sql.NullString
 	err = db.DB.QueryRow(
-		"SELECT id, progress_text, created_at, updated_at FROM progress WHERE id = ?",
+		"SELECT id, progress_text, file_paths, created_at, updated_at FROM progress WHERE id = ?",
 		progressID,
-	).Scan(&createdEntry.ID, &finalProgressText, &createdAt, &updatedAt)
+	).Scan(&createdEntry.ID, &createdEntry.Text, &retrievedFilePathsJSON, &createdAt, &updatedAt)
 
 	if err != nil {
 		log.Printf("Error retrieving created progress entry: %v", err)
@@ -136,28 +321,8 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 	createdEntry.CreatedAt = createdAt
 	createdEntry.UpdateAt = updatedAt
 
-	// Parse the stored progress text to populate the model fields
-	var progressData map[string]interface{}
-	if err := json.Unmarshal([]byte(finalProgressText), &progressData); err == nil {
-		// Successfully parsed as JSON, extract text and files
-		if text, ok := progressData["text"].(string); ok {
-			createdEntry.Text = text
-		}
-		if fileList, ok := progressData["files"].([]interface{}); ok {
-			// Convert files to map[string]string format expected by FilePaths
-			createdEntry.FilePaths = make(map[string]string)
-			for i, file := range fileList {
-				if fileMap, ok := file.(map[string]interface{}); ok {
-					if url, ok := fileMap["url"].(string); ok {
-						createdEntry.FilePaths[strconv.Itoa(i)] = url
-					}
-				}
-			}
-		}
-	} else {
-		// Not JSON, treat as plain text
-		createdEntry.Text = finalProgressText
-	}
+	// Parse file_paths จากฐานข้อมูล (ถ้ามี)
+	parseProgressFilePaths(retrievedFilePathsJSON, &createdEntry)
 
 	return c.JSON(fiber.Map{
 		"success": true,
@@ -185,7 +350,7 @@ func GetProgressHandler(c *fiber.Ctx) error {
 
 	// ตรวจสอบว่า task_id มีอยู่ในตาราง tasks หรือไม่
 	var taskExists string
-	err = db.DB.QueryRow("SELECT '1' FROM tasks WHERE id = ? AND deleted_at IS NULL LIMIT 1", taskID).Scan(&taskExists)
+	err = db.DB.QueryRow("SELECT '1' FROM tasks WHERE id = ? LIMIT 1", taskID).Scan(&taskExists)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
@@ -196,7 +361,7 @@ func GetProgressHandler(c *fiber.Ctx) error {
 
 	// ดึงข้อมูล progress entries สำหรับ task นี้
 	rows, err := db.DB.Query(
-		"SELECT id, progress_text, created_at, updated_at FROM progress WHERE task_id = ? AND deleted_at IS NULL ORDER BY created_at DESC",
+		"SELECT id, progress_text, file_paths, created_at, updated_at FROM progress WHERE task_id = ? ORDER BY created_at DESC",
 		taskID,
 	)
 	if err != nil {
@@ -210,36 +375,17 @@ func GetProgressHandler(c *fiber.Ctx) error {
 	for rows.Next() {
 		var entry models.ProgressEntry
 		var progressText string
+		var filePathsJSON sql.NullString
 
-		err := rows.Scan(&entry.ID, &progressText, &entry.CreatedAt, &entry.UpdateAt)
+		err := rows.Scan(&entry.ID, &progressText, &filePathsJSON, &entry.CreatedAt, &entry.UpdateAt)
 		if err != nil {
 			log.Printf("Error scanning progress row: %v", err)
 			continue
 		}
 
-		// Try to parse progress_text as JSON to extract text and files
-		var progressData map[string]interface{}
-
-		if err := json.Unmarshal([]byte(progressText), &progressData); err == nil {
-			// Successfully parsed as JSON, extract text and files
-			if text, ok := progressData["text"].(string); ok {
-				entry.Text = text
-			}
-			if fileList, ok := progressData["files"].([]interface{}); ok {
-				// Convert files to map[string]string format expected by FilePaths
-				entry.FilePaths = make(map[string]string)
-				for i, file := range fileList {
-					if fileMap, ok := file.(map[string]interface{}); ok {
-						if url, ok := fileMap["url"].(string); ok {
-							entry.FilePaths[strconv.Itoa(i)] = url
-						}
-					}
-				}
-			}
-		} else {
-			// Not JSON, treat as plain text
-			entry.Text = progressText
-		}
+		// Parse progress_text and file_paths
+		parseProgressText(progressText, &entry)
+		parseProgressFilePaths(filePathsJSON, &entry)
 
 		progressEntries = append(progressEntries, entry)
 	}
@@ -289,10 +435,11 @@ func UpdateProgressHandler(c *fiber.Ctx) error {
 	}
 	log.Printf("Found task with ticket_no: %s", ticketno)
 
+	var existingFilePathsJSON sql.NullString
 	err = db.DB.QueryRow(`
-		SELECT progress_text
+		SELECT progress_text, file_paths
 		FROM progress WHERE id = ?
-	`, progressid).Scan(&existingProgressText)
+	`, progressid).Scan(&existingProgressText, &existingFilePathsJSON)
 
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Progress not found"})
@@ -329,16 +476,21 @@ func UpdateProgressHandler(c *fiber.Ctx) error {
 		// ตรวจสอบว่า ImageURLs ที่ส่งมาตรงกับที่มีอยู่แล้วหรือไม่
 		if len(allFiles) == 0 && len(keepImageURLs) > 0 {
 			var existingURLs []string
-			var progressData map[string]interface{}
 
-			if err := json.Unmarshal([]byte(existingProgressText), &progressData); err == nil {
-				if fileList, ok := progressData["files"].([]interface{}); ok {
-					for _, file := range fileList {
-						if fileMap, ok := file.(map[string]interface{}); ok {
-							if url, ok := fileMap["url"].(string); ok {
-								existingURLs = append(existingURLs, url)
-							}
+			// ดึง URLs จาก file_paths column
+			if existingFilePathsJSON.Valid && existingFilePathsJSON.String != "" {
+				// Try to parse as array of objects [{"url": "..."}]
+				var fileObjects []map[string]any
+				if err := json.Unmarshal([]byte(existingFilePathsJSON.String), &fileObjects); err == nil {
+					for _, fileObj := range fileObjects {
+						if url, ok := fileObj["url"].(string); ok {
+							existingURLs = append(existingURLs, url)
 						}
+					}
+				} else {
+					// Fallback: try to parse as array of strings
+					if err := json.Unmarshal([]byte(existingFilePathsJSON.String), &existingURLs); err != nil {
+						log.Printf("Error parsing existing file_paths: %v", err)
 					}
 				}
 			}
@@ -347,14 +499,7 @@ func UpdateProgressHandler(c *fiber.Ctx) error {
 			if len(existingURLs) == len(keepImageURLs) {
 				allMatch := true
 				for _, keepURL := range keepImageURLs {
-					found := false
-					for _, existingURL := range existingURLs {
-						if keepURL == existingURL {
-							found = true
-							break
-						}
-					}
-					if !found {
+					if !slices.Contains(existingURLs, keepURL) {
 						allMatch = false
 						break
 					}
@@ -362,11 +507,7 @@ func UpdateProgressHandler(c *fiber.Ctx) error {
 				if allMatch {
 					// URLs ตรงกันทั้งหมด ใช้ text เดิมถ้าไม่ได้ส่งมาใหม่
 					if req.Text == "" {
-						if text, ok := progressData["text"].(string); ok {
-							req.Text = text
-						} else {
-							req.Text = existingProgressText
-						}
+						req.Text = existingProgressText
 					}
 					// อัปเดตเฉพาะ progress_text
 					_, err = db.DB.Exec(`UPDATE progress SET progress_text = ? WHERE id = ?`, req.Text, progressid)
@@ -380,40 +521,42 @@ func UpdateProgressHandler(c *fiber.Ctx) error {
 		}
 
 		// ลบรูปเก่าที่ไม่ต้องการเก็บไว้
-		var progressData map[string]interface{}
-		if err := json.Unmarshal([]byte(existingProgressText), &progressData); err == nil {
-			if fileList, ok := progressData["files"].([]interface{}); ok {
-				for _, file := range fileList {
-					if fileMap, ok := file.(map[string]interface{}); ok {
-						if url, ok := fileMap["url"].(string); ok {
-							// ถ้าไม่ได้ส่ง image_urls มา ให้ลบทั้งหมด
-							if len(keepImageURLs) == 0 {
-								if strings.Contains(url, "prefix=") {
-									parts := strings.Split(url, "prefix=")
-									if len(parts) > 1 {
-										objectName := parts[1]
-										common.DeleteImage(objectName)
-									}
-								}
-							} else {
-								// ตรวจสอบว่า URL นี้อยู่ในรายการที่ต้องการเก็บไว้หรือไม่
-								keepImage := false
-								for _, keepURL := range keepImageURLs {
-									if url == keepURL {
-										keepImage = true
-										break
-									}
-								}
-								// ถ้าไม่ต้องการเก็บ ให้ลบออกจาก MinIO
-								if !keepImage {
-									if strings.Contains(url, "prefix=") {
-										parts := strings.Split(url, "prefix=")
-										if len(parts) > 1 {
-											objectName := parts[1]
-											common.DeleteImage(objectName)
-										}
-									}
-								}
+		if existingFilePathsJSON.Valid && existingFilePathsJSON.String != "" {
+			var existingURLs []string
+
+			// Try to parse as array of objects [{"url": "..."}]
+			var fileObjects []map[string]any
+			if err := json.Unmarshal([]byte(existingFilePathsJSON.String), &fileObjects); err == nil {
+				for _, fileObj := range fileObjects {
+					if url, ok := fileObj["url"].(string); ok {
+						existingURLs = append(existingURLs, url)
+					}
+				}
+			} else {
+				// Fallback: try to parse as array of strings
+				if err := json.Unmarshal([]byte(existingFilePathsJSON.String), &existingURLs); err != nil {
+					log.Printf("Error parsing existing file_paths for deletion: %v", err)
+				}
+			}
+
+			for _, url := range existingURLs {
+				// ถ้าไม่ได้ส่ง image_urls มา ให้ลบทั้งหมด
+				if len(keepImageURLs) == 0 {
+					if strings.Contains(url, "prefix=") {
+						parts := strings.Split(url, "prefix=")
+						if len(parts) > 1 {
+							objectName := parts[1]
+							common.DeleteImage(objectName)
+						}
+					}
+				} else {
+					// ตรวจสอบว่า URL นี้อยู่ในรายการที่ต้องการเก็บไว้หรือไม่
+					if !slices.Contains(keepImageURLs, url) {
+						if strings.Contains(url, "prefix=") {
+							parts := strings.Split(url, "prefix=")
+							if len(parts) > 1 {
+								objectName := parts[1]
+								common.DeleteImage(objectName)
 							}
 						}
 					}
@@ -439,37 +582,22 @@ func UpdateProgressHandler(c *fiber.Ctx) error {
 
 	// ใช้ text เดิมถ้าไม่ได้ส่งมาใหม่
 	if req.Text == "" {
-		// ดึง text จาก progress_text เดิม
-		var progressData map[string]interface{}
-		if err := json.Unmarshal([]byte(existingProgressText), &progressData); err == nil {
-			if text, ok := progressData["text"].(string); ok {
-				req.Text = text
-			}
-		} else {
-			req.Text = existingProgressText
-		}
+		req.Text = existingProgressText
 	}
 
-	// เตรียม progress text ใหม่
-	var finalProgressText string
+	// เตรียม file paths JSON ใหม่
+	var newFilePathsJSON string
 	if len(uploadedFiles) > 0 {
-		// มีไฟล์ใหม่ สร้าง JSON ที่มี text และ files
-		progressData := fiber.Map{
-			"text":  req.Text,
-			"files": uploadedFiles,
-		}
-		progressDataBytes, err := json.Marshal(progressData)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to marshal progress data"})
-		}
-		finalProgressText = string(progressDataBytes)
-	} else {
-		// ไม่มีไฟล์ ใช้แค่ text อย่างเดียว
-		finalProgressText = req.Text
+		filePathsBytes, _ := json.Marshal(uploadedFiles)
+		newFilePathsJSON = string(filePathsBytes)
 	}
 
 	// อัปเดต progress
-	_, err = db.DB.Exec(`UPDATE progress SET progress_text = ? WHERE id = ?`, finalProgressText, progressid)
+	if newFilePathsJSON != "" {
+		_, err = db.DB.Exec(`UPDATE progress SET progress_text = ?, file_paths = ? WHERE id = ?`, req.Text, newFilePathsJSON, progressid)
+	} else {
+		_, err = db.DB.Exec(`UPDATE progress SET progress_text = ?, file_paths = NULL WHERE id = ?`, req.Text, progressid)
+	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update progress"})
 	}
@@ -479,4 +607,92 @@ func UpdateProgressHandler(c *fiber.Ctx) error {
 		"message": "Progress updated successfully",
 	})
 
+}
+
+// @Summary Delete progress entry
+// @Description Delete a specific progress entry and its associated files permanently
+// @Tags progress
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID"
+// @Param pgid path string true "Progress ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/progress/delete/{id}/{pgid} [delete]
+func DeleteProgressHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
+	progressid := c.Params("pgid")
+
+	// Validate task ID
+	taskID, err := strconv.Atoi(id)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid task ID"})
+	}
+
+	// Validate progress ID
+	progressID, err := strconv.Atoi(progressid)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid progress ID"})
+	}
+
+	// ตรวจสอบว่า task มีอยู่จริงหรือไม่
+	var taskExists string
+	err = db.DB.QueryRow("SELECT '1' FROM tasks WHERE id = ? LIMIT 1", taskID).Scan(&taskExists)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
+		}
+		log.Printf("Error checking task existence: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+	}
+
+	// ดึงข้อมูล progress entry ที่จะลบ โดยใช้ models.ProgressEntry
+	var progressEntry models.ProgressEntry
+	var progressText string
+	var filePathsJSON sql.NullString
+	err = db.DB.QueryRow(
+		"SELECT id, progress_text, file_paths, created_at, updated_at FROM progress WHERE id = ? AND task_id = ?",
+		progressID, taskID,
+	).Scan(&progressEntry.ID, &progressText, &filePathsJSON, &progressEntry.CreatedAt, &progressEntry.UpdateAt)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(404).JSON(fiber.Map{"error": "Progress entry not found"})
+		}
+		log.Printf("Error retrieving progress entry: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+	}
+
+	// Parse progress text เพื่อดึงข้อมูลไฟล์และ populate ProgressEntry
+	parseProgressTextAndDeleteFiles(progressText, &progressEntry)
+
+	// Parse file_paths จากฐานข้อมูล (ถ้ามี)
+	parseFilePathsAndDelete(filePathsJSON, &progressEntry)
+
+	// ทำ hard delete - ลบข้อมูลออกจากฐานข้อมูลจริง
+	_, err = db.DB.Exec(
+		"DELETE FROM progress WHERE id = ? AND task_id = ?",
+		progressID, taskID,
+	)
+	if err != nil {
+		log.Printf("Error deleting progress entry: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete progress entry"})
+	}
+
+	// Count deleted files for logging
+	fileCount := 0
+	if progressEntry.FilePaths != nil {
+		fileCount = len(progressEntry.FilePaths)
+	}
+
+	log.Printf("Successfully deleted progress entry ID: %d for task ID: %d with %d associated files", progressID, taskID, fileCount)
+
+	return c.JSON(fiber.Map{
+		"success":       true,
+		"message":       "Progress entry and associated files deleted successfully",
+		"deleted_entry": progressEntry,
+		"files_deleted": fileCount,
+	})
 }
