@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.15.0](https://github.com/PanithanPK/reports-api/compare/v1.14.0...v1.15.0) (2025-09-19)
+
+
+### Features
+
+* New feature progress and Update swagger ([7ffb4f6](https://github.com/PanithanPK/reports-api/commit/7ffb4f641984703e5a82bcd6a8636d4249c6c763))
+
+
+### Bug Fixes
+
+* Update edit and delete progress ([0db6cf6](https://github.com/PanithanPK/reports-api/commit/0db6cf61273c4be17bc11b6956a41bc1cdf7d7d8))
+* Update progress and fix Csv get progress ([12cc8a0](https://github.com/PanithanPK/reports-api/commit/12cc8a086bdab197bb537a605a5283c2ac9e1b50))
+* Update Progress and Update feature ([4e5c713](https://github.com/PanithanPK/reports-api/commit/4e5c713af56e9621843b3369d1d516f00e0f63d1))
+* Update status ([6f9e9c6](https://github.com/PanithanPK/reports-api/commit/6f9e9c617ef911bf3ec39038a6832503f764725e))
+* Update telegram ([557aa27](https://github.com/PanithanPK/reports-api/commit/557aa27f77b93fe325ce0c91ec7cdc14a12932b2))
+
+## [1.14.0](https://github.com/PanithanPK/reports-api/compare/v1.13.1...v1.14.0) (2025-09-13)
+
+
+### Features
+
+* New feature config and common Fix bug in feature solution edit ([fe506b9](https://github.com/PanithanPK/reports-api/commit/fe506b9893c5983cd02bc57fe49bdfb990bb5468))
+* New feature data summary Exprot excel file and fix bug in feature resolution and telegram ([242e7c7](https://github.com/PanithanPK/reports-api/commit/242e7c7ea1ac98aa0a162aa54286b80773328893))
+* New feature fundamental and minio and telegram ([c80d5a8](https://github.com/PanithanPK/reports-api/commit/c80d5a8ced354ea19a9647b175193e8471d179c9))
+
+
+### Bug Fixes
+
+* bcrypt password ([aa65623](https://github.com/PanithanPK/reports-api/commit/aa65623d80584a0bd0e48bff2ada97f275ac87c4))
+* hot fix bug telegram sync assignto ([8d33303](https://github.com/PanithanPK/reports-api/commit/8d3330392e7f7138f4963aac47af9e43d3569cc7))
+* telegram Update ([1bf49d1](https://github.com/PanithanPK/reports-api/commit/1bf49d1dc7a3229264e99db4b9028244cde0cff4))
+* Update and fix Update telegram solution ([c723358](https://github.com/PanithanPK/reports-api/commit/c723358f4459de073c402b15d8ea450ebfadf6df))
+* Update telegram ([c28e64c](https://github.com/PanithanPK/reports-api/commit/c28e64ce45aed574cce49c00938b417537b6459b))
+
 ### [1.13.1](https://github.com/PanithanPK/reports-api/compare/v1.13.0...v1.13.1) (2025-09-09)
 
 

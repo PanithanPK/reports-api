@@ -15,6 +15,7 @@ type TaskRequest struct {
 	Status           int    `json:"status"`
 	CreatedBy        int    `json:"created_by"`
 	UpdatedBy        int    `json:"updated_by"`
+	ResolvedAt       string `json:"resolved_at"`
 	Telegram         bool   `json:"telegram"`
 	TelegramUser     string `json:"telegram_user"`
 	MessageID        int    `json:"message_id"`

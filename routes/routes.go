@@ -51,6 +51,14 @@ func resolutionRoutes(r *fiber.App) {
 	r.Delete("/api/v1/resolution/delete/:id", handlers.DeleteResolutionHandler)
 }
 
+// progressRoutes registers all progress-related routes
+func progressRoutes(r *fiber.App) {
+	r.Get("/api/v1/progress/:id", handlers.GetProgressHandler)
+	r.Post("/api/v1/progress/create/:id", handlers.CreateProgressHandler)
+	r.Put("/api/v1/progress/update/:id/:pgid", handlers.UpdateProgressHandler)
+	r.Delete("/api/v1/progress/delete/:id/:pgid", handlers.DeleteProgressHandler)
+}
+
 // ipphoneRoutes registers all IP phone-related routes
 func ipphoneRoutes(r *fiber.App) {
 	r.Get("/api/v1/ipphone/list", handlers.ListIPPhonesHandler)
@@ -115,6 +123,7 @@ func RegisterRoutes(r *fiber.App) {
 	MainRoutes(r)
 	problemRoutes(r)
 	resolutionRoutes(r)
+	progressRoutes(r)
 	ipphoneRoutes(r)
 	programRoutes(r)
 	departmentRoutes(r)

@@ -61,9 +61,14 @@ Content-Type: application/json
 
 {
   "title": "System Issue (Updated)",
-  "status": "in_progress"
+  "status": 2
 }
 ```
+
+#### Status Values
+- `0` - รอดำเนินการ (Pending)
+- `1` - เสร็จสิ้น (Resolved)
+- `2` - กำลังดำเนินการ (In Progress)
 
 ### Delete Problem
 ```http

@@ -100,7 +100,6 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	var assignto string
 	var reportedby string
 	var telegramID int
-	var createdAt time.Time
 	var AssignedtoID int
 
 	if solutionByStr := c.FormValue("solution"); solutionByStr != "" {
@@ -147,17 +146,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	}
 
 	var createdAtStr string
-	err = db.DB.QueryRow(`SELECT created_at FROM tasks WHERE id = ?`, id).Scan(&createdAtStr)
-	if err != nil {
-		log.Println("Error fetching created_at:", err)
-		createdAt = time.Now() // fallback
-	} else {
-		createdAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
-		if err != nil {
-			log.Println("Error parsing created_at:", err)
-			createdAt = time.Now() // fallback
-		}
-	}
+	CreatedAt := common.Fixtimefeature(createdAtStr)
 
 	// ลองแยกการ parse ข้อมูล
 	form, err := c.MultipartForm()
@@ -203,7 +192,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	resolutionID, _ := res.LastInsertId()
 
 	// อัพเดต solution_id ใน tasks
-	_, err = db.DB.Exec(`UPDATE tasks SET solution_id = ?, status = 1, resolved_at=CURRENT_TIMESTAMP WHERE id = ?`, resolutionID, id)
+	_, err = db.DB.Exec(`UPDATE tasks SET solution_id = ?, status = 2, resolved_at=CURRENT_TIMESTAMP WHERE id = ?`, resolutionID, id)
 	if err != nil {
 		log.Printf("Failed to update solution_id in tasks: %q", err)
 	}
@@ -225,9 +214,9 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 
 	// เตรียมข้อมูล response
 	req.TicketNo = ticketno
-	req.CreatedAt = createdAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
+	req.CreatedAt = CreatedAt
 	req.Url = Urlenv
-	req.ResolvedAt = resolvedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
+	req.ResolvedAt = resolvedAt.Add(7 * time.Hour).Format("2006/01/02/ 15:04:05")
 
 	var assignmsgID int
 	// ส่ง solution ไปยัง Telegram ถ้ามี reportID
@@ -291,7 +280,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 			ReportedBy:     reportedby,
 			CreatedAt:      req.CreatedAt,
 			UpdatedAt:      req.ResolvedAt,
-			Status:         1,
+			Status:         2,
 			Url:            req.Url,
 			PhoneNumber:    phoneNumber,
 			DepartmentName: departmentName,
@@ -346,6 +335,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 		}
 		req.TelegramUser = telegramUser
 		// ส่ง reply message ไปยัง Telegram
+		log.Printf("Sending reply to Telegram - MessageID: %d, TelegramUser: %s, PhotoURLs count: %d", req.MessageID, req.TelegramUser, len(replyPhotoURLs))
 		replyMessageID, err := common.ReplyToSpecificMessage(req, replyPhotoURLs...)
 		if err != nil {
 			log.Printf("Failed to send solution to Telegram: %v", err)
@@ -401,9 +391,9 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	var systemID, departmentID int
 	var text string
 	var reportID int
-	var ticketno, assignto, reportedby string
-	var createdAt time.Time
+	var ticketno, assignto, reportedby, resolvedat string
 	var taskID, assigntoID int
+	var createdAtStr string
 
 	req.Solution = c.FormValue("solution")
 
@@ -469,15 +459,19 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	// ดึงข้อมูล task
 
 	err = db.DB.QueryRow(`
-		SELECT r.tasks_id, t.ticket_no, IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, '')
+		SELECT r.tasks_id, t.ticket_no, IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.created_at, t.resolved_at
 		FROM resolutions r
 		JOIN tasks t ON r.tasks_id = t.id
 		WHERE r.id = ?
-	`, resolutions).Scan(&taskID, &ticketno, &assigntoID, &assignto, &reportedby)
+	`, resolutions).Scan(&taskID, &ticketno, &assigntoID, &assignto, &reportedby, &createdAtStr, &resolvedat)
 
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Resolutions not found"})
 	}
+
+	// Parse created_at string to time
+	CreatedAt := common.Fixtimefeature(createdAtStr)
+	ResolvedAt := common.Fixtimefeature(resolvedat)
 
 	// Parse ข้อมูลจาก request
 	var keepImageURLs []string
@@ -554,14 +548,8 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 						if req.Assignto == "" {
 							req.Assignto = assignto
 						}
-						req.CreatedAt = createdAt.Add(7 * time.Hour).Format("02-01-2006 15:04:05")
-						resolvedAt, err := common.GetResolvedAtSafely(db.DB, resolutions)
-						if err != nil {
-							log.Printf("Failed to get resolved_at: %v", err)
-							resolvedAt = time.Now() // Fallback to current time
-						}
-						db.DB.QueryRow(`SELECT resolved_at FROM resolutions WHERE id = ?`, resolutions).Scan(&resolvedAt)
-						req.ResolvedAt = resolvedAt.Add(7 * time.Hour).Format("02-01-2006 15:04:05")
+						req.CreatedAt = CreatedAt
+						req.ResolvedAt = ResolvedAt
 						var Urlenv string
 						env := config.AppConfig.Environment
 						if env == "dev" {
@@ -570,8 +558,14 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 							Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + fmt.Sprintf("%d", taskID)
 						}
 						req.Url = Urlenv
+						req.MessageID = reportID
 
-						messageID, _ := common.UpdatereplyToSpecificMessage(solutionMessageID, req, keepImageURLs...)
+						messageID, err := common.UpdatereplyToSpecificMessage(solutionMessageID, req, keepImageURLs...)
+						if err != nil {
+							log.Printf("Failed to update Telegram reply: %v", err)
+						} else {
+							log.Printf("Successfully updated Telegram reply message with ID: %d", messageID)
+						}
 						db.DB.Exec(`UPDATE telegram_chat SET solution_id = ? WHERE id = ?`, messageID, telegramID)
 					}
 
@@ -669,14 +663,6 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	}
 
 	// ดึง resolved_at
-	resolvedAt, err := common.GetResolvedAtSafely(db.DB, resolutions)
-	if err != nil {
-		log.Printf("Failed to get resolved_at: %v", err)
-		resolvedAt = time.Now() // Fallback to current time
-	}
-	if err != nil {
-		log.Printf("Failed to get resolved_at: %v", err)
-	}
 	var Urlenv string
 	env := config.AppConfig.Environment
 	if env == "dev" {
@@ -686,20 +672,20 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	}
 	// เตรียมข้อมูลสำหรับ Telegram
 	req.TicketNo = ticketno
-
-	err = db.DB.QueryRow(`SELECT name FROM responsibilities WHERE id = ?`, req.AssignedtoID).Scan(&Assignto)
-	if err != nil {
-		log.Printf("Failed to get resolved_at: %q", err)
-	}
-	req.CreatedAt = createdAt.Add(7 * time.Hour).Format("02-01-2006 15:04:05")
-	req.Url = Urlenv
-	req.ResolvedAt = resolvedAt.Add(7 * time.Hour).Format("02-01-2006 15:04:05")
-
-	// ดึง telegram_user สำหรับ UpdateAssignedtoMsg
 	var telegramUser string
 	if req.AssignedtoID > 0 {
-		db.DB.QueryRow(`SELECT IFNULL(telegram_user, '') FROM responsibilities WHERE id = ?`, req.AssignedtoID).Scan(&telegramUser)
+		err = db.DB.QueryRow(`SELECT IFNULL(name, ''), IFNULL(telegram_username, '') FROM responsibilities WHERE id = ?`, req.AssignedtoID).Scan(&Assignto, &telegramUser)
+		if err != nil {
+			log.Printf("Failed to get assignto name: %v", err)
+			Assignto = req.Assignto // fallback to existing assignto
+		}
+	} else {
+		Assignto = req.Assignto
 	}
+	req.CreatedAt = CreatedAt
+	req.Url = Urlenv
+	req.ResolvedAt = ResolvedAt
+	req.TelegramUser = telegramUser
 
 	// อัปเดตสถานะใน Telegram message ด้วยข้อมูลที่ครบ
 	taskReq := models.TaskRequest{
@@ -712,8 +698,8 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		Assignto:       req.Assignto,
 		ReportedBy:     reportedby,
 		CreatedAt:      req.CreatedAt,
-		UpdatedAt:      req.ResolvedAt,
-		Status:         1,
+		ResolvedAt:     req.ResolvedAt,
+		Status:         2,
 		Url:            req.Url,
 		PhoneNumber:    phoneNumber,
 		DepartmentName: departmentName,
@@ -748,14 +734,6 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		log.Printf("Failed to update Telegram status: %q", err)
 	}
 
-	// ใช้ UpdateAssignedtoMsg สำหรับแจ้งเตือนผู้รับผิดชอบ
-	if telegramUser != "" {
-		_, err = common.UpdateAssignedtoMsg(0, taskReq)
-		if err != nil {
-			log.Printf("Failed to send assignment notification: %v", err)
-		}
-	}
-
 	// อัปเดต Telegram reply message ถ้ามี solution_id
 	var solutionMessageID int
 	err = db.DB.QueryRow(`SELECT solution_id FROM telegram_chat WHERE id = ?`, telegramID).Scan(&solutionMessageID)
@@ -773,14 +751,23 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		// ตั้งค่า MessageID ให้ถูกต้องสำหรับ reply
+		// ตั้งค่าข้อมูลให้ครบถ้วนสำหรับ reply
 		req.MessageID = reportID
+		req.TicketNo = ticketno
+		if req.Assignto == "" {
+			req.Assignto = Assignto
+		}
+		req.CreatedAt = CreatedAt
+		req.Url = Urlenv
 
 		var messageID int
 		// อัปเดต reply message
+		log.Printf("Updating Telegram reply - SolutionMessageID: %d, MessageID: %d, TelegramUser: %s, PhotoURLs count: %d", solutionMessageID, req.MessageID, req.TelegramUser, len(solutionPhotoURLs))
 		messageID, err = common.UpdatereplyToSpecificMessage(solutionMessageID, req, solutionPhotoURLs...)
 		if err != nil {
 			log.Printf("Failed to update Telegram reply: %v", err)
+		} else {
+			log.Printf("Successfully updated Telegram reply message with new ID: %d", messageID)
 		}
 
 		_, err = db.DB.Exec(`UPDATE telegram_chat SET solution_id = ? WHERE id = ?`, messageID, telegramID)
@@ -938,7 +925,6 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 
 	// ดึงข้อมูล task สำหรับอัปเดต Telegram
 	var ticketno, assignto, reportedby string
-	var taskCreatedAt time.Time
 	var phoneID *int
 	var systemID, departmentID int
 	var text string
@@ -957,12 +943,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 	}
 
 	// แปลง string เป็น time.Time
-	taskCreatedAt, err = time.Parse("2006-01-02 15:04:05", taskCreatedAtStr)
-	if err != nil {
-		log.Printf("Failed to parse created_at time '%s': %v", taskCreatedAtStr, err)
-		taskCreatedAt = time.Now() // ใช้เวลาปัจจุบันถ้า parse ไม่ได้
-	}
-
+	CreatedAt := common.Fixtimefeature(taskCreatedAtStr)
 	log.Printf("Task details: ticket=%s, assignto=%s, reportedby=%s, phoneID=%v, systemID=%d, departmentID=%d, assigntoID=%d, createdAt=%s",
 		ticketno, assignto, reportedby, phoneID, systemID, departmentID, assigntoID, taskCreatedAtStr)
 
@@ -1035,7 +1016,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 		Ticket:         ticketno,
 		Assignto:       assignto,
 		ReportedBy:     reportedby,
-		CreatedAt:      taskCreatedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05"),
+		CreatedAt:      CreatedAt,
 		UpdatedAt:      "",
 		Status:         0, // เปลี่ยนกลับเป็น "รอดำเนินการ"
 		Url:            Urlenv,

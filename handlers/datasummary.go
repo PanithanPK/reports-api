@@ -291,9 +291,11 @@ func exportTableToCSV(writer *csv.Writer, db *sql.DB, tableName string) error {
 			res.text as solution_text,
 			CASE 
 				WHEN t.status = 0 THEN 'รอดำเนินการ'
-				WHEN t.status = 1 THEN 'เสร็จสิ้นแล้ว'
+				WHEN t.status = 1 THEN 'กำลังดำเนินการ'
+				WHEN t.status = 2 THEN 'เสร็จสิ้นแล้ว'
 				ELSE 'ไม่ระบุ'
 			END as status_text,
+			GROUP_CONCAT(DISTINCT p.progress_text ORDER BY p.created_at SEPARATOR ' , ') as progress_notes,
 			DATE_ADD(t.created_at, INTERVAL 7 HOUR) as created_at,
 			DATE_ADD(t.updated_at, INTERVAL 7 HOUR) as updated_at,
 			CASE WHEN t.resolved_at IS NOT NULL THEN DATE_ADD(t.resolved_at, INTERVAL 7 HOUR) ELSE NULL END as resolved_at
@@ -305,12 +307,14 @@ func exportTableToCSV(writer *csv.Writer, db *sql.DB, tableName string) error {
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN responsibilities r ON t.assignto_id = r.id
 		LEFT JOIN resolutions res ON t.solution_id = res.id
-		WHERE t.deleted_at IS NULL`
+		LEFT JOIN progress p ON t.id = p.task_id
+		WHERE t.deleted_at IS NULL
+		GROUP BY t.id`
 
 		headers = []string{
 			"ID", "Ticket No", "Phone Name", "Issue Type", "System/Issue",
 			"Branch", "Department", "Description", "Reported By", "Assigned To",
-			"Solution", "Status", "Created At", "Updated At", "Resolved At",
+			"Solution", "Status", "Progress Notes", "Created At", "Updated At", "Resolved At",
 		}
 	} else {
 		query, headers = buildFilteredQuery(tableName)
@@ -332,11 +336,11 @@ func exportTableToCSV(writer *csv.Writer, db *sql.DB, tableName string) error {
 		if tableName == "tasks" {
 			var task models.DataTask
 			var createdAtStr, updatedAtStr string
-			var resolvedAtStr sql.NullString
+			var resolvedAtStr, progressNotesStr sql.NullString
 			err := rows.Scan(&task.ID, &task.TicketNo, &task.PhoneName, &task.IssueTypeName,
 				&task.SystemName, &task.BranchName, &task.DepartmentName, &task.Text,
 				&task.ReportedBy, &task.AssigntoName, &task.SolutionText, &task.StatusText,
-				&createdAtStr, &updatedAtStr, &resolvedAtStr)
+				&progressNotesStr, &createdAtStr, &updatedAtStr, &resolvedAtStr)
 			if err != nil {
 				return err
 			}
@@ -380,7 +384,7 @@ func exportTableToCSV(writer *csv.Writer, db *sql.DB, tableName string) error {
 				fmt.Sprintf("%d", task.ID), ticketNo, phoneName, issueTypeName,
 				systemName, branchName, departmentName, text,
 				reportedBy, assigntoName, solutionText, statusText,
-				createdAtStr, updatedAtStr, resolvedAtStr.String,
+				progressNotesStr.String, createdAtStr, updatedAtStr, resolvedAtStr.String,
 			}
 
 			if err := writer.Write(record); err != nil {
