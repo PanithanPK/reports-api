@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.15.0](https://github.com/PanithanPK/reports-api/compare/v1.14.0...v1.15.0) (2025-09-19)
+
+
+### Features
+
+* New feature progress and Update swagger ([7ffb4f6](https://github.com/PanithanPK/reports-api/commit/7ffb4f641984703e5a82bcd6a8636d4249c6c763))
+
+
+### Bug Fixes
+
+* Update edit and delete progress ([0db6cf6](https://github.com/PanithanPK/reports-api/commit/0db6cf61273c4be17bc11b6956a41bc1cdf7d7d8))
+* Update progress and fix Csv get progress ([12cc8a0](https://github.com/PanithanPK/reports-api/commit/12cc8a086bdab197bb537a605a5283c2ac9e1b50))
+* Update Progress and Update feature ([4e5c713](https://github.com/PanithanPK/reports-api/commit/4e5c713af56e9621843b3369d1d516f00e0f63d1))
+* Update status ([6f9e9c6](https://github.com/PanithanPK/reports-api/commit/6f9e9c617ef911bf3ec39038a6832503f764725e))
+* Update telegram ([557aa27](https://github.com/PanithanPK/reports-api/commit/557aa27f77b93fe325ce0c91ec7cdc14a12932b2))
+
 ## [1.14.0](https://github.com/PanithanPK/reports-api/compare/v1.13.1...v1.14.0) (2025-09-13)
 
 
