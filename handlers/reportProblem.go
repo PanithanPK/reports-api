@@ -700,30 +700,6 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		// ส่ง assignto notification ใหม่เมื่อมีการเปลี่ยน assignto และไม่ใช่ status = 1
-		// if currentAssignto != "" && telegramUser != "" && req.Status != 1 && previousAssignto != currentAssignto {
-		// 	// สร้าง notification message สำหรับผู้รับผิดชอบใหม่
-		// 	assigntoReq := telegramReq
-		// 	assigntoReq.Text = fmt.Sprintf("📋 *คุณได้รับมอบหมายงานใหม่*\n\n🎫 *Ticket:* %s\n📝 *รายละเอียด:* %s", telegramReq.Ticket, telegramReq.Text)
-
-		// 	var assigntoNotificationID int
-		// 	if len(photoURLs) > 0 {
-		// 		assigntoNotificationID, _, _ = common.SendTelegram(assigntoReq, photoURLs...)
-		// 	} else {
-		// 		assigntoNotificationID, _, _ = common.SendTelegram(assigntoReq)
-		// 	}
-		// 	log.Printf("assigntoNotificationID : %d", assigntoNotificationID)
-
-		// 	if assigntoNotificationID > 0 {
-		// 		// อัปเดต assignto_id ใน telegram_chat
-		// 		_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, assigntoNotificationID, telegramID)
-		// 		if err != nil {
-		// 			log.Printf("❌ Failed to update assignto_id: %v", err)
-		// 		} else {
-		// 			log.Printf("✅ Assignto notification sent and ID updated: %d", assigntoNotificationID)
-		// 		}
-		// 	}
-		// }
 		var assigntoNotificationID int
 		// ส่งหรืออัปเดต main task message
 		if len(photoURLs) > 0 {
@@ -944,6 +920,86 @@ func DeleteTaskHandler(c *fiber.Ctx) error {
 		}
 	}
 
+	// Delete progress files from MinIO before deleting progress records
+	progressRows, err := db.DB.Query(`SELECT id, progress_text, file_paths FROM progress WHERE task_id = ?`, id)
+	if err != nil {
+		log.Printf("Failed to get progress data: %v", err)
+	} else {
+		defer progressRows.Close()
+		for progressRows.Next() {
+			var progressID int
+			var progressText string
+			var progressFilePathsJSON sql.NullString
+
+			err := progressRows.Scan(&progressID, &progressText, &progressFilePathsJSON)
+			if err != nil {
+				log.Printf("Error scanning progress row: %v", err)
+				continue
+			}
+
+			// Delete files from progress_text (legacy format)
+			var progressData map[string]any
+			if err := json.Unmarshal([]byte(progressText), &progressData); err == nil {
+				if fileList, ok := progressData["files"].([]any); ok {
+					for _, file := range fileList {
+						if fileMap, ok := file.(map[string]any); ok {
+							if url, ok := fileMap["url"].(string); ok {
+								if strings.Contains(url, "prefix=") {
+									parts := strings.Split(url, "prefix=")
+									if len(parts) > 1 {
+										objectName := parts[1]
+										common.DeleteImage(objectName)
+										log.Printf("Deleted progress file from text: %s", objectName)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// Delete files from file_paths column
+			if progressFilePathsJSON.Valid && progressFilePathsJSON.String != "" && progressFilePathsJSON.String != "[]" {
+				// Try to parse as array of objects [{"url": "..."}]
+				var fileObjects []map[string]any
+				if err := json.Unmarshal([]byte(progressFilePathsJSON.String), &fileObjects); err == nil {
+					for _, fileObj := range fileObjects {
+						if url, ok := fileObj["url"].(string); ok {
+							if strings.Contains(url, "prefix=") {
+								parts := strings.Split(url, "prefix=")
+								if len(parts) > 1 {
+									objectName := parts[1]
+									common.DeleteImage(objectName)
+									log.Printf("Deleted progress file from file_paths: %s", objectName)
+								}
+							}
+						}
+					}
+				} else {
+					// Fallback: try to parse as array of strings
+					var fileURLs []string
+					if err := json.Unmarshal([]byte(progressFilePathsJSON.String), &fileURLs); err == nil {
+						for _, url := range fileURLs {
+							if strings.Contains(url, "prefix=") {
+								parts := strings.Split(url, "prefix=")
+								if len(parts) > 1 {
+									objectName := parts[1]
+									common.DeleteImage(objectName)
+									log.Printf("Deleted progress file from file_paths (legacy): %s", objectName)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Now delete progress records
+	_, err = db.DB.Exec(`DELETE FROM progress WHERE task_id = ?`, id)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete progress"})
+	}
 	// Delete task
 	_, err = db.DB.Exec(`DELETE FROM tasks WHERE id = ?`, id)
 	if err != nil {
@@ -1430,12 +1486,25 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 				UpdatedAt:      UpdatedAt,
 			}
 			if len(photoURLs) > 0 {
-				_, _ = common.UpdateTelegram(telegramReq, photoURLs...)
+				assigntoID, _ := common.UpdateTelegram(telegramReq, photoURLs...)
+				_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, assigntoID, id)
+				if err != nil {
+					log.Printf("Database error: %v", err)
+					return c.Status(500).JSON(fiber.Map{"error": "Failed to update telegram chat"})
+				}
 			} else {
-				_, _ = common.UpdateTelegram(telegramReq)
+				assigntoID, _ := common.UpdateTelegram(telegramReq)
+				_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, assigntoID, id)
+				if err != nil {
+					log.Printf("Database error: %v", err)
+					return c.Status(500).JSON(fiber.Map{"error": "Failed to update telegram chat"})
+				}
 			}
+
 		}
+
 	}
+
 	return c.JSON(fiber.Map{"success": true, "message": "Assigned person updated successfully"})
 }
 
@@ -1506,9 +1575,30 @@ func GetTaskSort(c *fiber.Ctx) error {
 	var total int
 	db.DB.QueryRow(fmt.Sprintf("SELECT COUNT(*) %s", baseQuery)).Scan(&total)
 
-	orderBy := fmt.Sprintf("ORDER BY CASE WHEN %s = ? THEN 0 ELSE 1 END, t.id DESC", sqlColumn)
-	queryStr := fmt.Sprintf("SELECT %s %s %s LIMIT ? OFFSET ?", selectFields, baseQuery, orderBy)
-	rows, err := db.DB.Query(queryStr, queryParam, pagination.Limit, offset)
+	var orderBy string
+	var rows *sql.Rows
+	var err error
+
+	if column == "status" {
+		// Custom ordering for status: selected status first, then others
+		statusVal := queryParam.(int)
+		switch statusVal {
+		case 0:
+			orderBy = "ORDER BY CASE WHEN t.status = 0 THEN 0 WHEN t.status = 1 THEN 1 WHEN t.status = 2 THEN 2 ELSE 3 END, t.id DESC"
+		case 1:
+			orderBy = "ORDER BY CASE WHEN t.status = 1 THEN 0 WHEN t.status = 0 THEN 1 WHEN t.status = 2 THEN 2 ELSE 3 END, t.id DESC"
+		case 2:
+			orderBy = "ORDER BY CASE WHEN t.status = 2 THEN 0 WHEN t.status = 0 THEN 1 WHEN t.status = 1 THEN 2 ELSE 3 END, t.id DESC"
+		default:
+			orderBy = "ORDER BY t.status, t.id DESC"
+		}
+		queryStr := fmt.Sprintf("SELECT %s %s %s LIMIT ? OFFSET ?", selectFields, baseQuery, orderBy)
+		rows, err = db.DB.Query(queryStr, pagination.Limit, offset)
+	} else {
+		orderBy = fmt.Sprintf("ORDER BY CASE WHEN %s = ? THEN 0 ELSE 1 END, t.id DESC", sqlColumn)
+		queryStr := fmt.Sprintf("SELECT %s %s %s LIMIT ? OFFSET ?", selectFields, baseQuery, orderBy)
+		rows, err = db.DB.Query(queryStr, queryParam, pagination.Limit, offset)
+	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to query tasks"})
 	}
@@ -1519,7 +1609,7 @@ func GetTaskSort(c *fiber.Ctx) error {
 		var t models.TaskWithDetails
 		var issueTypeName string
 		var filePathsJSON string
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.AssignedtoID, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
+		err = rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.AssignedtoID, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue

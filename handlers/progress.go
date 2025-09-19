@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"mime/multipart"
+	"reports-api/config"
 	"reports-api/db"
 	"reports-api/handlers/common"
 	"reports-api/models"
@@ -200,6 +201,9 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 	// ตรวจสอบว่า task_id มีอยู่ในตาราง tasks หรือไม่ และดึง ticket_no และ status
 	var ticketNo string
 	var status int
+	var Urlenv string
+	env := config.AppConfig.Environment
+
 	err = db.DB.QueryRow("SELECT IFNULL(ticket_no, ''), IFNULL(status, 0) FROM tasks WHERE id = ?", taskID).Scan(&ticketNo, &status)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -324,10 +328,94 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 	// Parse file_paths จากฐานข้อมูล (ถ้ามี)
 	parseProgressFilePaths(retrievedFilePathsJSON, &createdEntry)
 
+	// ดึงข้อมูล task สำหรับอัพเดต Telegram
+	var ticket, text, issueElse, reportedBy, assignto, branchName, departmentName, programName string
+	var phoneID, systemID, departmentID, messageID, phoneNumber, branchID, telegramID int
+	var telegramUser string
+	// Fix SQL: JOINs before WHERE, select tc.report_id as messageID
+	err = db.DB.QueryRow(`
+			SELECT IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(t.system_id, 0), IFNULL(t.issue_else, ''), IFNULL(t.department_id, 0),
+			IFNULL(t.text, ''), IFNULL(t.status, 0), IFNULL(t.reported_by, ''), IFNULL(t.assignto, ''), IFNULL(rs.telegram_username, ''), 
+			IFNULL(tc.report_id, 0), IFNULL(t.file_paths, '[]'), IFNULL(d.branch_id, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, ''),
+			IFNULL(t.telegram_id, 0)
+			FROM tasks t
+			LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
+			LEFT JOIN departments d ON t.department_id = d.id
+			LEFT JOIN branches b ON d.branch_id = b.id
+			LEFT JOIN systems_program s ON t.system_id = s.id
+			LEFT JOIN responsibilities rs ON t.assignto_id = rs.id
+			WHERE t.id = ?
+		`, idStr).Scan(&ticket, &phoneID, &systemID, &issueElse, &departmentID, &text, &status, &reportedBy, &assignto, &telegramUser, &messageID, &filePathsJSON, &branchID, &createdAt, &updatedAt, &telegramID)
+	log.Printf("Fetched task for Telegram update, ID: %s, MessageID: %d", telegramUser, messageID)
+	// Query extra info for Telegram
+	db.DB.QueryRow(`SELECT name FROM branches WHERE id = ?`, branchID).Scan(&branchName)
+	db.DB.QueryRow(`SELECT name FROM departments WHERE id = ?`, departmentID).Scan(&departmentName)
+	db.DB.QueryRow(`SELECT name FROM systems_program WHERE id = ?`, systemID).Scan(&programName)
+	db.DB.QueryRow(`SELECT number FROM ip_phones WHERE id = ?`, phoneID).Scan(&phoneNumber)
+
+	if env == "dev" {
+		Urlenv = "http://helpdesk-dev.nopadol.com/tasks/show/" + idStr
+	} else {
+		Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + idStr
+	}
+
+	CreatedAt := common.Fixtimefeature(createdAt)
+	UpdatedAt := common.Fixtimefeature(updatedAt)
+
+	if err == nil {
+		// Parse file_paths JSON
+		var photoURLs []string
+		if filePathsJSON != "" && filePathsJSON != "[]" {
+			var filePaths []fiber.Map
+			if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err == nil && len(filePaths) > 0 {
+				for _, file := range filePaths {
+					if url, ok := file["url"].(string); ok {
+						photoURLs = append(photoURLs, url)
+					}
+				}
+			}
+		}
+		telegramReq := models.TaskRequest{
+			PhoneID:        &phoneID,
+			SystemID:       systemID,
+			IssueElse:      issueElse,
+			DepartmentID:   departmentID,
+			Text:           text,
+			Status:         1,
+			ReportedBy:     reportedBy,
+			Assignto:       assignto,
+			TelegramUser:   telegramUser,
+			MessageID:      messageID,
+			Ticket:         ticket,
+			BranchName:     branchName,
+			DepartmentName: departmentName,
+			PhoneNumber:    phoneNumber,
+			ProgramName:    programName,
+			Url:            Urlenv,
+			CreatedAt:      CreatedAt,
+			UpdatedAt:      UpdatedAt,
+		}
+		if len(photoURLs) > 0 {
+			assigntoID, _ := common.UpdateTelegram(telegramReq, photoURLs...)
+			_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, assigntoID, idStr)
+			if err != nil {
+				log.Printf("Database error: %v", err)
+				return c.Status(500).JSON(fiber.Map{"error": "Failed to update telegram chat"})
+			}
+		} else {
+			assigntoID, _ := common.UpdateTelegram(telegramReq)
+			_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, assigntoID, idStr)
+			if err != nil {
+				log.Printf("Database error: %v", err)
+				return c.Status(500).JSON(fiber.Map{"error": "Failed to update telegram chat"})
+			}
+		}
+
+	}
+
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Progress entry created successfully",
-		"data":    createdEntry,
 	})
 }
 
@@ -350,7 +438,8 @@ func GetProgressHandler(c *fiber.Ctx) error {
 
 	// ตรวจสอบว่า task_id มีอยู่ในตาราง tasks หรือไม่
 	var taskExists string
-	err = db.DB.QueryRow("SELECT '1' FROM tasks WHERE id = ? LIMIT 1", taskID).Scan(&taskExists)
+	var assignto string
+	err = db.DB.QueryRow("SELECT '1', IFNULL(assignto,'') FROM tasks WHERE id = ? LIMIT 1", taskID).Scan(&taskExists, &assignto)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
@@ -361,7 +450,7 @@ func GetProgressHandler(c *fiber.Ctx) error {
 
 	// ดึงข้อมูล progress entries สำหรับ task นี้
 	rows, err := db.DB.Query(
-		"SELECT id, progress_text, file_paths, created_at, updated_at FROM progress WHERE task_id = ? ORDER BY created_at DESC",
+		"SELECT id, progress_text, file_paths, created_at, updated_at FROM progress WHERE task_id = ?",
 		taskID,
 	)
 	if err != nil {
@@ -376,8 +465,10 @@ func GetProgressHandler(c *fiber.Ctx) error {
 		var entry models.ProgressEntry
 		var progressText string
 		var filePathsJSON sql.NullString
+		var CreatedAt string
+		var UpdateAt string
 
-		err := rows.Scan(&entry.ID, &progressText, &filePathsJSON, &entry.CreatedAt, &entry.UpdateAt)
+		err := rows.Scan(&entry.ID, &progressText, &filePathsJSON, &CreatedAt, &UpdateAt)
 		if err != nil {
 			log.Printf("Error scanning progress row: %v", err)
 			continue
@@ -386,6 +477,11 @@ func GetProgressHandler(c *fiber.Ctx) error {
 		// Parse progress_text and file_paths
 		parseProgressText(progressText, &entry)
 		parseProgressFilePaths(filePathsJSON, &entry)
+
+		// Set assignto from task
+		entry.CreatedAt = common.Fixtimefeature(CreatedAt)
+		entry.UpdateAt = common.Fixtimefeature(UpdateAt)
+		entry.AssignTo = assignto
 
 		progressEntries = append(progressEntries, entry)
 	}
@@ -420,30 +516,40 @@ func GetProgressHandler(c *fiber.Ctx) error {
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/progress/update/{id}/{pgid} [put]
 func UpdateProgressHandler(c *fiber.Ctx) error {
-	id := c.Params("id")
+	idStr := c.Params("id")
+
 	progressid := c.Params("pgid")
-	var req models.ProgressEntry
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid task ID"})
+	}
+	var req models.UpdateProgress
 	var existingProgressText string
 	var uploadedFiles []fiber.Map
 	var ticketno string
+	var existingFilePathsJSON sql.NullString
+	var taskid int
+	err = db.DB.QueryRow(`
+		SELECT task_id, progress_text, file_paths
+		FROM progress WHERE id = ?
+	`, progressid).Scan(&taskid, &existingProgressText, &existingFilePathsJSON)
 
-	log.Printf("Looking for task with ID: %s", id)
-	err := db.DB.QueryRow("SELECT ticket_no FROM tasks WHERE id = ?", id).Scan(&ticketno)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Progress not found"})
+	}
+
+	if taskid != id {
+		return c.Status(404).JSON(fiber.Map{"error": "tasks id not match"})
+	}
+
+	log.Printf("Looking for task with ID: %d", id)
+	err = db.DB.QueryRow("SELECT ticket_no FROM tasks WHERE id = ?", id).Scan(&ticketno)
 	if err != nil {
 		log.Printf("Task not found error: %v", err)
 		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
 	}
 	log.Printf("Found task with ticket_no: %s", ticketno)
-
-	var existingFilePathsJSON sql.NullString
-	err = db.DB.QueryRow(`
-		SELECT progress_text, file_paths
-		FROM progress WHERE id = ?
-	`, progressid).Scan(&existingProgressText, &existingFilePathsJSON)
-
-	if err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Progress not found"})
-	}
 
 	var keepImageURLs []string
 	form, err := c.MultipartForm()
@@ -690,9 +796,7 @@ func DeleteProgressHandler(c *fiber.Ctx) error {
 	log.Printf("Successfully deleted progress entry ID: %d for task ID: %d with %d associated files", progressID, taskID, fileCount)
 
 	return c.JSON(fiber.Map{
-		"success":       true,
-		"message":       "Progress entry and associated files deleted successfully",
-		"deleted_entry": progressEntry,
-		"files_deleted": fileCount,
+		"success": true,
+		"message": "Progress entry deleted successfully",
 	})
 }

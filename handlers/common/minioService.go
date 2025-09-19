@@ -51,7 +51,7 @@ func HandleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 			continue
 		}
 		// Name Object
-		dateStr := time.Now().Add(7 * time.Hour).Format("01022006")
+		dateStr := time.Now().Add(7 * time.Hour).Format("1504")
 		filenameSafe := strings.ReplaceAll(file.Filename, " ", "-")
 		filenameSafe = strings.ReplaceAll(filenameSafe, "(", "[")
 		filenameSafe = strings.ReplaceAll(filenameSafe, ")", "]")
@@ -115,7 +115,7 @@ func HandleFileUploadsResolution(files []*multipart.FileHeader, ticketno string)
 			continue
 		}
 
-		dateStr := time.Now().Add(7 * time.Hour).Format("01022006")
+		dateStr := time.Now().Add(7 * time.Hour).Format("1504")
 		filenameSafe := strings.ReplaceAll(file.Filename, " ", "-")
 		filenameSafe = strings.ReplaceAll(filenameSafe, "(", "[")
 		filenameSafe = strings.ReplaceAll(filenameSafe, ")", "]")
@@ -184,7 +184,7 @@ func HandleFileUploadsProgress(files []*multipart.FileHeader, ticketNo string) (
 			continue
 		}
 		// Name Object for progress
-		dateStr := time.Now().Add(7 * time.Hour).Format("01022006")
+		dateStr := time.Now().Add(7 * time.Hour).Format("1504")
 		filenameSafe := strings.ReplaceAll(file.Filename, " ", "-")
 		filenameSafe = strings.ReplaceAll(filenameSafe, "(", "[")
 		filenameSafe = strings.ReplaceAll(filenameSafe, ")", "]")

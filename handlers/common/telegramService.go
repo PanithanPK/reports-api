@@ -303,9 +303,9 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		var notificationMsg string
 		switch req.Status {
 		case 0:
-			notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
+			notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* [%s](%s)\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url, req.Url)
 		case 1:
-			notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
+			notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* [%s](%s)\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url, req.Url)
 		}
 
 		if notificationMsg != "" {

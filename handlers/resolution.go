@@ -391,7 +391,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	var systemID, departmentID int
 	var text string
 	var reportID int
-	var ticketno, assignto, reportedby string
+	var ticketno, assignto, reportedby, resolvedat string
 	var taskID, assigntoID int
 	var createdAtStr string
 
@@ -459,11 +459,11 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	// ดึงข้อมูล task
 
 	err = db.DB.QueryRow(`
-		SELECT r.tasks_id, t.ticket_no, IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.created_at
+		SELECT r.tasks_id, t.ticket_no, IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.created_at, t.resolved_at
 		FROM resolutions r
 		JOIN tasks t ON r.tasks_id = t.id
 		WHERE r.id = ?
-	`, resolutions).Scan(&taskID, &ticketno, &assigntoID, &assignto, &reportedby, &createdAtStr)
+	`, resolutions).Scan(&taskID, &ticketno, &assigntoID, &assignto, &reportedby, &createdAtStr, &resolvedat)
 
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Resolutions not found"})
@@ -471,6 +471,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 
 	// Parse created_at string to time
 	CreatedAt := common.Fixtimefeature(createdAtStr)
+	ResolvedAt := common.Fixtimefeature(resolvedat)
 
 	// Parse ข้อมูลจาก request
 	var keepImageURLs []string
@@ -548,12 +549,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 							req.Assignto = assignto
 						}
 						req.CreatedAt = CreatedAt
-						resolvedAt, err := common.GetResolvedAtSafely(db.DB, resolutions)
-						if err != nil {
-							log.Printf("Failed to get resolved_at: %v", err)
-							resolvedAt = time.Now() // Fallback to current time
-						}
-						req.ResolvedAt = resolvedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
+						req.ResolvedAt = ResolvedAt
 						var Urlenv string
 						env := config.AppConfig.Environment
 						if env == "dev" {
@@ -667,14 +663,6 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	}
 
 	// ดึง resolved_at
-	resolvedAt, err := common.GetResolvedAtSafely(db.DB, resolutions)
-	if err != nil {
-		log.Printf("Failed to get resolved_at: %v", err)
-		resolvedAt = time.Now() // Fallback to current time
-	}
-	if err != nil {
-		log.Printf("Failed to get resolved_at: %v", err)
-	}
 	var Urlenv string
 	env := config.AppConfig.Environment
 	if env == "dev" {
@@ -696,7 +684,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	}
 	req.CreatedAt = CreatedAt
 	req.Url = Urlenv
-	req.ResolvedAt = resolvedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
+	req.ResolvedAt = ResolvedAt
 	req.TelegramUser = telegramUser
 
 	// อัปเดตสถานะใน Telegram message ด้วยข้อมูลที่ครบ
@@ -710,7 +698,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		Assignto:       req.Assignto,
 		ReportedBy:     reportedby,
 		CreatedAt:      req.CreatedAt,
-		UpdatedAt:      req.ResolvedAt,
+		ResolvedAt:     req.ResolvedAt,
 		Status:         2,
 		Url:            req.Url,
 		PhoneNumber:    phoneNumber,
