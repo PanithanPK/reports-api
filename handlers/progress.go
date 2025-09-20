@@ -439,7 +439,8 @@ func GetProgressHandler(c *fiber.Ctx) error {
 	// ตรวจสอบว่า task_id มีอยู่ในตาราง tasks หรือไม่
 	var taskExists string
 	var assignto string
-	err = db.DB.QueryRow("SELECT '1', IFNULL(assignto,'') FROM tasks WHERE id = ? LIMIT 1", taskID).Scan(&taskExists, &assignto)
+	var ticketno string
+	err = db.DB.QueryRow("SELECT '1', IFNULL(ticket_no, ''),IFNULL(assignto,'') FROM tasks WHERE id = ? LIMIT 1", taskID).Scan(&taskExists, &ticketno, &assignto)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
@@ -481,6 +482,7 @@ func GetProgressHandler(c *fiber.Ctx) error {
 		// Set assignto from task
 		entry.CreatedAt = common.Fixtimefeature(CreatedAt)
 		entry.UpdateAt = common.Fixtimefeature(UpdateAt)
+		entry.Ticketno = ticketno
 		entry.AssignTo = assignto
 
 		progressEntries = append(progressEntries, entry)

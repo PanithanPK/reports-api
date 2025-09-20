@@ -279,7 +279,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 			Assignto:       req.Assignto,
 			ReportedBy:     reportedby,
 			CreatedAt:      req.CreatedAt,
-			UpdatedAt:      req.ResolvedAt,
+			ResolvedAt:     req.ResolvedAt,
 			Status:         2,
 			Url:            req.Url,
 			PhoneNumber:    phoneNumber,

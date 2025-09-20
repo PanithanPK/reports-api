@@ -3,7 +3,6 @@ package common
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"reports-api/config"
@@ -198,9 +197,12 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 			}
 		} else {
 			defer resp.Body.Close()
-			var buf bytes.Buffer
-			_, err = io.Copy(&buf, resp.Body)
+
+			// Process downloaded image for Telegram optimization
+			imageConfig := DefaultImageConfig()
+			processedImage, _, err := ProcessImageFromReader(resp.Body, photoURL[0], imageConfig)
 			if err != nil {
+				log.Printf("Error processing downloaded image: %v, sending as text", err)
 				message := tgbotapi.NewMessage(chatID, msg)
 				message.ParseMode = "Markdown"
 				sentMsg, err = bot.Send(message)
@@ -208,10 +210,10 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 					return 0, "", err
 				}
 			} else {
-				log.Printf("URL Images: %s", photoURL[0])
+				log.Printf("URL Images processed: %s, Size: %d bytes", photoURL[0], processedImage.Len())
 				photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileReader{
 					Name:   photoURL[0],
-					Reader: &buf,
+					Reader: bytes.NewReader(processedImage.Bytes()),
 				})
 				photoMsg.Caption = msg
 				photoMsg.ParseMode = "Markdown"
@@ -451,9 +453,12 @@ func ReplyToSpecificMessage(req models.ResolutionReq, photoURLs ...string) (int,
 			}
 		} else {
 			defer resp.Body.Close()
-			var buf bytes.Buffer
-			_, err = io.Copy(&buf, resp.Body)
+
+			// Process downloaded image for Telegram optimization
+			imageConfig := DefaultImageConfig()
+			processedImage, _, err := ProcessImageFromReader(resp.Body, photoURLs[0], imageConfig)
 			if err != nil {
+				log.Printf("Error processing downloaded image: %v, sending as text", err)
 				// ส่งเป็นข้อความแทน
 				message := tgbotapi.NewMessage(chatID, replyText)
 				message.ParseMode = "Markdown"
@@ -466,7 +471,7 @@ func ReplyToSpecificMessage(req models.ResolutionReq, photoURLs ...string) (int,
 				// ส่งรูปพร้อม caption
 				photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileReader{
 					Name:   photoURLs[0],
-					Reader: &buf,
+					Reader: bytes.NewReader(processedImage.Bytes()),
 				})
 				photoMsg.Caption = replyText
 				photoMsg.ParseMode = "Markdown"
@@ -560,18 +565,19 @@ func sendPhotoMessage(bot *tgbotapi.BotAPI, chatID int64, photoURL, caption stri
 	}
 	defer resp.Body.Close()
 
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, resp.Body)
+	// Process downloaded image for Telegram optimization
+	imageConfig := DefaultImageConfig()
+	processedImage, _, err := ProcessImageFromReader(resp.Body, photoURL, imageConfig)
 	if err != nil {
-		log.Printf("⚠️ Error reading photo: %v, sending as text instead", err)
+		log.Printf("⚠️ Error processing photo: %v, sending as text instead", err)
 		return sendTextMessage(bot, chatID, caption, replyToMessageID)
 	}
 
-	log.Printf("📸 Photo downloaded successfully, size: %d bytes", buf.Len())
+	log.Printf("📸 Photo processed successfully, size: %d bytes", processedImage.Len())
 
 	photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileReader{
 		Name:   photoURL,
-		Reader: &buf,
+		Reader: bytes.NewReader(processedImage.Bytes()),
 	})
 	photoMsg.Caption = caption
 	photoMsg.ParseMode = "Markdown"

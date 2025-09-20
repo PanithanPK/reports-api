@@ -121,7 +121,7 @@ func RegisterAuthRoutes(r *fiber.App) {
 func RegisterRoutes(r *fiber.App) {
 	RegisterAuthRoutes(r)
 	MainRoutes(r)
-	problemRoutes(r)
+	go problemRoutes(r)
 	resolutionRoutes(r)
 	progressRoutes(r)
 	ipphoneRoutes(r)

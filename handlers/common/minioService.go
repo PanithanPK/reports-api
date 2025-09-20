@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -36,40 +37,54 @@ func HandleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 		return uploadedFiles, []string{"Failed to initialize storage client"}
 	}
 
+	// Image processing configuration
+	imageConfig := DefaultImageConfig()
+
 	// loop through files and upload to MinIO
 	for i, file := range files {
-		// Load file image
-		src, err := file.Open()
-		// Check file type file image
-		contentType := "image/jpeg"
-		if filepath.Ext(file.Filename) == ".png" {
-			contentType = "image/png"
-		}
-		if err != nil {
-			log.Printf("Failed to open %s: %v", file.Filename, err)
-			errors = append(errors, fmt.Sprintf("Failed to open %s: %v", file.Filename, err))
+		// Check if file is an image
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+		if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+			log.Printf("Skipping non-image file: %s", file.Filename)
+			errors = append(errors, fmt.Sprintf("Unsupported file type: %s", file.Filename))
 			continue
 		}
+
+		// Process image (resize and compress)
+		processedImage, contentType, err := ProcessImage(file, imageConfig)
+		if err != nil {
+			log.Printf("Failed to process image %s: %v", file.Filename, err)
+			errors = append(errors, fmt.Sprintf("Failed to process image %s: %v", file.Filename, err))
+			continue
+		}
+
 		// Name Object
 		dateStr := time.Now().Add(7 * time.Hour).Format("1504")
 		filenameSafe := strings.ReplaceAll(file.Filename, " ", "-")
 		filenameSafe = strings.ReplaceAll(filenameSafe, "(", "[")
 		filenameSafe = strings.ReplaceAll(filenameSafe, ")", "]")
+
+		// Update filename extension based on processed format
+		if contentType == "image/jpeg" && (ext == ".png") {
+			// Replace .png with .jpg if converted
+			filenameSafe = strings.TrimSuffix(filenameSafe, ext) + ".jpg"
+		}
+
 		objectName := fmt.Sprintf("%s-%02d-%s-%s", ticketno, i+1, dateStr, filenameSafe)
 
-		// Upload to MinIO
+		// Upload processed image to MinIO
 		_, err = minioClient.PutObject(
 			context.Background(),
 			bucketName,
 			objectName,
-			src,
-			file.Size,
+			bytes.NewReader(processedImage.Bytes()),
+			int64(processedImage.Len()),
 			minio.PutObjectOptions{ContentType: contentType},
 		)
-		src.Close()
+
 		if err != nil {
-			log.Printf("Failed to upload %s: %v", file.Filename, err)
-			errors = append(errors, fmt.Sprintf("Failed to upload %s: %v", file.Filename, err))
+			log.Printf("Failed to upload processed image %s: %v", file.Filename, err)
+			errors = append(errors, fmt.Sprintf("Failed to upload processed image %s: %v", file.Filename, err))
 			continue
 		}
 
@@ -103,15 +118,23 @@ func HandleFileUploadsResolution(files []*multipart.FileHeader, ticketno string)
 		return uploadedFiles, []string{"Failed to initialize storage client"}
 	}
 
+	// Image processing configuration
+	imageConfig := DefaultImageConfig()
+
 	for i, file := range files {
-		src, err := file.Open()
-		contentType := "image/jpeg"
-		if filepath.Ext(file.Filename) == ".png" {
-			contentType = "image/png"
+		// Check if file is an image
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+		if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+			log.Printf("Skipping non-image file: %s", file.Filename)
+			errors = append(errors, fmt.Sprintf("Unsupported file type: %s", file.Filename))
+			continue
 		}
+
+		// Process image (resize and compress)
+		processedImage, contentType, err := ProcessImage(file, imageConfig)
 		if err != nil {
-			log.Printf("Failed to open file: %v", err)
-			errors = append(errors, fmt.Sprintf("Failed to open %s: %v", file.Filename, err))
+			log.Printf("Failed to process image %s: %v", file.Filename, err)
+			errors = append(errors, fmt.Sprintf("Failed to process image %s: %v", file.Filename, err))
 			continue
 		}
 
@@ -119,6 +142,13 @@ func HandleFileUploadsResolution(files []*multipart.FileHeader, ticketno string)
 		filenameSafe := strings.ReplaceAll(file.Filename, " ", "-")
 		filenameSafe = strings.ReplaceAll(filenameSafe, "(", "[")
 		filenameSafe = strings.ReplaceAll(filenameSafe, ")", "]")
+
+		// Update filename extension based on processed format
+		if contentType == "image/jpeg" && (ext == ".png") {
+			// Replace .png with .jpg if converted
+			filenameSafe = strings.TrimSuffix(filenameSafe, ext) + ".jpg"
+		}
+
 		filename := "solution"
 		objectName := fmt.Sprintf("%s-%s-%02d-%s-%s", ticketno, filename, i+1, dateStr, filenameSafe)
 
@@ -126,15 +156,14 @@ func HandleFileUploadsResolution(files []*multipart.FileHeader, ticketno string)
 			context.Background(),
 			bucketName,
 			objectName,
-			src,
-			file.Size,
+			bytes.NewReader(processedImage.Bytes()),
+			int64(processedImage.Len()),
 			minio.PutObjectOptions{ContentType: contentType},
 		)
-		src.Close()
 
 		if err != nil {
-			log.Printf("Failed to upload %s: %v", file.Filename, err)
-			errors = append(errors, fmt.Sprintf("Failed to upload %s: %v", file.Filename, err))
+			log.Printf("Failed to upload processed image %s: %v", file.Filename, err)
+			errors = append(errors, fmt.Sprintf("Failed to upload processed image %s: %v", file.Filename, err))
 			continue
 		}
 
@@ -169,41 +198,55 @@ func HandleFileUploadsProgress(files []*multipart.FileHeader, ticketNo string) (
 		return uploadedFiles, []string{"Failed to initialize storage client"}
 	}
 
+	// Image processing configuration
+	imageConfig := DefaultImageConfig()
+
 	// loop through files and upload to MinIO
 	for i, file := range files {
-		// Load file image
-		src, err := file.Open()
-		// Check file type file image
-		contentType := "image/jpeg"
-		if filepath.Ext(file.Filename) == ".png" {
-			contentType = "image/png"
-		}
-		if err != nil {
-			log.Printf("Failed to open %s: %v", file.Filename, err)
-			errors = append(errors, fmt.Sprintf("Failed to open %s: %v", file.Filename, err))
+		// Check if file is an image
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+		if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+			log.Printf("Skipping non-image file: %s", file.Filename)
+			errors = append(errors, fmt.Sprintf("Unsupported file type: %s", file.Filename))
 			continue
 		}
+
+		// Process image (resize and compress)
+		processedImage, contentType, err := ProcessImage(file, imageConfig)
+		if err != nil {
+			log.Printf("Failed to process image %s: %v", file.Filename, err)
+			errors = append(errors, fmt.Sprintf("Failed to process image %s: %v", file.Filename, err))
+			continue
+		}
+
 		// Name Object for progress
 		dateStr := time.Now().Add(7 * time.Hour).Format("1504")
 		filenameSafe := strings.ReplaceAll(file.Filename, " ", "-")
 		filenameSafe = strings.ReplaceAll(filenameSafe, "(", "[")
 		filenameSafe = strings.ReplaceAll(filenameSafe, ")", "]")
+
+		// Update filename extension based on processed format
+		if contentType == "image/jpeg" && (ext == ".png") {
+			// Replace .png with .jpg if converted
+			filenameSafe = strings.TrimSuffix(filenameSafe, ext) + ".jpg"
+		}
+
 		filename := "progress"
 		objectName := fmt.Sprintf("%s-%s-%02d-%s-%s", ticketNo, filename, i+1, dateStr, filenameSafe)
 
-		// Upload to MinIO
+		// Upload processed image to MinIO
 		_, err = minioClient.PutObject(
 			context.Background(),
 			bucketName,
 			objectName,
-			src,
-			file.Size,
+			bytes.NewReader(processedImage.Bytes()),
+			int64(processedImage.Len()),
 			minio.PutObjectOptions{ContentType: contentType},
 		)
-		src.Close()
+
 		if err != nil {
-			log.Printf("Failed to upload %s: %v", file.Filename, err)
-			errors = append(errors, fmt.Sprintf("Failed to upload %s: %v", file.Filename, err))
+			log.Printf("Failed to upload processed image %s: %v", file.Filename, err)
+			errors = append(errors, fmt.Sprintf("Failed to upload processed image %s: %v", file.Filename, err))
 			continue
 		}
 

@@ -2,6 +2,7 @@ package models
 
 type ProgressEntry struct {
 	ID        int               `json:"id"`
+	Ticketno  string            `json:"ticket_no"`
 	Text      string            `json:"text"`
 	FilePaths map[string]string `json:"file_paths,omitempty"`
 	AssignTo  string            `json:"assignto"`
