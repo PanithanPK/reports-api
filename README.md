@@ -39,13 +39,124 @@ This project is a backend API built with Go for managing a problem reporting sys
 *   **Database Integration:** Designed to connect to a database (potentially MySQL based on other files).
 *   **Notification System:** Potentially integrates with Telegram for notifications (based on `PROJECT_OVERVIEW.md`).
 
-## Prerequisites & Dependencies
+## System Requirements
 
-Before you begin, ensure you have the following installed:
+### Hardware Requirements
 
-*   **Go (version 1.23 or higher):**  [https://go.dev/dl/](https://go.dev/dl/)
-*   **Docker:** [https://www.docker.com/get-started/](https://www.docker.com/get-started/)
-*   **Node.js (for some tooling, version may vary):** [https://nodejs.org/](https://nodejs.org/) (check package.json for version requirements if any).  While not strictly required for running the Go backend, it's listed as a technology used in the project.
+#### Minimum
+- **CPU:** 1 Core (x86_64 or ARM64)
+- **RAM:** 512 MB
+- **Storage:** 500 MB free space
+- **Network:** Internet connection (for downloading dependencies)
+
+#### Recommended
+- **CPU:** 2+ Cores (x86_64 or ARM64)
+- **RAM:** 2 GB or more
+- **Storage:** 2 GB free space (including database)
+- **Network:** Broadband Internet Connection
+
+#### Production
+- **CPU:** 4+ Cores
+- **RAM:** 4 GB or more
+- **Storage:** 10 GB+ (SSD recommended)
+- **Network:** Dedicated Server/VPS
+
+### Software Requirements
+
+#### Required
+- **Go:** Version 1.23.0 or later
+  - Download: [https://go.dev/dl/](https://go.dev/dl/)
+  - Check version: `go version`
+
+- **MySQL:** Version 8.0 or later
+  - Download: [https://dev.mysql.com/downloads/mysql/](https://dev.mysql.com/downloads/mysql/)
+  - Or use MariaDB 10.5+
+
+- **Git:** Latest version
+  - Download: [https://git-scm.com/downloads](https://git-scm.com/downloads)
+
+#### Optional
+- **Docker:** Version 20.10+ and Docker Compose 2.0+
+  - Download: [https://www.docker.com/get-started/](https://www.docker.com/get-started/)
+  - For containerized deployment
+
+- **Node.js:** Version 16+ (for development tools)
+  - Download: [https://nodejs.org/](https://nodejs.org/)
+  - Used for standard-version and changelog management
+
+- **MinIO:** Latest version (for file storage)
+  - Download: [https://min.io/download](https://min.io/download)
+
+### Supported Operating Systems
+
+#### Linux (Recommended)
+- **Ubuntu:** 20.04 LTS, 22.04 LTS, 24.04 LTS
+- **CentOS/RHEL:** 8, 9
+- **Debian:** 11, 12
+- **Alpine Linux:** 3.15+
+
+#### Windows
+- **Windows 10:** Build 1903 or later
+- **Windows 11:** All versions
+- **Windows Server:** 2019, 2022
+
+#### macOS
+- **macOS:** 10.15 (Catalina) or later
+- **Apple Silicon (M1/M2):** Supported
+
+### Dependencies & Versions
+
+#### Go Modules (from go.mod)
+```
+Go Toolchain: 1.24.4
+Main Dependencies:
+├── github.com/gofiber/fiber/v2 v2.52.5
+├── github.com/go-sql-driver/mysql v1.9.3
+├── github.com/joho/godotenv v1.5.1
+├── github.com/swaggo/swag v1.16.6
+├── github.com/swaggo/fiber-swagger v1.3.0
+├── github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
+├── github.com/minio/minio-go/v7 v7.0.95
+├── github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+└── golang.org/x/crypto v0.40.0
+```
+
+#### Development Tools
+```
+Node.js Dependencies:
+├── standard-version v9.5.0 (for changelog management)
+└── npm/yarn (package manager)
+
+Go Tools:
+├── swag CLI (go install github.com/swaggo/swag/cmd/swag@latest)
+└── air (hot reload - optional)
+```
+
+### Prerequisites Check
+
+Before starting installation, verify your system is ready:
+
+```bash
+# Check Go
+go version
+# Should show: go version go1.23.0 or later
+
+# Check MySQL
+mysql --version
+# Should show: mysql Ver 8.0.x
+
+# Check Git
+git --version
+# Should show: git version 2.x.x
+
+# Check Docker (if using)
+docker --version && docker-compose --version
+# Should show: Docker version 20.10.x and Docker Compose version 2.x.x
+
+# Check Node.js (if using)
+node --version && npm --version
+# Should show: v16.x.x or later
+```
 
 ## Installation & Setup Instructions
 

@@ -423,7 +423,7 @@ CHAT_ID=prod_telegram_chat_id
 
 ## Deployment
 
-### Docker
+### Docker Deployment
 ```bash
 # Build development image
 docker build -t reports-api:dev -f Dockerfile.dev .
@@ -431,11 +431,55 @@ docker build -t reports-api:dev -f Dockerfile.dev .
 # Build production image
 docker build -t reports-api:prod .
 
-# Run with Docker Compose
+# Run with Docker Compose (Full Stack)
 docker-compose up -d
+
+# Run with development configuration
+docker-compose -f docker-compose.dev.yml up -d
 
 # Run container manually
 docker run -p 5000:5000 --env-file .env.prod reports-api:prod
+```
+
+### Production Deployment with Nginx
+```bash
+# Full production stack with Nginx, MySQL, MinIO
+docker-compose -f docker-compose.prod.yml up -d
+
+# Scale API instances for load balancing
+docker-compose up -d --scale reports-api=3
+
+# Update services without downtime
+docker-compose up -d --no-deps reports-api
+```
+
+### Kubernetes Deployment
+```yaml
+# Basic Kubernetes deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reports-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: reports-api
+  template:
+    metadata:
+      labels:
+        app: reports-api
+    spec:
+      containers:
+      - name: reports-api
+        image: reports-api:latest
+        ports:
+        - containerPort: 5001
+        env:
+        - name: DB_HOST
+          value: "mysql-service"
+        - name: PORT
+          value: "5001"
 ```
 
 ### Manual Run
@@ -521,11 +565,99 @@ When you need ChatGPT to help develop or modify code, reference this file to:
 - **v1.2.0**: Telegram integration
 - **v1.1.0**: Initial release
 
+## Infrastructure Architecture
+
+### Container Architecture
+```
+┌─────────────────┐    ┌─────────────────┐       ┌─────────────────┐
+│     Nginx       │───>│   Reports API   │──────>│     MySQL       │
+│  (Reverse Proxy)│    │   (Go + Fiber)  │       │   (Database)    │
+│   Load Balancer │<───│                 │<──────│                 │
+└─────────────────┘    └─────────────────┘       └─────────────────┘
+         │                       │_______________________
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Static Files  │    │     MinIO       │    │   Telegram Bot  │
+│   (CSS/JS/IMG)  │    │ (File Storage)  │    │ (Notifications) │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### Network Architecture
+- **Frontend Network**: Public-facing Nginx (ports 80/443)
+- **Backend Network**: Internal API communication
+- **Database Network**: Isolated database access
+- **Storage Network**: MinIO file storage access
+
+### Scaling Strategy
+- **Horizontal Scaling**: Multiple API instances behind load balancer
+- **Database Scaling**: Read replicas and connection pooling
+- **File Storage**: Distributed MinIO cluster
+- **Caching**: Nginx caching and Redis integration
+
+### Security Layers
+1. **Network Security**: Firewall and VPN access
+2. **Application Security**: JWT authentication and RBAC
+3. **Transport Security**: SSL/TLS encryption
+4. **Data Security**: Database encryption and secure file storage
+
+## Monitoring and Observability
+
+### Health Monitoring
+- **Application Health**: `/health` endpoint monitoring
+- **Database Health**: Connection pool monitoring
+- **File Storage Health**: MinIO cluster status
+- **Nginx Health**: Upstream server monitoring
+
+### Logging Strategy
+- **Application Logs**: Structured JSON logging
+- **Access Logs**: Nginx access and error logs
+- **Database Logs**: MySQL slow query and error logs
+- **System Logs**: Container and host system logs
+
+### Metrics Collection
+- **Performance Metrics**: Response times and throughput
+- **Resource Metrics**: CPU, memory, and disk usage
+- **Business Metrics**: Task creation rates and resolution times
+- **Error Metrics**: Error rates and failure patterns
+
+## Backup and Recovery
+
+### Database Backup
+```bash
+# Automated daily backups
+docker exec mysql mysqldump -u root -p reports_db > backup_$(date +%Y%m%d).sql
+
+# Point-in-time recovery setup
+mysql> SET GLOBAL binlog_format = 'ROW';
+mysql> SET GLOBAL log_bin = ON;
+```
+
+### File Storage Backup
+```bash
+# MinIO data backup
+mc mirror minio/reports-bucket /backup/minio/reports-bucket
+
+# Automated backup script
+#!/bin/bash
+DATE=$(date +%Y%m%d)
+mc mirror minio/reports-bucket /backup/minio/$DATE/
+```
+
+### Disaster Recovery
+- **RTO (Recovery Time Objective)**: 4 hours
+- **RPO (Recovery Point Objective)**: 1 hour
+- **Backup Retention**: 30 days daily, 12 months monthly
+- **Geographic Redundancy**: Multi-region backup storage
+
 ## Current Status
-- **Latest Version**: v1.14.0
-- **Environment**: Development/Production ready
-- **Database**: MySQL with full schema
-- **File Storage**: MinIO integration active
-- **Notifications**: Telegram bot operational
-- **Documentation**: Swagger UI available
-- **CI/CD**: GitLab pipeline configured
+- **Latest Version**: v1.15.0
+- **Environment**: Production-ready with full infrastructure
+- **Database**: MySQL 8.0 with connection pooling and backups
+- **File Storage**: MinIO cluster with redundancy
+- **Notifications**: Telegram bot with image support
+- **Documentation**: Complete API and infrastructure documentation
+- **CI/CD**: GitLab pipeline with automated testing and deployment
+- **Monitoring**: Health checks and logging infrastructure
+- **Security**: SSL/TLS, authentication, and security headers
+- **Scalability**: Load balancing and horizontal scaling ready
