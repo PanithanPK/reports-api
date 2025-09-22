@@ -243,9 +243,6 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 }
 
 func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
-	log.Printf("UpdateTelegram called - MessageID: %d, Status: %d, Assignto: %s", req.MessageID, req.Status, req.Assignto)
-	log.Printf("UpdateTelegram - PhotoURLs: %v", photoURL)
-
 	// Helper function to escape Markdown characters
 	botToken := config.AppConfig.BotToken
 	chatIDStr := config.AppConfig.ChatID
@@ -257,14 +254,10 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	}
 	messageID := req.MessageID
 
-	log.Printf("UpdateTelegram - Bot config: chatID=%d, messageID=%d", chatID, messageID)
-
 	newMessage := FormatRepostMessage(req, photoURL...)
-	log.Printf("UpdateTelegram - Formatted message length: %d characters", len(newMessage))
 
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
-		log.Printf("UpdateTelegram - Failed to create Telegram bot: %v", err)
 		log.Panic("Failed to create Telegram bot:", err)
 	}
 	bot.Debug = false
@@ -289,8 +282,6 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 			return 0, err
 		}
 	}
-
-	log.Printf("UpdateTelegram - Message edit successful")
 
 	// ส่งการแจ้งเตือนเฉพาะเมื่อมีการเปลี่ยนผู้รับผิดชอบ
 	var notificationID int
@@ -322,8 +313,6 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 				notificationID = notificationResp.MessageID
 				log.Printf("UpdateTelegram - Notification sent with ID: %d", notificationID)
 			}
-		} else {
-			log.Printf("UpdateTelegram - No notification message for status: %d", req.Status)
 		}
 	} else {
 		log.Printf("UpdateTelegram - No notification needed")
@@ -520,15 +509,12 @@ func UpdatereplyToSpecificMessage(messageID int, req models.ResolutionReq, photo
 	}
 
 	// ลองลบ message เก่า (ไม่ถือเป็น error ร้ายแรงถ้าลบไม่ได้)
-	log.Printf("🗑️ Attempting to delete message ID: %d", messageID)
 	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
 	resp, err := bot.Request(deleteMsg)
 	if err != nil {
 		log.Printf("⚠️ Cannot delete message ID %d: %v (continuing anyway)", messageID, err)
 	} else if !resp.Ok {
 		log.Printf("⚠️ Delete message failed for ID %d: %s (continuing anyway)", messageID, resp.Description)
-	} else {
-		log.Printf("✅ Successfully deleted message ID: %d", messageID)
 	}
 
 	// Format solution message
@@ -539,10 +525,8 @@ func UpdatereplyToSpecificMessage(messageID int, req models.ResolutionReq, photo
 
 	// ส่ง message ใหม่
 	if len(photoURLs) > 0 && photoURLs[0] != "" {
-		log.Printf("📸 Sending photo message with URL: %s", photoURLs[0])
 		sentMsg, err = sendPhotoMessage(bot, chatID, photoURLs[0], replyText, req.MessageID)
 	} else {
-		log.Printf("📄 Sending text message")
 		sentMsg, err = sendTextMessage(bot, chatID, replyText, req.MessageID)
 	}
 
@@ -556,7 +540,6 @@ func UpdatereplyToSpecificMessage(messageID int, req models.ResolutionReq, photo
 
 // Helper functions
 func sendPhotoMessage(bot *tgbotapi.BotAPI, chatID int64, photoURL, caption string, replyToMessageID int) (tgbotapi.Message, error) {
-	log.Printf("🔄 Fetching photo from: %s", photoURL)
 
 	resp, err := http.Get(photoURL)
 	if err != nil {

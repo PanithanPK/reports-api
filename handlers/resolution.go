@@ -111,12 +111,12 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	if assignedtoIDStr := c.FormValue("assignedto_id"); assignedtoIDStr != "" {
 		req.AssignedtoID, _ = strconv.Atoi(assignedtoIDStr)
 	}
-
+	var createdAtStr string
 	err := db.DB.QueryRow(`
-			SELECT ticket_no, IFNULL(assignto_id, 0),IFNULL(assignto, '') AS assignto, IFNULL(reported_by, '') AS reported_by, IFNULL(telegram_id, 0)
+			SELECT ticket_no, IFNULL(assignto_id, 0),IFNULL(assignto, '') AS assignto, IFNULL(reported_by, '') AS reported_by, IFNULL(telegram_id, 0), IFNULL(created_at, '')
 			FROM tasks
 			WHERE id = ?
-		`, id).Scan(&ticketno, &AssignedtoID, &assignto, &reportedby, &telegramID)
+		`, id).Scan(&ticketno, &AssignedtoID, &assignto, &reportedby, &telegramID, &createdAtStr)
 	if err != nil {
 		log.Printf("Failed to retrieve task data for task ID %s: %v", id, err)
 		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
@@ -145,7 +145,6 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 		log.Printf("Failed to retrieve report ID: %v", err)
 	}
 
-	var createdAtStr string
 	CreatedAt := common.Fixtimefeature(createdAtStr)
 
 	// ลองแยกการ parse ข้อมูล
@@ -278,7 +277,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 			Ticket:         ticketno,
 			Assignto:       req.Assignto,
 			ReportedBy:     reportedby,
-			CreatedAt:      req.CreatedAt,
+			CreatedAt:      CreatedAt,
 			ResolvedAt:     req.ResolvedAt,
 			Status:         2,
 			Url:            req.Url,
@@ -339,8 +338,6 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 		replyMessageID, err := common.ReplyToSpecificMessage(req, replyPhotoURLs...)
 		if err != nil {
 			log.Printf("Failed to send solution to Telegram: %v", err)
-		} else {
-			log.Printf("Solution sent to Telegram with reply message ID: %d telegram user: %s", replyMessageID, telegramUser)
 		}
 
 		_, err = db.DB.Exec(`UPDATE telegram_chat SET solution_id = ? WHERE id = ?`, replyMessageID, telegramID)

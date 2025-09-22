@@ -279,7 +279,6 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 		// Keep the original format with url objects: [{"url": "..."}]
 		filePathsBytes, _ := json.Marshal(uploadedFiles)
 		filePathsJSON = string(filePathsBytes)
-		log.Printf("filePathsJSON : %s", filePathsJSON)
 	}
 
 	// บันทึกข้อมูลลงในตาราง progress

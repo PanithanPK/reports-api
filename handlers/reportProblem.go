@@ -618,18 +618,20 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 	var assigntoID int
 	var ResolvedAt string
 	var telegramID int
+	var updatedAtStr string
 
 	err = db.DB.QueryRow(`
 		SELECT IFNULL(t.ticket_no, ''),IFNULL(tc.report_id, 0), IFNULL(t.reported_by, ''), 
-		IFNULL(t.file_paths, '[]'), IFNULL(rs.telegram_username, ''), IFNULL(tc.assignto_id, 0), t.created_at, IFNULL(t.telegram_id, 0)
+		IFNULL(t.file_paths, '[]'), IFNULL(rs.telegram_username, ''), IFNULL(tc.assignto_id, 0), t.created_at, IFNULL(t.telegram_id, 0), t.updated_at
 		FROM tasks t
 		LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
 		LEFT JOIN responsibilities rs ON t.assignto_id = rs.id
 		WHERE t.id = ?
-		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON, &telegramUser, &assigntoID, &createdAtStr, &telegramID)
+		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON, &telegramUser, &assigntoID, &createdAtStr, &telegramID, &updatedAtStr)
 
 	// Parse created_at string to time
 	CreatedAt := common.Fixtimefeature(createdAtStr)
+	UpdatedAt := common.Fixtimefeature(updatedAtStr)
 
 	log.Printf("Query result - err: %v, messageID: %d, telegramID: %d", err, messageID, telegramID)
 
@@ -685,6 +687,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		telegramReq.PreviousAssignto = previousAssignto
 		telegramReq.CreatedAt = CreatedAt
 		telegramReq.ResolvedAt = resolvedAtnow
+		telegramReq.UpdatedAt = UpdatedAt
 
 		// Get first image URL from existing files for Telegram
 		photoURLs := getPhotoURLs(existingFilePathsJSON)
@@ -1394,13 +1397,14 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 	}
 
 	var messageID int
+	var status int
 
 	err := db.DB.QueryRow(`
-		SELECT IFNULL(tc.assignto_id, 0) as assignto_id
+		SELECT IFNULL(tc.assignto_id, 0) as assignto_id, IFNULL(status, 0)
 		FROM tasks t
 		LEFT JOIN telegram_chat tc ON t.telegram_id = tc.id
 		WHERE t.id = ?
-		`, id).Scan(&messageID)
+		`, id).Scan(&messageID, &status)
 	if err != nil {
 		log.Printf("Failed to get task data: %v", err)
 	}
@@ -1408,12 +1412,20 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 	if messageID > 0 {
 		_, _ = common.DeleteTelegram(messageID)
 	}
-
-	_, err = db.DB.Exec(`UPDATE tasks SET assignto_id = ?, assignto = ?, status = 1, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.AssignedtoID, req.Assignto, req.UpdatedBy, id)
-	if err != nil {
-		log.Printf("Database error: %v", err)
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to update assigned person"})
+	if status == 2 {
+		_, err = db.DB.Exec(`UPDATE tasks SET assignto_id = ?, assignto = ?, status = 2, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.AssignedtoID, req.Assignto, req.UpdatedBy, id)
+		if err != nil {
+			log.Printf("Database error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to update assigned person"})
+		}
+	} else {
+		_, err = db.DB.Exec(`UPDATE tasks SET assignto_id = ?, assignto = ?, status = 1, updated_by = ?, updated_at = NOW() WHERE id = ?`, req.AssignedtoID, req.Assignto, req.UpdatedBy, id)
+		if err != nil {
+			log.Printf("Database error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to update assigned person"})
+		}
 	}
+
 	// เฉพาะกรณีที่ต้องการอัพเดต Telegram
 	if req.UpdateTelegram {
 
