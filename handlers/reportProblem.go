@@ -263,7 +263,6 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		}
 		if telegramStr := c.FormValue("telegram"); telegramStr != "" {
 			req.Telegram = telegramStr == "true"
-			log.Printf("📥 Parsed telegram field from form: '%s' -> %t", telegramStr, req.Telegram)
 		} else {
 			log.Printf("📥 No telegram field found in form, defaulting to false")
 		}
@@ -290,7 +289,6 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 	var res sql.Result
 	if len(uploadedFiles) > 0 {
 		filePathsBytes, _ := json.Marshal(uploadedFiles)
-		log.Printf("Saving file_paths: %s", string(filePathsBytes))
 		if req.SystemID > 0 {
 			// ดึง typeid จาก systems_program
 			var typeid int
@@ -338,9 +336,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 	} else {
 		Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + strconv.Itoa(int(id))
 	}
-	log.Printf("🔔 Telegram flag: %t", req.Telegram)
 	if req.Telegram {
-		log.Printf("🚀 Preparing to send Telegram notification for task ID: %d", id)
 		// Get additional data for Telegram
 		phoneNumber, departmentName, branchName, programName := getTelegramData(req.PhoneID, req.SystemID, req.DepartmentID, "")
 
@@ -372,7 +368,6 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 		}
 
 		if err == nil {
-			log.Printf("✅ Telegram sent successfully, updating message_id: %d for task: %d", messageID, id)
 			// Update task with message_id
 			chatID, _ := strconv.Atoi(os.Getenv("CHAT_ID"))
 			resTG, errTG := db.DB.Exec(`INSERT INTO telegram_chat (chat_id, chat_name, report_id) VALUES (?, ?, ?)`, chatID, messageName, messageID)
@@ -816,8 +811,6 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			} else {
 				log.Printf("❌ Failed to fetch resolution data: %v", err)
 			}
-		} else {
-			log.Printf("ℹ️ No solution message to update - resolutionID valid: %v, solutionMessageID: %d", resolutionID.Valid, solutionMessageID)
 		}
 	}
 

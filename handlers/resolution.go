@@ -174,10 +174,9 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	// เตรียม file paths JSON
 	var filePathsJSON interface{}
 	if len(uploadedFiles) > 0 {
-		log.Printf("Uploaded %d files", len(uploadedFiles))
+
 		filePathsBytes, _ := json.Marshal(uploadedFiles)
 		filePathsJSON = string(filePathsBytes)
-		log.Printf("Saving file_paths: %s", filePathsJSON)
 	} else {
 		filePathsJSON = nil
 	}
@@ -560,8 +559,6 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 						messageID, err := common.UpdatereplyToSpecificMessage(solutionMessageID, req, keepImageURLs...)
 						if err != nil {
 							log.Printf("Failed to update Telegram reply: %v", err)
-						} else {
-							log.Printf("Successfully updated Telegram reply message with ID: %d", messageID)
 						}
 						db.DB.Exec(`UPDATE telegram_chat SET solution_id = ? WHERE id = ?`, messageID, telegramID)
 					}

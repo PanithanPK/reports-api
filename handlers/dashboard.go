@@ -22,7 +22,6 @@ import (
 // @Router /api/v1/dashboard/data [get]
 func GetDashboardDataHandler(c *fiber.Ctx) error {
 	logger := log.Default()
-	logger.Printf("📊 Loading dashboard data from %s", c.IP())
 
 	defer func() {
 		if r := recover(); r != nil {

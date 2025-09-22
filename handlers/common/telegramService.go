@@ -238,7 +238,6 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 		}
 	}
 
-	log.Printf("Telegram message sent successfully with ID: %d", sentMsg.MessageID)
 	return sentMsg.MessageID, sentMsg.From.UserName, nil
 }
 
@@ -264,7 +263,6 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 
 	// Edit photo caption if photoURL is provided, otherwise edit text message
 	if len(photoURL) > 0 && photoURL[0] != "" {
-		log.Printf("UpdateTelegram - Editing message caption for messageID: %d", messageID)
 		editMsg := tgbotapi.NewEditMessageCaption(chatID, messageID, newMessage)
 		editMsg.ParseMode = "Markdown"
 		_, err := bot.Send(editMsg)
@@ -273,7 +271,6 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 			return 0, err
 		}
 	} else {
-		log.Printf("UpdateTelegram - Editing message text for messageID: %d", messageID)
 		editMsg := tgbotapi.NewEditMessageText(chatID, messageID, newMessage)
 		editMsg.ParseMode = "Markdown"
 		_, err := bot.Send(editMsg)
@@ -287,7 +284,6 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	var notificationID int
 
 	if req.TelegramUser != "" && req.PreviousAssignto != req.Assignto {
-		log.Printf("UpdateTelegram - Sending notification for assignee change")
 		telegramTag := req.TelegramUser
 		if !strings.HasPrefix(telegramTag, "@") {
 			telegramTag = "@" + telegramTag
@@ -302,7 +298,6 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		}
 
 		if notificationMsg != "" {
-			log.Printf("UpdateTelegram - Sending notification message")
 			notifyMsg := tgbotapi.NewMessage(chatID, notificationMsg)
 			notifyMsg.ParseMode = "Markdown"
 			notifyMsg.ReplyToMessageID = messageID
@@ -314,8 +309,6 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 				log.Printf("UpdateTelegram - Notification sent with ID: %d", notificationID)
 			}
 		}
-	} else {
-		log.Printf("UpdateTelegram - No notification needed")
 	}
 
 	log.Printf("Message ID %d edited successfully!", messageID)

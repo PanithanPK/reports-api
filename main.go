@@ -166,6 +166,9 @@ func main() {
 	logger.Info.Println("🍪 Session middleware configured")
 
 	// Add middleware
+	app.Use(middleware.CompressionMiddleware())
+	app.Use(middleware.LoggingMiddleware())
+	app.Use(middleware.ResponseStandardizationMiddleware())
 	// app.Use(middleware.HeaderMiddleware())
 	app.Use(middleware.RateLimiter())
 	logger.Info.Println("✅ Middleware added")

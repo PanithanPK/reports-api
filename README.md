@@ -1,6 +1,6 @@
 # Reports API
 
-![Reports API](https://raw.githubusercontent.com/PanithanPK/reports-api/refs/heads/develop/dockergo.png)
+![Reports API](https://raw.githubusercontent.com/PanithanPK/reports-api/refs/heads/develop/docs/dockergo.png)
 
 <div align="center">
   <img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go">
