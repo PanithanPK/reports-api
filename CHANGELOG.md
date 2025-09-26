@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.16.0](https://github.com/PanithanPK/reports-api/compare/v1.15.0...v1.16.0) (2025-09-26)
+
+
+### Features
+
+* Feature resize images file ([0cccea6](https://github.com/PanithanPK/reports-api/commit/0cccea6e562df710a437501c98ca9dccd3807306))
+* New feature logging and Compression response and Update document ([6591fa5](https://github.com/PanithanPK/reports-api/commit/6591fa501d5e7994606629233393bec3ccb438f0))
+
+
+### Bug Fixes
+
+* fix bug update telegram message in reportProblem ([cb6af54](https://github.com/PanithanPK/reports-api/commit/cb6af54423d6dbd1db1913cd330d086200901012))
+
 ## [1.15.0](https://github.com/PanithanPK/reports-api/compare/v1.14.0...v1.15.0) (2025-09-19)
 
 
