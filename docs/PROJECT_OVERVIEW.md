@@ -569,18 +569,18 @@ When you need ChatGPT to help develop or modify code, reference this file to:
 
 ### Container Architecture
 ```
-┌─────────────────┐    ┌─────────────────┐       ┌─────────────────┐
-│     Nginx       │───>│   Reports API   │──────>│     MySQL       │
-│  (Reverse Proxy)│    │   (Go + Fiber)  │       │   (Database)    │
-│   Load Balancer │<───│                 │<──────│                 │
-└─────────────────┘    └─────────────────┘       └─────────────────┘
-         │                       │_______________________
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Static Files  │    │     MinIO       │    │   Telegram Bot  │
-│   (CSS/JS/IMG)  │    │ (File Storage)  │    │ (Notifications) │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ Reports website │───>│     Nginx       │───>│   Reports API   │───>│     MySQL       │
+│   ( next js )   │    │  (Reverse Proxy)│    │   (Go + Fiber)  │    │   (Database)    │
+│                 │<───│   Load Balancer │<───│                 │<───│                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │                       │
+                              │                       │───────────────────────┐
+                              ▼                       ▼                       ▼
+                      ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+                      │   Static Files  │    │     MinIO       │    │   Telegram Bot  │
+                      │   (CSS/JS/IMG)  │    │ (File Storage)  │    │ (Notifications) │
+                      └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
 ### Network Architecture

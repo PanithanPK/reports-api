@@ -10,22 +10,17 @@ import (
 	"log"
 	"mime/multipart"
 	"path/filepath"
+	"reports-api/models"
 	"strings"
 
 	"github.com/nfnt/resize"
 )
 
 // ImageConfig holds configuration for image processing
-type ImageConfig struct {
-	MaxWidth    uint
-	MaxHeight   uint
-	Quality     int   // JPEG quality (1-100)
-	MaxFileSize int64 // Maximum file size in bytes (e.g., 10MB for Telegram)
-}
 
 // DefaultImageConfig returns default configuration optimized for Telegram
-func DefaultImageConfig() ImageConfig {
-	return ImageConfig{
+func DefaultImageConfig() models.ImageConfig {
+	return models.ImageConfig{
 		MaxWidth:    1920,             // Max width for images
 		MaxHeight:   1080,             // Max height for images
 		Quality:     85,               // JPEG quality
@@ -34,7 +29,7 @@ func DefaultImageConfig() ImageConfig {
 }
 
 // ProcessImage resizes and compresses an image file
-func ProcessImage(file *multipart.FileHeader, config ImageConfig) (*bytes.Buffer, string, error) {
+func ProcessImage(file *multipart.FileHeader, config models.ImageConfig) (*bytes.Buffer, string, error) {
 	// Open the uploaded file
 	src, err := file.Open()
 	if err != nil {
@@ -180,7 +175,7 @@ func calculateNewDimensions(originalWidth, originalHeight, maxWidth, maxHeight u
 }
 
 // ProcessImageFromReader processes an image from an io.Reader (for downloaded images)
-func ProcessImageFromReader(reader io.Reader, filename string, config ImageConfig) (*bytes.Buffer, string, error) {
+func ProcessImageFromReader(reader io.Reader, filename string, config models.ImageConfig) (*bytes.Buffer, string, error) {
 	// Read all data into memory
 	data, err := io.ReadAll(reader)
 	if err != nil {

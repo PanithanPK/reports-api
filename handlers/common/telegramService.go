@@ -43,7 +43,12 @@ func FormatSolutionMessage(req models.ResolutionReq, photoURLs ...string) string
 	replyText += "🎫 *Ticket No:* [" + req.TicketNo + "](" + req.Url + ")\n"
 
 	if req.TelegramUser != "" {
-		replyText += "👥 *ผู้รับผิดชอบ:* " + req.Assignto + " " + EscapeMarkdown(req.TelegramUser) + "\n"
+		telegramTag := req.TelegramUser
+		if !strings.HasPrefix(telegramTag, "@") {
+			telegramTag = "@" + telegramTag
+		}
+		telegramTag = strings.ReplaceAll(telegramTag, "_", "\\_")
+		replyText += "👥 *ผู้รับผิดชอบ:* " + req.Assignto + " " + telegramTag + "\n"
 	} else {
 		replyText += "👥 *ผู้รับผิดชอบ:* " + req.Assignto + "\n"
 	}

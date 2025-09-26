@@ -103,31 +103,3 @@ func GetDBStats() sql.DBStats {
 	}
 	return sql.DBStats{}
 }
-
-type Problem struct {
-	ID           int
-	IpPhone      sql.NullString
-	Program      sql.NullString
-	Other        sql.NullString
-	Problem      string
-	Solution     sql.NullString
-	SolutionDate sql.NullTime
-	SolutionUser sql.NullString
-	Status       string
-	CreatedAt    time.Time
-}
-
-type Program struct {
-	ID   string
-	Name string
-}
-
-func GetAllProblems() ([]Problem, error) {
-	// TODO: Implement actual database query
-	return []Problem{}, nil
-}
-
-func GetProgramByID(id string) (*Program, error) {
-	// TODO: Implement actual database query
-	return &Program{}, nil
-}

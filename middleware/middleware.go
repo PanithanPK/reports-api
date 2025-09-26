@@ -3,6 +3,7 @@ package middleware
 import (
 	"encoding/json"
 	"log"
+	"reports-api/models"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -83,14 +84,6 @@ func LoggingMiddleware() fiber.Handler {
 }
 
 // StandardResponse represents the standard API response format
-type StandardResponse struct {
-	Success   bool   `json:"success"`
-	Message   string `json:"message"`
-	Data      any    `json:"data,omitempty"`
-	Error     any    `json:"error,omitempty"`
-	Timestamp string `json:"timestamp"`
-	RequestID string `json:"request_id,omitempty"`
-}
 
 // CompressionMiddleware enables gzip compression for responses
 func CompressionMiddleware() fiber.Handler {
@@ -141,7 +134,7 @@ func ResponseStandardizationMiddleware() fiber.Handler {
 		}
 
 		// Create standard response
-		standardResponse := StandardResponse{
+		standardResponse := models.StandardResponse{
 			Success:   status >= 200 && status < 300,
 			Timestamp: time.Now().Format(time.RFC3339),
 			RequestID: requestID,

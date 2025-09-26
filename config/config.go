@@ -1,21 +1,14 @@
 package config
 
-import "os"
+import (
+	"os"
+	"reports-api/models"
+)
 
-type Config struct {
-	EndPoint        string
-	AccessKey       string
-	SecretAccessKey string
-	BucketName      string
-	Environment     string
-	ChatID          string
-	BotToken        string
-}
-
-var AppConfig *Config
+var AppConfig *models.Config
 
 func InitConfig() {
-	AppConfig = &Config{
+	AppConfig = &models.Config{
 		EndPoint:        os.Getenv("End_POINT"),
 		AccessKey:       os.Getenv("ACCESS_KEY"),
 		SecretAccessKey: os.Getenv("SECRET_ACCESSKEY"),
