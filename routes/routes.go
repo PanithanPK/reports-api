@@ -112,6 +112,8 @@ func RegisterAuthRoutes(r *fiber.App) {
 	r.Post("/api/authEntry/login", handlers.LoginHandler)
 	r.Post("/api/authEntry/registerUser", handlers.RegisterHandler("user"))
 	r.Post("/api/authEntry/registerAdmin", handlers.RegisterHandler("admin"))
+	r.Get("/api/authEntry/users", handlers.GetUsersHandler)
+	r.Get("/api/authEntry/user/:id", handlers.GetUserByIDHandler)
 	r.Put("/api/authEntry/updateUser", handlers.UpdateUserHandler)
 	r.Delete("/api/authEntry/deleteUser", handlers.DeleteUserHandler)
 	r.Post("/api/authEntry/logout", handlers.LogoutHandler)

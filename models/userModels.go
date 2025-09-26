@@ -46,3 +46,11 @@ type ResponseRequest struct {
 	Name             string `json:"name"`
 	TelegramUsername string `json:"telegram_username"`
 }
+
+// UserResponse represents the structure of user response (without password for security)
+type UsernameResponse struct {
+	ID        int    `json:"id"`
+	Username  string `json:"username"`
+	Role      string `json:"role"`
+	CreatedAt string `json:"created_at"`
+}

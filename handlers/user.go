@@ -212,6 +212,67 @@ func LogoutHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Logged out"})
 }
 
+// @Summary Get users
+// @Description Get all users with username and role
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/authEntry/users [get]
+func GetUsersHandler(c *fiber.Ctx) error {
+	rows, err := db.DB.Query("SELECT id, username, role, created_at FROM users WHERE deleted_at IS NULL ORDER BY id DESC")
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+	}
+	defer rows.Close()
+
+	var users []models.UsernameResponse
+	for rows.Next() {
+		var user models.UsernameResponse
+		if err := rows.Scan(&user.ID, &user.Username, &user.Role, &user.CreatedAt); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+		}
+		users = append(users, user)
+	}
+
+	log.Printf("Retrieved %d users", len(users))
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    users,
+	})
+}
+
+// @Summary Get user by ID
+// @Description Get user details by ID (without password for security)
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/authEntry/user/{id} [get]
+func GetUserByIDHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid user ID"})
+	}
+
+	var user models.UsernameResponse
+	err = db.DB.QueryRow("SELECT id, username, role, created_at FROM users WHERE id = ? AND deleted_at IS NULL", id).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedAt)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "User not found"})
+	}
+
+	log.Printf("Retrieved user details for ID: %d", id)
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    user,
+	})
+}
+
 // @Summary Get responsibilities
 // @Description Get all responsibilities
 // @Tags responsibilities
