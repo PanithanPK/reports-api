@@ -29,10 +29,11 @@ type RegisterUserRequest struct {
 
 // UserDetailResponse represents the structure of user details response
 type UpdateUserRequest struct {
-	ID        int    `json:"id"`
-	Username  string `json:"username"`
-	Password  string `json:"password"`
-	UpdatedBy int    `json:"updated_by"`
+	ID            int     `json:"id"`
+	Username      string  `json:"username"`
+	Password      string  `json:"password"`
+	PlainPassword *string `json:"plain_password"`
+	Role          string  `json:"role"`
 }
 
 // UserDetailResponse represents the structure of user details response
@@ -49,8 +50,11 @@ type ResponseRequest struct {
 
 // UserResponse represents the structure of user response (without password for security)
 type UsernameResponse struct {
-	ID        int    `json:"id"`
-	Username  string `json:"username"`
-	Role      string `json:"role"`
-	CreatedAt string `json:"created_at"`
+	ID             int    `json:"id"`
+	Username       string `json:"username"`
+	Role           string `json:"role"`
+	CreatedAt      string `json:"created_at"`
+	HashedPassword string `json:"hashed_password,omitempty"`
+	PlainPassword  string `json:"plain_password,omitempty"`
+	PasswordNote   string `json:"password_note,omitempty"`
 }

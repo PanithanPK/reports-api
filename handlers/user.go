@@ -6,7 +6,6 @@ import (
 	"reports-api/db"
 	"reports-api/models"
 	"strconv"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -108,8 +107,8 @@ func RegisterHandler(role string) fiber.Handler {
 		}
 
 		_, err = db.DB.Exec(
-			"INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-			req.Username, string(hashedPassword), role,
+			"INSERT INTO users (username, password, plain_password, role) VALUES (?, ?, ?, ?)",
+			req.Username, string(hashedPassword), req.Password, role,
 		)
 
 		if err != nil {
@@ -118,7 +117,11 @@ func RegisterHandler(role string) fiber.Handler {
 		}
 
 		log.Printf("User %s registered successfully as %s", req.Username, role)
-		return c.JSON(fiber.Map{"message": "Registered as " + role})
+		return c.JSON(fiber.Map{
+			"message":  "Registered as " + role,
+			"username": req.Username,
+			"role":     role,
+		})
 	}
 }
 
@@ -148,16 +151,26 @@ func UpdateUserHandler(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "User not found"})
 	}
 
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to hash password"})
+	}
+
 	_, err = db.DB.Exec(
-		"UPDATE users SET username = ?, password = ?, updated_by = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
-		req.Username, req.Password, req.UpdatedBy, time.Now(), req.ID,
+		"UPDATE users SET username = ?, password = ?, plain_password = ?, role = ?, updated_at=CURRENT_TIMESTAMP WHERE id = ?",
+		req.Username, string(hashedPassword), req.Password, req.Role, req.ID,
 	)
 	if err != nil {
+		log.Printf("Error updating user: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update user"})
 	}
 
 	log.Printf("Updating user ID: %d with username: %s", req.ID, req.Username)
-	return c.JSON(fiber.Map{"message": "User updated"})
+	return c.JSON(fiber.Map{
+		"message":  "User updated",
+		"username": req.Username,
+	})
 }
 
 // @Summary Delete user
@@ -176,16 +189,17 @@ func DeleteUserHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
+	// Hard delete - remove user completely from database
 	_, err := db.DB.Exec(
-		"UPDATE users SET deleted_at = ?, deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
-		time.Now(), req.DeletedBy, req.ID,
+		"DELETE FROM users WHERE id = ?",
+		req.ID,
 	)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete user"})
 	}
 
-	log.Printf("User ID: %d deleted by user ID: %d", req.ID, req.DeletedBy)
-	return c.JSON(fiber.Map{"message": "User deleted"})
+	log.Printf("User ID: %d permanently deleted by user ID: %d", req.ID, req.DeletedBy)
+	return c.JSON(fiber.Map{"message": "User permanently deleted"})
 }
 
 // @Summary User logout
@@ -196,12 +210,12 @@ func DeleteUserHandler(c *fiber.Ctx) error {
 // @Success 200 {object} map[string]interface{}
 // @Router /api/authEntry/logout [post]
 func LogoutHandler(c *fiber.Ctx) error {
-	sessionID := c.Cookies("session")
+	sessionID := c.Cookies("session_cookie")
 	if sessionID != "" {
 		delete(sessions, sessionID)
 	}
 	c.Cookie(&fiber.Cookie{
-		Name:     "session",
+		Name:     "session_cookie",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
@@ -210,67 +224,6 @@ func LogoutHandler(c *fiber.Ctx) error {
 
 	log.Printf("User logged out successfully")
 	return c.JSON(fiber.Map{"message": "Logged out"})
-}
-
-// @Summary Get users
-// @Description Get all users with username and role
-// @Tags authentication
-// @Accept json
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Failure 500 {object} map[string]interface{}
-// @Router /api/authEntry/users [get]
-func GetUsersHandler(c *fiber.Ctx) error {
-	rows, err := db.DB.Query("SELECT id, username, role, created_at FROM users WHERE deleted_at IS NULL ORDER BY id DESC")
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
-	}
-	defer rows.Close()
-
-	var users []models.UsernameResponse
-	for rows.Next() {
-		var user models.UsernameResponse
-		if err := rows.Scan(&user.ID, &user.Username, &user.Role, &user.CreatedAt); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Database error"})
-		}
-		users = append(users, user)
-	}
-
-	log.Printf("Retrieved %d users", len(users))
-	return c.JSON(fiber.Map{
-		"success": true,
-		"data":    users,
-	})
-}
-
-// @Summary Get user by ID
-// @Description Get user details by ID (without password for security)
-// @Tags authentication
-// @Accept json
-// @Produce json
-// @Param id path string true "User ID"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {object} map[string]interface{}
-// @Failure 404 {object} map[string]interface{}
-// @Router /api/authEntry/user/{id} [get]
-func GetUserByIDHandler(c *fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid user ID"})
-	}
-
-	var user models.UsernameResponse
-	err = db.DB.QueryRow("SELECT id, username, role, created_at FROM users WHERE id = ? AND deleted_at IS NULL", id).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedAt)
-	if err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "User not found"})
-	}
-
-	log.Printf("Retrieved user details for ID: %d", id)
-	return c.JSON(fiber.Map{
-		"success": true,
-		"data":    user,
-	})
 }
 
 // @Summary Get responsibilities
@@ -412,4 +365,71 @@ func GetResponsDetailHandler(c *fiber.Ctx) error {
 
 	log.Printf("Getting program details Success for ID: %d", id)
 	return c.JSON(fiber.Map{"success": true, "data": user})
+}
+
+// @Summary Get all users
+// @Description Get all users with username, plain_password and role
+// @Tags users
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/authEntry/users [get]
+func GetAllUsersHandler(c *fiber.Ctx) error {
+	rows, err := db.DB.Query("SELECT id, username, IFNULL(plain_password, '') as plain_password, role FROM users WHERE deleted_at IS NULL")
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+	}
+	defer rows.Close()
+
+	var users []models.UsernameResponse
+	for rows.Next() {
+		var user models.UsernameResponse
+		if err := rows.Scan(&user.ID, &user.Username, &user.PlainPassword, &user.Role); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+		}
+		users = append(users, user)
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    users,
+	})
+}
+
+// @Summary Get user details
+// @Description Get detailed information about a specific user including username, plain_password and role
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/authEntry/user/{id} [get]
+func GetUserDetailHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
+	}
+
+	var user models.UsernameResponse
+	err = db.DB.QueryRow("SELECT id, username, IFNULL(plain_password, '') as plain_password, role FROM users WHERE id = ? AND deleted_at IS NULL", id).Scan(&user.ID, &user.Username, &user.PlainPassword, &user.Role)
+
+	if err != nil {
+		log.Printf("Error fetching user details: %v", err)
+		return c.Status(404).JSON(fiber.Map{"error": "User not found"})
+	}
+
+	log.Printf("Getting user details Success for ID: %d", id)
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data": fiber.Map{
+			"id":             user.ID,
+			"username":       user.Username,
+			"plain_password": user.PlainPassword,
+			"role":           user.Role,
+		},
+	})
 }
