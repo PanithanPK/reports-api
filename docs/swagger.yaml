@@ -331,8 +331,10 @@ definitions:
         type: integer
       password:
         type: string
-      updated_by:
-        type: integer
+      plain_password:
+        type: string
+      role:
+        type: string
       username:
         type: string
     type: object
@@ -507,6 +509,60 @@ paths:
             additionalProperties: true
             type: object
       summary: Update user
+      tags:
+      - users
+  /api/authEntry/user/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific user including username,
+        plain_password and role
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get user details
+      tags:
+      - users
+  /api/authEntry/users:
+    get:
+      consumes:
+      - application/json
+      description: Get all users with username, plain_password and role
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get all users
       tags:
       - users
   /api/v1/branch/{id}:
@@ -1861,6 +1917,102 @@ paths:
             additionalProperties: true
             type: object
       summary: Create progress entry for task
+      tags:
+      - progress
+  /api/v1/progress/delete/{id}/{pgid}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific progress entry and its associated files permanently
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Progress ID
+        in: path
+        name: pgid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete progress entry
+      tags:
+      - progress
+  /api/v1/progress/update/{id}/{pgid}:
+    put:
+      consumes:
+      - multipart/form-data
+      description: Update an existing progress entry with new text and/or images
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Progress ID
+        in: path
+        name: pgid
+        required: true
+        type: string
+      - description: Updated progress text
+        in: formData
+        name: text
+        type: string
+      - description: JSON array of image URLs to keep
+        in: formData
+        name: image_urls
+        type: string
+      - description: New image files
+        in: formData
+        name: image
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update progress entry
       tags:
       - progress
   /api/v1/resolution/{id}:
