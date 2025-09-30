@@ -92,7 +92,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 
 	// Get paginated data
 	query := `
-		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), t.text, IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(t.phone_else, ''), IFNULL(p.number, 0), IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), t.text, IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
@@ -116,7 +116,7 @@ func GetTasksHandler(c *fiber.Ctx) error {
 		var issueTypeName string
 		var filePathsJSON string
 		// Scan row into task model
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.AssignedtoID, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.PhoneElse, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.AssignedtoID, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue
@@ -171,7 +171,7 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 	var task models.TaskWithDetails
 	var issueTypeName string
 	err = db.DB.QueryRow(`
-		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), IFNULL(t.system_id, 0), IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), IFNULL(t.text, ''), IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), IFNULL(t.status, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, ''), IFNULL(t.file_paths, '[]')
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(t.phone_else, ''), IFNULL(p.number, 0), IFNULL(p.name, ''), IFNULL(t.system_id, 0), IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), IFNULL(t.text, ''), IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), IFNULL(t.status, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, ''), IFNULL(t.file_paths, '[]')
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
@@ -179,7 +179,7 @@ func GetTaskDetailHandler(c *fiber.Ctx) error {
 		LEFT JOIN systems_program s ON t.system_id = s.id
 		LEFT JOIN issue_types it ON t.issue_type = it.id
 		WHERE t.id = ?
-	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.IssueTypeID, &task.IssueElse, &issueTypeName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.AssignedtoID, &task.Assignto, &task.ReportedBy, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
+	`, id).Scan(&task.ID, &task.Ticket, &task.PhoneID, &task.PhoneElse, &task.Number, &task.PhoneName, &task.SystemID, &task.SystemName, &task.IssueTypeID, &task.IssueElse, &issueTypeName, &task.DepartmentID, &task.DepartmentName, &task.BranchID, &task.BranchName, &task.Text, &task.AssignedtoID, &task.Assignto, &task.ReportedBy, &task.Status, &task.CreatedAt, &task.UpdatedAt, &filePathsJSON)
 
 	if task.SystemID > 0 {
 		task.SystemType = issueTypeName
@@ -242,6 +242,9 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 				req.PhoneID = &phoneID
 			}
 		}
+		if phoneElseStr := c.FormValue("phone_else"); phoneElseStr != "" {
+			req.PhoneElse = &phoneElseStr
+		}
 		if systemIDStr := c.FormValue("system_id"); systemIDStr != "" {
 			req.SystemID, _ = strconv.Atoi(systemIDStr)
 		}
@@ -293,27 +296,27 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 			// ดึง typeid จาก systems_program
 			var typeid int
 			db.DB.QueryRow(`SELECT type FROM systems_program WHERE id = ?`, req.SystemID).Scan(&typeid)
-			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, issue_type, department_id, text, reported_by, status, created_by, file_paths) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`, req.PhoneID, ticketno, req.SystemID, typeid, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy, string(filePathsBytes))
+			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, phone_else, ticket_no, system_id, issue_type, department_id, text, reported_by, status, created_by, file_paths) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`, req.PhoneID, req.PhoneElse, ticketno, req.SystemID, typeid, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy, string(filePathsBytes))
 		} else {
 			// กรณีไม่มีระบบ ให้เก็บ issue_type และ issue_else
 			if req.IssueTypeID == 0 || req.IssueElse == "" {
 				return c.Status(400).JSON(fiber.Map{"error": "issue_type and issue_else must be provided when system_id is 0"})
 			}
 			// รับค่า issue_type จาก frontend โดยตรง
-			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, issue_type, issue_else, department_id, text, reported_by, status, created_by, file_paths) VALUES (?, ?, 0, ?, ?, ?, ?, ?, 0, ?, ?)`, req.PhoneID, ticketno, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy, string(filePathsBytes))
+			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, phone_else, ticket_no, system_id, issue_type, issue_else, department_id, text, reported_by, status, created_by, file_paths) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, 0, ?, ?)`, req.PhoneID, req.PhoneElse, ticketno, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy, string(filePathsBytes))
 		}
 	} else {
 		if req.SystemID > 0 {
 			var typeid int
 			db.DB.QueryRow(`SELECT type FROM systems_program WHERE id = ?`, req.SystemID).Scan(&typeid)
-			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, issue_type, department_id, text, reported_by, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.SystemID, typeid, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy)
+			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, phone_else, ticket_no, system_id, issue_type, department_id, text, reported_by, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, req.PhoneElse, ticketno, req.SystemID, typeid, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy)
 		} else {
 			// กรณีไม่มีระบบ ให้เก็บ issue_type และ issue_else
 			if req.IssueTypeID == 0 || req.IssueElse == "" {
 				return c.Status(400).JSON(fiber.Map{"error": "issue_type and issue_else must be provided when system_id is 0"})
 			}
 			// รับค่า issue_type จาก frontend โดยตรง
-			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, ticket_no, system_id, issue_type, issue_else, department_id, text, reported_by, status, created_by) VALUES (?, ?, 0, ?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, ticketno, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy)
+			res, err = db.DB.Exec(`INSERT INTO tasks (phone_id, phone_else, ticket_no, system_id, issue_type, issue_else, department_id, text, reported_by, status, created_by) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, 0, ?)`, req.PhoneID, req.PhoneElse, ticketno, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.Text, req.ReportedBy, req.CreatedBy)
 		}
 	}
 
@@ -457,6 +460,9 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			req.PhoneID = &phoneID
 		}
 	}
+	if phoneElseStr := c.FormValue("phone_else"); phoneElseStr != "" {
+		req.PhoneElse = &phoneElseStr
+	}
 	if systemIDStr := c.FormValue("system_id"); systemIDStr != "" {
 		req.SystemID, _ = strconv.Atoi(systemIDStr)
 	}
@@ -540,15 +546,15 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			var typeid int
 			db.DB.QueryRow(`SELECT type FROM systems_program WHERE id = ?`, req.SystemID).Scan(&typeid)
 			if req.ReportedBy != nil {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, phone_else=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.PhoneElse, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
 			} else {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, phone_else=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.PhoneElse, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
 			}
 		} else {
 			if req.ReportedBy != nil {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, phone_else=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.PhoneElse, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
 			} else {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, phone_else=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=?, file_paths=? WHERE id=?`, req.PhoneID, req.PhoneElse, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, req.Assignto, req.Text, req.Status, req.UpdatedBy, string(filePathsBytes), id)
 			}
 		}
 	} else {
@@ -556,9 +562,9 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			var typeid int
 			db.DB.QueryRow(`SELECT type FROM systems_program WHERE id = ?`, req.SystemID).Scan(&typeid)
 			if req.ReportedBy != nil {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, phone_else=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.PhoneElse, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
 			} else {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, phone_else=?, system_id=?, issue_type=?, issue_else=NULL, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.PhoneElse, req.SystemID, typeid, req.DepartmentID, req.AssignedtoID, req.Assignto, req.Text, req.Status, req.UpdatedBy, id)
 			}
 		} else {
 			var assignto string
@@ -566,9 +572,9 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 				assignto = *req.Assignto
 			}
 			if req.ReportedBy != nil {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, phone_else=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, reported_by=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.PhoneElse, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, assignto, req.ReportedBy, req.Text, req.Status, req.UpdatedBy, id)
 			} else {
-				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, assignto, req.Text, req.Status, req.UpdatedBy, id)
+				_, err = db.DB.Exec(`UPDATE tasks SET phone_id=?, phone_else=?, system_id=0, issue_type=?, issue_else=?, department_id=?, assignto_id=?, assignto=?, text=?, status=?, updated_at=CURRENT_TIMESTAMP, updated_by=? WHERE id=?`, req.PhoneID, req.PhoneElse, req.IssueTypeID, req.IssueElse, req.DepartmentID, req.AssignedtoID, assignto, req.Text, req.Status, req.UpdatedBy, id)
 			}
 		}
 	}
@@ -640,6 +646,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		// Create TaskRequest from TaskRequestUpdate for Telegram
 		telegramReq := models.TaskRequest{
 			PhoneID:          req.PhoneID,
+			PhoneElse:        req.PhoneElse,
 			SystemID:         req.SystemID,
 			DepartmentID:     req.DepartmentID,
 			Text:             req.Text,
@@ -1132,25 +1139,25 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
-		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR it.name LIKE ? OR t.status LIKE ?)
-	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).Scan(&total)
+		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR t.phone_else LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR it.name LIKE ? OR t.status LIKE ?)
+	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).Scan(&total)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to count search results"})
 	}
 
 	// Get search results with pagination
 	rows, err := db.DB.Query(`
-		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0) as number, IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
+		SELECT t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(t.phone_else, ''), IFNULL(p.number, 0) as number, IFNULL(p.name, ''), t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), IFNULL(b.name, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at
 		FROM tasks t
 		LEFT JOIN ip_phones p ON t.phone_id = p.id
 		LEFT JOIN departments d ON t.department_id = d.id
 		LEFT JOIN branches b ON d.branch_id = b.id
 		LEFT JOIN systems_program s ON t.system_id = s.id
 		LEFT JOIN issue_types it ON t.issue_type = it.id
-		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR it.name LIKE ? OR t.assignto LIKE ? OR t.status LIKE ?)
+		WHERE (t.ticket_no LIKE ? OR p.number LIKE ? OR p.name LIKE ? OR t.phone_else LIKE ? OR d.name LIKE ? OR b.name LIKE ? OR s.name LIKE ? OR t.text LIKE ? OR it.name LIKE ? OR t.assignto LIKE ? OR t.status LIKE ?)
 		ORDER BY t.id DESC
 		LIMIT ? OFFSET ?
-	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, pagination.Limit, offset)
+	`, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, pagination.Limit, offset)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to search tasks"})
 	}
@@ -1160,7 +1167,7 @@ func GetTasksWithQueryHandler(c *fiber.Ctx) error {
 	for rows.Next() {
 		var t models.TaskWithDetails
 		var issueTypeName string
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.PhoneElse, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt)
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue
@@ -1470,8 +1477,18 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 					}
 				}
 			}
+			var phoneElsePtr *string
+			if phoneID == 0 {
+				var phoneElse sql.NullString
+				db.DB.QueryRow(`SELECT IFNULL(phone_else, '') FROM tasks WHERE id = ?`, id).Scan(&phoneElse)
+				if phoneElse.Valid {
+					phoneElsePtr = &phoneElse.String
+				}
+			}
+
 			telegramReq := models.TaskRequest{
 				PhoneID:        &phoneID,
+				PhoneElse:      phoneElsePtr,
 				SystemID:       systemID,
 				IssueElse:      issueElse,
 				DepartmentID:   departmentID,

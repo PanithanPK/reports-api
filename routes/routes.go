@@ -12,11 +12,11 @@ func MainRoutes(r *fiber.App) {
 	r.Get("/api/v1/dashboard/data", handlers.GetDashboardDataHandler)
 
 	//Data export routes
-	r.Get("/api/v1/dashboard/data/csv", handlers.ExportToCSV)
 	r.Get("/api/v1/dashboard/data/phonecsv", handlers.IpphonesExportCsv)
 	r.Get("/api/v1/dashboard/data/departmetcsv", handlers.DepartmentsExportCsv)
 	r.Get("/api/v1/dashboard/data/branchcsv", handlers.BranchExportCsv)
 	r.Get("/api/v1/dashboard/data/systemcsv", handlers.SystemExportCsv)
+	r.Get("/api/v1/dashboard/data/taskscsv", handlers.TasksExportCsv)
 
 	r.Get("/api/v1/scores/list", handlers.ListScoresHandler)
 	r.Get("/api/v1/scores/:id", handlers.GetScoreDetailHandler)

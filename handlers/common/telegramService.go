@@ -115,6 +115,10 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 	}
 	if req.PhoneNumber > 0 {
 		newMessage += fmt.Sprintf("📠 *เบอร์โทร:* %d\n", req.PhoneNumber)
+	} else if req.PhoneNumber == 0 {
+		if req.PhoneElse != nil && *req.PhoneElse != "" {
+			newMessage += "📠 *เบอร์โทร:* " + *req.PhoneElse + "\n"
+		}
 	}
 	if Program != "" {
 		newMessage += "💻 *โปรแกรม:* " + Program + "\n"
@@ -163,7 +167,6 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 	if req.Url != "" {
 		newMessage += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")\n"
 	}
-
 	return newMessage
 }
 

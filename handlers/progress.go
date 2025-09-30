@@ -330,10 +330,11 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 	// ดึงข้อมูล task สำหรับอัพเดต Telegram
 	var ticket, text, issueElse, reportedBy, assignto, branchName, departmentName, programName string
 	var phoneID, systemID, departmentID, messageID, phoneNumber, branchID, telegramID int
+	var phoneElse *string
 	var telegramUser string
 	// Fix SQL: JOINs before WHERE, select tc.report_id as messageID
 	err = db.DB.QueryRow(`
-			SELECT IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(t.system_id, 0), IFNULL(t.issue_else, ''), IFNULL(t.department_id, 0),
+			SELECT IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(t.phone_else, ''), IFNULL(t.system_id, 0), IFNULL(t.issue_else, ''), IFNULL(t.department_id, 0),
 			IFNULL(t.text, ''), IFNULL(t.status, 0), IFNULL(t.reported_by, ''), IFNULL(t.assignto, ''), IFNULL(rs.telegram_username, ''), 
 			IFNULL(tc.report_id, 0), IFNULL(t.file_paths, '[]'), IFNULL(d.branch_id, 0), IFNULL(t.created_at, ''), IFNULL(t.updated_at, ''),
 			IFNULL(t.telegram_id, 0)
@@ -344,7 +345,7 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 			LEFT JOIN systems_program s ON t.system_id = s.id
 			LEFT JOIN responsibilities rs ON t.assignto_id = rs.id
 			WHERE t.id = ?
-		`, idStr).Scan(&ticket, &phoneID, &systemID, &issueElse, &departmentID, &text, &status, &reportedBy, &assignto, &telegramUser, &messageID, &filePathsJSON, &branchID, &createdAt, &updatedAt, &telegramID)
+		`, idStr).Scan(&ticket, &phoneID, &phoneElse, &systemID, &issueElse, &departmentID, &text, &status, &reportedBy, &assignto, &telegramUser, &messageID, &filePathsJSON, &branchID, &createdAt, &updatedAt, &telegramID)
 	log.Printf("Fetched task for Telegram update, ID: %s, MessageID: %d", telegramUser, messageID)
 	// Query extra info for Telegram
 	db.DB.QueryRow(`SELECT name FROM branches WHERE id = ?`, branchID).Scan(&branchName)
@@ -376,6 +377,7 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 		}
 		telegramReq := models.TaskRequest{
 			PhoneID:        &phoneID,
+			PhoneElse:      phoneElse,
 			SystemID:       systemID,
 			IssueElse:      issueElse,
 			DepartmentID:   departmentID,
