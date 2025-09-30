@@ -79,7 +79,6 @@ type TaskWithDetails struct {
 	ResolvedAt     string            `json:"resolved_at"`
 	CreatedAt      string            `json:"created_at"`
 	UpdatedAt      string            `json:"updated_at"`
-	Overdue        interface{}       `json:"overdue"`
 }
 
 type AssignRequest struct {

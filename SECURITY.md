@@ -6,10 +6,8 @@ We actively support the following versions of Reports API with security updates:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.13.x  | :white_check_mark: |
-| 1.12.x  | :white_check_mark: |
-| 1.11.x  | :x:                |
-| < 1.11  | :x:                |
+| 1.x.x   | :white_check_mark: |
+| < 1.0   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -40,18 +38,9 @@ Please include the following information in your report:
 
 ## Security Best Practices
 
-### For Users
-
-- Always use the latest supported version
-- Keep Go dependencies updated (`go mod tidy && go mod download`)
-- Use environment variables for sensitive data
-- Enable HTTPS in production
-- Regular security audits
-- Monitor application logs
-
 ### Environment Variables
 
-Never commit sensitive information to the repository. Use environment variables for:
+Create `.env` file (never commit to repository):
 
 ```bash
 # Database Configuration
@@ -60,49 +49,49 @@ DATABASE_PORT=3306
 DATABASE_USER=your_user
 DATABASE_PASSWORD=your_secure_password
 DATABASE_NAME=reports_db
+MYSQL_ROOT_PASSWORD=your_root_password
+MYSQL_PASSWORD=your_mysql_password
 
 # Application Configuration
 PORT=8080
 APP_ENV=prod
 
-# Telegram Bot (if used)
+# Telegram Bot
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
 
-# MinIO/S3 Configuration (if used)
+# MinIO/S3 Configuration
 MINIO_ENDPOINT=your_endpoint
 MINIO_ACCESS_KEY=your_access_key
 MINIO_SECRET_KEY=your_secret_key
+
+# Docker Registry
+DOCKER_TOKEN=your_docker_token
 ```
 
 ### Database Security
 
-- Use strong passwords for MySQL connections
-- Enable SSL/TLS connections
-- Implement proper access controls
+- Use strong, randomly generated passwords (minimum 16 characters)
+- Enable SSL/TLS connections with proper certificates
+- Implement proper access controls and least privilege
 - Regular backups with encryption
 - Monitor database access logs
-- Use connection pooling securely
+- Use parameterized queries to prevent SQL injection
 
 ### API Security
 
-- Input validation and sanitization implemented
+- Input validation and sanitization for all endpoints
 - CORS properly configured for specific origins
-- Security headers enabled
+- Security headers implementation
 - File upload restrictions (100MB limit)
 - Request timeouts configured (30 seconds)
+- Use crypto/rand for session ID generation
 
-## Known Security Features
+## Security Implementation Status
 
-### Implemented Security Measures
+### ✅ Implemented Security Measures
 
-- **Security Headers**:
-  - `X-Content-Type-Options: nosniff`
-  - `X-Frame-Options: DENY`
-  - `X-XSS-Protection: 1; mode=block`
-  - `Content-Type: application/json`
-
-- **Application Security**:
+- **Application Limits**:
   - Memory limit: 384MB
   - CPU cores limited to 2
   - Request body limit: 100MB
@@ -110,9 +99,25 @@ MINIO_SECRET_KEY=your_secret_key
   - Panic recovery middleware
 
 - **Development Security**:
-  - Swagger UI only available in development mode
+  - Swagger UI configuration
   - Environment-based configuration
-  - Structured logging with levels
+  - Structured logging framework
+
+### 🔧 Required Security Headers
+
+Implement these security headers:
+
+```go
+// Add to Fiber middleware
+app.Use(func(c *fiber.Ctx) error {
+    c.Set("X-Content-Type-Options", "nosniff")
+    c.Set("X-Frame-Options", "DENY")
+    c.Set("X-XSS-Protection", "1; mode=block")
+    c.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    c.Set("Content-Security-Policy", "default-src 'self'")
+    return c.Next()
+})
+```
 
 ## Dependencies Security
 
@@ -124,13 +129,32 @@ MINIO_SECRET_KEY=your_secret_key
 - **Telegram Bot API**: v5.5.1+
 - **MinIO**: v7.0.95+ (object storage)
 - **Swagger**: v1.16.6+
+- **Crypto**: golang.org/x/crypto v0.40.0
 
-### Security Recommendations
+### Security Audit Commands
 
-1. Regularly update dependencies: `go get -u ./...`
-2. Run security audits: `go list -json -deps | nancy sleuth`
-3. Use `go mod verify` to verify dependencies
-4. Monitor for CVEs in used packages
+```bash
+# Update all dependencies
+go get -u ./...
+
+# Verify module integrity
+go mod verify
+
+# Check for known vulnerabilities
+go install golang.org/x/vuln/cmd/govulncheck@latest
+govulncheck ./...
+
+# Alternative security scanning
+go install github.com/sonatypecommunity/nancy@latest
+go list -json -deps | nancy sleuth
+```
+
+### Dependency Monitoring
+
+1. Enable GitHub Dependabot alerts
+2. Regular dependency updates (monthly)
+3. Monitor CVE databases
+4. Use `go mod tidy` to clean unused dependencies
 
 ## Deployment Security
 
@@ -138,19 +162,58 @@ MINIO_SECRET_KEY=your_secret_key
 
 - Use multi-stage builds
 - Run as non-root user
-- Scan images for vulnerabilities
+- Scan images for vulnerabilities: `docker scan reports-api:latest`
 - Keep base images updated
 - Use `.dockerignore` to exclude sensitive files
+- Use environment variables for sensitive data
 
-### Production Checklist
+### Production Security Checklist
 
+#### High Priority
+- [ ] Implement security headers
+- [ ] Enable database SSL connections
 - [ ] Use HTTPS/TLS encryption
 - [ ] Set `APP_ENV=prod`
+- [ ] Input validation and sanitization
+- [ ] Use crypto/rand for session generation
+
+#### Medium Priority
 - [ ] Configure proper firewall rules
-- [ ] Enable database SSL connections
 - [ ] Set up monitoring and alerting
 - [ ] Regular security updates
 - [ ] Backup and disaster recovery plan
+- [ ] Implement rate limiting
+- [ ] Add request logging and monitoring
+
+### Secure Configuration Template
+
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+services:
+  app:
+    environment:
+      - APP_ENV=prod
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    secrets:
+      - db_password
+      - telegram_token
+  
+  mysql:
+    environment:
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
+    secrets:
+      - mysql_root_password
+
+secrets:
+  db_password:
+    external: true
+  telegram_token:
+    external: true
+  mysql_root_password:
+    external: true
+```
 
 ## Security Updates
 

@@ -1234,6 +1234,7 @@ func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
 
 	stringColumns := map[string]bool{
 		"ticket_no":       true,
+		"phone_else":      true,
 		"number":          true,
 		"phone_name":      true,
 		"system_name":     true,
@@ -1285,6 +1286,7 @@ func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
 		"updated_by":      "t.updated_by",
 		"telegram_id":     "t.telegram_id",
 		"phone_name":      "p.name",
+		"phone_else":      "t.phone_else",
 		"number":          "p.number",
 		"system_name":     "s.name",
 		"department_name": "d.name",
@@ -1309,7 +1311,7 @@ func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
 		LEFT JOIN systems_program s ON t.system_id = s.id
 		LEFT JOIN issue_types it ON t.issue_type = it.id`
 
-	selectFields := `t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''), 
+	selectFields := `t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(t.phone_else, ''), IFNULL(p.number, 0), IFNULL(p.name, ''), 
 		t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''), 
 		IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0), 
 		IFNULL(b.name, ''), IFNULL(t.reported_by, ''), t.text, IFNULL(t.assignto, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')`
@@ -1347,7 +1349,7 @@ func GetTasksWithColumnQueryHandler(c *fiber.Ctx) error {
 		var t models.TaskWithDetails
 		var issueTypeName string
 		var filePathsJSON string
-		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName,
+		err := rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.PhoneElse, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName,
 			&t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName,
 			&t.BranchID, &t.BranchName, &t.ReportedBy, &t.Text, &t.Assignto, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
 		if err != nil {
@@ -1547,7 +1549,7 @@ func GetTaskSort(c *fiber.Ctx) error {
 	}
 
 	stringColumns := map[string]bool{
-		"ticket_no": true, "number": true, "phone_name": true, "system_name": true,
+		"ticket_no": true, "number": true, "phone_else": true, "phone_name": true, "system_name": true,
 		"issue_else": true, "department_name": true, "branch_name": true, "text": true,
 		"assignto": true, "reported_by": true, "solution": true,
 	}
@@ -1568,7 +1570,7 @@ func GetTaskSort(c *fiber.Ctx) error {
 	}
 
 	columnMap := map[string]string{
-		"phone_id": "t.phone_id", "issue_type": "t.issue_type", "system_id": "t.system_id",
+		"phone_id": "t.phone_id", "phone_else": "t.phone_else", "issue_type": "t.issue_type", "system_id": "t.system_id",
 		"department_id": "t.department_id", "branch_id": "d.branch_id", "status": "t.status",
 		"created_by": "t.created_by", "updated_by": "t.updated_by", "telegram_id": "t.telegram_id",
 		"phone_name": "p.name", "number": "p.number", "system_name": "s.name",
@@ -1589,7 +1591,7 @@ func GetTaskSort(c *fiber.Ctx) error {
 		LEFT JOIN systems_program s ON t.system_id = s.id
 		LEFT JOIN issue_types it ON t.issue_type = it.id`
 
-	selectFields := `t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(p.number, 0), IFNULL(p.name, ''),
+	selectFields := `t.id, IFNULL(t.ticket_no, ''), IFNULL(t.phone_id, 0), IFNULL(t.phone_else, ''), IFNULL(p.number, 0), IFNULL(p.name, ''),
 		t.system_id, IFNULL(s.name, ''), IFNULL(t.issue_type, 0), IFNULL(t.issue_else, ''),
 		IFNULL(it.name, ''), IFNULL(t.department_id, 0), IFNULL(d.name, ''), IFNULL(d.branch_id, 0),
 		IFNULL(b.name, ''), t.text, IFNULL(t.assignto_id, 0), IFNULL(t.assignto, ''), IFNULL(t.reported_by, ''), t.status, t.created_at, t.updated_at, IFNULL(t.file_paths, '[]')`
@@ -1631,7 +1633,7 @@ func GetTaskSort(c *fiber.Ctx) error {
 		var t models.TaskWithDetails
 		var issueTypeName string
 		var filePathsJSON string
-		err = rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.AssignedtoID, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
+		err = rows.Scan(&t.ID, &t.Ticket, &t.PhoneID, &t.PhoneElse, &t.Number, &t.PhoneName, &t.SystemID, &t.SystemName, &t.IssueTypeID, &t.IssueElse, &issueTypeName, &t.DepartmentID, &t.DepartmentName, &t.BranchID, &t.BranchName, &t.Text, &t.AssignedtoID, &t.Assignto, &t.ReportedBy, &t.Status, &t.CreatedAt, &t.UpdatedAt, &filePathsJSON)
 		if err != nil {
 			log.Printf("Error scanning task: %v", err)
 			continue
