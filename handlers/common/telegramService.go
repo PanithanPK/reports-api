@@ -115,6 +115,10 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 	}
 	if req.PhoneNumber > 0 {
 		newMessage += fmt.Sprintf("📠 *เบอร์โทร:* %d\n", req.PhoneNumber)
+	} else if req.PhoneNumber == 0 {
+		if req.PhoneElse != nil && *req.PhoneElse != "" {
+			newMessage += "📠 *เบอร์โทร:* " + *req.PhoneElse + "\n"
+		}
 	}
 	if Program != "" {
 		newMessage += "💻 *โปรแกรม:* " + Program + "\n"
@@ -163,7 +167,6 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 	if req.Url != "" {
 		newMessage += "\n🔗 [ดูรายละเอียดเพิ่มเติม](" + req.Url + ")\n"
 	}
-
 	return newMessage
 }
 
@@ -346,9 +349,9 @@ func UpdateAssignedtoMsg(messageID int, req models.TaskRequest) (int, error) {
 	var notificationMsg string
 	switch req.Status {
 	case 0:
-		notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
+		notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n━━━━━━━━━━━━━━\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
 	case 1:
-		notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
+		notificationMsg = fmt.Sprintf("🔔 *การแจ้งเตือนมอบหมายงาน* 🔔\n━━━━━━━━━━━━━━\n👋 %s\n📋 คุณได้รับมอบหมายงานใหม่แล้ว\n🎫 *Ticket:* `%s`\n━━━━━━━━━━━━━━\n🔗 [ดูรายละเอียดเพิ่มเติม](%s)\n━━━━━━━━━━━━━━", EscapeMarkdown(telegramTag), req.Ticket, req.Url)
 	}
 
 	if messageID > 0 {

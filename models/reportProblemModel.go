@@ -2,36 +2,38 @@ package models
 
 // TaskRequest model for receiving task data
 type TaskRequest struct {
-	PhoneID          *int   `json:"phone_id" db:"phone_id"`
-	Ticket           string `json:"ticket_no" db:"ticket_no"`
-	SystemID         int    `json:"system_id"`
-	IssueElse        string `json:"issue_else" db:"issue_else"`
-	IssueTypeID      int    `json:"issue_type" db:"issue_type"`
-	DepartmentID     int    `json:"department_id"`
-	Text             string `json:"text"`
-	ReportedBy       string `json:"reported_by"`
-	AssignedtoID     int    `json:"assignedto_id" db:"assignedto_id"`
-	Assignto         string `json:"assign_to"`
-	Status           int    `json:"status"`
-	CreatedBy        int    `json:"created_by"`
-	UpdatedBy        int    `json:"updated_by"`
-	ResolvedAt       string `json:"resolved_at"`
-	Telegram         bool   `json:"telegram"`
-	TelegramUser     string `json:"telegram_user"`
-	MessageID        int    `json:"message_id"`
-	UpdatedAt        string `json:"updated_at"`
-	PreviousAssignto string `json:"previous_assignto"`
-	AssigntoID       int    `json:"-"`
-	PhoneNumber      int    `json:"-"`
-	DepartmentName   string `json:"-"`
-	BranchName       string `json:"-"`
-	ProgramName      string `json:"-"`
-	Url              string `json:"-"`
-	CreatedAt        string `json:"-"`
+	PhoneID          *int    `json:"phone_id" db:"phone_id"`
+	PhoneElse        *string `json:"phone_else" db:"phone_else"`
+	Ticket           string  `json:"ticket_no" db:"ticket_no"`
+	SystemID         int     `json:"system_id"`
+	IssueElse        string  `json:"issue_else" db:"issue_else"`
+	IssueTypeID      int     `json:"issue_type" db:"issue_type"`
+	DepartmentID     int     `json:"department_id"`
+	Text             string  `json:"text"`
+	ReportedBy       string  `json:"reported_by"`
+	AssignedtoID     int     `json:"assignedto_id" db:"assignedto_id"`
+	Assignto         string  `json:"assign_to"`
+	Status           int     `json:"status"`
+	CreatedBy        int     `json:"created_by"`
+	UpdatedBy        int     `json:"updated_by"`
+	ResolvedAt       string  `json:"resolved_at"`
+	Telegram         bool    `json:"telegram"`
+	TelegramUser     string  `json:"telegram_user"`
+	MessageID        int     `json:"message_id"`
+	UpdatedAt        string  `json:"updated_at"`
+	PreviousAssignto string  `json:"previous_assignto"`
+	AssigntoID       int     `json:"-"`
+	PhoneNumber      int     `json:"-"`
+	DepartmentName   string  `json:"-"`
+	BranchName       string  `json:"-"`
+	ProgramName      string  `json:"-"`
+	Url              string  `json:"-"`
+	CreatedAt        string  `json:"-"`
 }
 
 type TaskRequestUpdate struct {
 	PhoneID      *int    `json:"phone_id" db:"phone_id"`
+	PhoneElse    *string `json:"phone_else" db:"phone_else"`
 	SystemID     int     `json:"system_id"`
 	IssueElse    string  `json:"issue_else" db:"issue_else"`
 	IssueTypeID  int     `json:"issue_type" db:"issue_type"`
@@ -56,6 +58,7 @@ type TaskWithDetails struct {
 	ID             int               `json:"id" db:"id"`
 	Ticket         string            `json:"ticket_no" db:"ticket_no"`
 	PhoneID        *int              `json:"phone_id"`
+	PhoneElse      *string           `json:"phone_else"`
 	Number         *int              `json:"number"`
 	PhoneName      *string           `json:"phone_name"`
 	SystemID       int               `json:"system_id"`
@@ -76,7 +79,6 @@ type TaskWithDetails struct {
 	ResolvedAt     string            `json:"resolved_at"`
 	CreatedAt      string            `json:"created_at"`
 	UpdatedAt      string            `json:"updated_at"`
-	Overdue        interface{}       `json:"overdue"`
 }
 
 type AssignRequest struct {

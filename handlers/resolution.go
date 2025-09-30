@@ -229,14 +229,15 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 		var phoneNumber int
 		var departmentName, branchName, programName string
 		var phoneID *int
+		var phoneElse *string
 		var systemID, departmentID int
 		var text string
 		var telegramUser string
 
 		err = db.DB.QueryRow(`
-			SELECT phone_id, system_id, department_id, text
+			SELECT phone_id, IFNULL(phone_else, ''), system_id, department_id, text
 			FROM tasks WHERE id = ?
-		`, id).Scan(&phoneID, &systemID, &departmentID, &text)
+		`, id).Scan(&phoneID, &phoneElse, &systemID, &departmentID, &text)
 		if err != nil {
 			log.Printf("Failed to get task details: %v", err)
 		}
@@ -269,6 +270,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 		// อัปเดตสถานะใน Telegram message
 		taskReq := models.TaskRequest{
 			PhoneID:        phoneID,
+			PhoneElse:      phoneElse,
 			SystemID:       systemID,
 			DepartmentID:   departmentID,
 			Text:           text,
@@ -384,6 +386,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	var phoneNumber int
 	var departmentName, branchName, programName string
 	var phoneID *int
+	var phoneElse *string
 	var systemID, departmentID int
 	var text string
 	var reportID int
@@ -401,11 +404,11 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	}
 	// ดึงข้อมูล task ทั้งหมดที่จำเป็น
 	err := db.DB.QueryRow(`
-		SELECT IFNULL(phone_id, 0), IFNULL(system_id, 0), IFNULL(department_id, 0), 
+		SELECT IFNULL(phone_id, 0), IFNULL(phone_else, ''), IFNULL(system_id, 0), IFNULL(department_id, 0), 
 		       IFNULL(text, ''), IFNULL(telegram_id, 0), IFNULL(ticket_no, ''), 
 		       IFNULL(assignto, ''), IFNULL(reported_by, ''), IFNULL(assignto_id, 0)
 		FROM tasks WHERE id = ?
-	`, id).Scan(&phoneID, &systemID, &departmentID, &text, &telegramID, &ticketno, &assignto, &reportedby, &assigntoID)
+	`, id).Scan(&phoneID, &phoneElse, &systemID, &departmentID, &text, &telegramID, &ticketno, &assignto, &reportedby, &assigntoID)
 	if err != nil {
 		log.Printf("Failed to get task details: %v", err)
 		return c.Status(404).JSON(fiber.Map{"error": "Task not found"})
@@ -684,6 +687,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	// อัปเดตสถานะใน Telegram message ด้วยข้อมูลที่ครบ
 	taskReq := models.TaskRequest{
 		PhoneID:        phoneID,
+		PhoneElse:      phoneElse,
 		SystemID:       systemID,
 		DepartmentID:   departmentID,
 		Text:           text,
@@ -920,15 +924,16 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 	// ดึงข้อมูล task สำหรับอัปเดต Telegram
 	var ticketno, assignto, reportedby string
 	var phoneID *int
+	var phoneElse *string
 	var systemID, departmentID int
 	var text string
 	var assigntoID int
 	var taskCreatedAtStr string
 
 	err = db.DB.QueryRow(`
-		SELECT ticket_no, IFNULL(assignto, ''), IFNULL(reported_by, ''), phone_id, system_id, department_id, text, created_at, IFNULL(assignto_id, 0)
+		SELECT ticket_no, IFNULL(assignto, ''), IFNULL(reported_by, ''), phone_id, IFNULL(phone_else, ''), system_id, department_id, text, created_at, IFNULL(assignto_id, 0)
 		FROM tasks WHERE id = ?
-	`, id).Scan(&ticketno, &assignto, &reportedby, &phoneID, &systemID, &departmentID, &text, &taskCreatedAtStr, &assigntoID)
+	`, id).Scan(&ticketno, &assignto, &reportedby, &phoneID, &phoneElse, &systemID, &departmentID, &text, &taskCreatedAtStr, &assigntoID)
 
 	log.Printf("Debug - Task query error: %v", err)
 	if err != nil {
@@ -1003,6 +1008,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 
 	taskReq := models.TaskRequest{
 		PhoneID:        phoneID,
+		PhoneElse:      phoneElse,
 		SystemID:       systemID,
 		DepartmentID:   departmentID,
 		Text:           text,
