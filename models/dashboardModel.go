@@ -11,6 +11,8 @@ type DashboardResponse struct {
 	Programs    []ProgramDb         `json:"programs"`
 	Tasks       []TaskWithDetailsDb `json:"tasks"`
 	IssueTypes  []IssueTypeDb       `json:"issue_types"`
+	Timestamp   string              `json:"timestamp,omitempty"`
+	RequestID   string              `json:"request_id,omitempty"`
 }
 
 // TaskWithDetailsDb model for task with details

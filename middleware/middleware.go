@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"reports-api/models"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -226,62 +227,42 @@ type RateLimiterConfig struct {
 	Expiration time.Duration
 }
 
-// RateLimiter creates a basic rate limiting middleware
-// Uses IP-based rate limiting with default limits
-func RateLimiter() fiber.Handler {
-	return limiter.New(limiter.Config{
-		Max:        100,
-		Expiration: 1 * time.Minute,
-		KeyGenerator: func(c *fiber.Ctx) string {
-			// Use IP for rate limiting
-			return c.IP()
-		},
-		LimitReached: func(c *fiber.Ctx) error {
-			requestID := c.Get("X-Request-ID")
-			if requestID == "" {
-				requestID = generateRequestID()
-			}
-			return c.Status(429).JSON(models.StandardResponse{
-				Success: false,
-				Message: "Too Many Requests",
-				Error: map[string]any{
-					"message": "Too many requests. Please try again later.",
-					"limit":   100,
-					"window":  "1m0s",
-				},
-				Timestamp: time.Now().Format(time.RFC3339),
-				RequestID: requestID,
-			})
-		},
-	})
+// getEndpointLimits returns rate limit configuration for different endpoints
+func getEndpointLimits(path string) RateLimiterConfig {
+	switch {
+	case strings.Contains(path, "/api/v1/problem/create"):
+		return RateLimiterConfig{Max: 10, Expiration: 1 * time.Minute}
+	case strings.Contains(path, "/api/v1/problem/update"):
+		return RateLimiterConfig{Max: 20, Expiration: 1 * time.Minute}
+	case strings.Contains(path, "/api/v1/problem/delete"):
+		return RateLimiterConfig{Max: 5, Expiration: 1 * time.Minute}
+	case strings.Contains(path, "/api/v1/problem/list"):
+		return RateLimiterConfig{Max: 200, Expiration: 1 * time.Minute}
+	default:
+		return RateLimiterConfig{Max: 100, Expiration: 1 * time.Minute}
+	}
 }
 
-// EndpointRateLimiter creates an endpoint-specific rate limiting middleware
-// Use this to apply different limits to specific routes
-func EndpointRateLimiter(max int, expiration time.Duration) fiber.Handler {
-	return limiter.New(limiter.Config{
-		Max:        max,
-		Expiration: expiration,
-		KeyGenerator: func(c *fiber.Ctx) string {
-			// Use IP + Path for per-endpoint limiting
-			return c.IP() + ":" + c.Path()
-		},
-		LimitReached: func(c *fiber.Ctx) error {
-			requestID := c.Get("X-Request-ID")
-			if requestID == "" {
-				requestID = generateRequestID()
-			}
-			return c.Status(429).JSON(models.StandardResponse{
-				Success: false,
-				Message: "Too Many Requests",
-				Error: map[string]any{
-					"message": "Too many requests for this endpoint",
-					"limit":   max,
-					"window":  expiration.String(),
-				},
-				Timestamp: time.Now().Format(time.RFC3339),
-				RequestID: requestID,
-			})
-		},
-	})
+// RateLimiter creates an endpoint-specific rate limiting middleware
+func RateLimiter() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		config := getEndpointLimits(c.Path())
+
+		limiterMiddleware := limiter.New(limiter.Config{
+			Max:        config.Max,
+			Expiration: config.Expiration,
+			KeyGenerator: func(c *fiber.Ctx) string {
+				return c.IP() + ":" + c.Path()
+			},
+			LimitReached: func(c *fiber.Ctx) error {
+				return c.Status(429).JSON(fiber.Map{
+					"error":  "Too many requests for this endpoint",
+					"limit":  config.Max,
+					"window": config.Expiration.String(),
+				})
+			},
+		})
+
+		return limiterMiddleware(c)
+	}
 }

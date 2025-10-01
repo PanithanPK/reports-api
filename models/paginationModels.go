@@ -17,6 +17,9 @@ type PaginationResponse struct {
 // PaginatedResponse represents a paginated API response
 type PaginatedResponse struct {
 	Success    bool               `json:"success"`
+	Message    string             `json:"message,omitempty"`
 	Data       interface{}        `json:"data"`
 	Pagination PaginationResponse `json:"pagination"`
+	Timestamp  string             `json:"timestamp,omitempty"`
+	RequestID  string             `json:"request_id,omitempty"`
 }

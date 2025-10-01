@@ -70,6 +70,7 @@ func LoginHandler(c *fiber.Ctx) error {
 
 	log.Printf("User %s logged in successfully", username)
 	return c.JSON(models.LoginResponse{
+		Success: true,
 		Message: "Login successful",
 		Data:    &models.Data{ID: id, Username: username, Role: role},
 	})

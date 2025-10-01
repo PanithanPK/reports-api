@@ -7,6 +7,9 @@ type User struct {
 }
 
 type UserResponse struct {
-	Success bool        `json:"success"`
-	Data    interface{} `json:"data"`
+	Success   bool        `json:"success"`
+	Message   string      `json:"message,omitempty"`
+	Data      interface{} `json:"data"`
+	Timestamp string      `json:"timestamp,omitempty"`
+	RequestID string      `json:"request_id,omitempty"`
 }

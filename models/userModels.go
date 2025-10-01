@@ -15,9 +15,12 @@ type Credentials struct {
 
 // LoginResponse represents the structure of the response after a user logs in
 type LoginResponse struct {
-	Message string `json:"message"`
-	Token   string `json:"token,omitempty"`
-	Data    *Data  `json:"data,omitempty"`
+	Success   bool   `json:"success"`
+	Message   string `json:"message"`
+	Token     string `json:"token,omitempty"`
+	Data      *Data  `json:"data,omitempty"`
+	Timestamp string `json:"timestamp,omitempty"`
+	RequestID string `json:"request_id,omitempty"`
 }
 
 // RegisterUserRequest represents the structure of the request to register a new user
