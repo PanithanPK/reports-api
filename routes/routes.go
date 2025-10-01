@@ -9,10 +9,10 @@ import (
 
 // MainRoutes registers all API routes
 func MainRoutes(r *fiber.App) {
-	//Dashboard routes
+	// Dashboard routes
 	r.Get("/api/v1/dashboard/data", handlers.GetDashboardDataHandler)
 
-	//Data export routes
+	// Data export routes
 	r.Get("/api/v1/dashboard/data/phonecsv", handlers.IpphonesExportCsv)
 	r.Get("/api/v1/dashboard/data/departmetcsv", handlers.DepartmentsExportCsv)
 	r.Get("/api/v1/dashboard/data/branchcsv", handlers.BranchExportCsv)
@@ -24,11 +24,11 @@ func MainRoutes(r *fiber.App) {
 	r.Put("/api/v1/scores/update/:id", handlers.UpdateScoreHandler)
 	r.Delete("/api/v1/scores/delete/:id", handlers.DeleteScoreHandler)
 
-	r.Get("/api/v1/respons/list", handlers.GetresponsHandler)
-	r.Get("/api/v1/respons/:id", handlers.GetResponsDetailHandler)
-	r.Post("/api/v1/respons/create", handlers.AddresponsHandler)
-	r.Put("/api/v1/respons/update/:id", handlers.UpdateResponsHandler)
-	r.Delete("/api/v1/respons/delete/:id", handlers.DeleteResponsHandler)
+	r.Get("/api/v1/respons/list", handlers.GetResponsibilitiesHandler)
+	r.Get("/api/v1/respons/:id", handlers.GetResponsibilityDetailHandler)
+	r.Post("/api/v1/respons/create", handlers.AddResponsibilityHandler)
+	r.Put("/api/v1/respons/update/:id", handlers.UpdateResponsibilityHandler)
+	r.Delete("/api/v1/respons/delete/:id", handlers.DeleteResponsibilityHandler)
 }
 
 // problemRoutes registers all problem-related routes

@@ -236,7 +236,7 @@ func LogoutHandler(c *fiber.Ctx) error {
 // @Success 200 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/respons/list [get]
-func GetresponsHandler(c *fiber.Ctx) error {
+func GetResponsibilitiesHandler(c *fiber.Ctx) error {
 	rows, err := db.DB.Query("SELECT id, IFNULL(telegram_username, '') as telegram_username, COALESCE(name, '') as name FROM responsibilities")
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
@@ -268,7 +268,7 @@ func GetresponsHandler(c *fiber.Ctx) error {
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/respons/create [post]
-func AddresponsHandler(c *fiber.Ctx) error {
+func AddResponsibilityHandler(c *fiber.Ctx) error {
 	var req models.ResponseRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
@@ -297,7 +297,7 @@ func AddresponsHandler(c *fiber.Ctx) error {
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/respons/update/{id} [put]
-func UpdateResponsHandler(c *fiber.Ctx) error {
+func UpdateResponsibilityHandler(c *fiber.Ctx) error {
 	id := c.Params("id")
 	var req models.ResponseRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -326,7 +326,7 @@ func UpdateResponsHandler(c *fiber.Ctx) error {
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/respons/delete/{id} [delete]
-func DeleteResponsHandler(c *fiber.Ctx) error {
+func DeleteResponsibilityHandler(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	_, err := db.DB.Exec(
@@ -351,7 +351,7 @@ func DeleteResponsHandler(c *fiber.Ctx) error {
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
 // @Router /api/v1/respons/{id} [get]
-func GetResponsDetailHandler(c *fiber.Ctx) error {
+func GetResponsibilityDetailHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {

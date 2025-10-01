@@ -23,7 +23,7 @@ import (
 	fiberSwagger "github.com/swaggo/fiber-swagger"
 )
 
-// CurrentEnvironment เก็บสภาพแวดล้อมปัจจุบัน (dev, prod, หรือ default)
+// CurrentEnvironment stores the current environment (dev, prod, or default)
 var CurrentEnvironment string
 
 // Custom logger with levels
@@ -194,17 +194,10 @@ func main() {
 		})
 	})
 
-	// Register Authentication routes
+	// Register all routes
 	logger.Info.Println("🔐 Registering routes...")
 	routes.RegisterRoutes(app)
 	logger.Info.Println("✅ Routes registered successfully")
-
-	// Test route for RecoveryMiddleware
-	app.Get("/test-panic", func(c *fiber.Ctx) error {
-		logger.Info.Println("🧪 Testing RecoveryMiddleware with a deliberate panic")
-		panic("This is a test panic to verify RecoveryMiddleware is working")
-	})
-	logger.Info.Println("🧪 Test route for RecoveryMiddleware added at /test-panic")
 
 	// Get port from environment variable
 	port := os.Getenv("PORT")

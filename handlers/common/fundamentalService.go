@@ -28,23 +28,23 @@ func GetResolvedAtSafely(db *sql.DB, resolutionID int) (time.Time, error) {
 	return resolvedAt, nil
 }
 
-func Fixtimefeature(timeStr string) string {
+func FixTimeFeature(timeStr string) string {
 	parsedTime, err := time.Parse("2006-01-02 15:04:05", timeStr)
 	if err != nil {
 		log.Printf("Failed to parse created_at time '%s': %v", timeStr, err)
-		parsedTime = time.Now() // ใช้เวลาปัจจุบันถ้า parse ไม่ได้
+		parsedTime = time.Now() // Use current time if parsing fails
 	}
 	return parsedTime.Add(7 * time.Hour).Format("2006/01/02 15:04:05")
 }
 
-func Generateticketno() string {
-	// create ticket as TK-DDMMYYYY-no using the latest number of that month/year + 1
+func GenerateTicketNo() string {
+	// Create ticket as TK-DDMMYYYY-no using the latest number of that month/year + 1
 	now := time.Now().Add(7 * time.Hour)
-	dateStr := now.Format("20060102") // วันเดือนปี
+	dateStr := now.Format("20060102") // Date in DDMMYYYY format
 	year := now.Year()
 	month := int(now.Month())
 
-	// get last ticket number for this month/year
+	// Get last ticket number for this month/year
 	var lastNo sql.NullInt64
 	err := db.DB.QueryRow(`
 		SELECT MAX(CAST(RIGHT(ticket_no, 4) AS UNSIGNED)) 
@@ -52,7 +52,7 @@ func Generateticketno() string {
 		WHERE YEAR(created_at) = ? AND MONTH(created_at) = ? 
 		AND ticket_no REGEXP '^TK-[0-9]{8}-[0-9]{4}$'`, year, month).Scan(&lastNo)
 
-	ticketNo := 1 // default to 1 if no records found
+	ticketNo := 1 // Default to 1 if no records found
 	if err != nil {
 		log.Printf("Error getting last ticket no for month/year: %v", err)
 	} else if lastNo.Valid {
@@ -62,12 +62,12 @@ func Generateticketno() string {
 	return ticket
 }
 
-// FormatResolvedAt รับ resolved_at และบวก 7 ชั่วโมง แล้ว format เป็น string
+// FormatResolvedAt takes resolved_at, adds 7 hours, and formats it as string
 func FormatResolvedAt(resolvedAt time.Time) string {
 	return resolvedAt.Add(7 * time.Hour).Format("02/01/2006 15:04:05")
 }
 
-// FormatResolvedAtFromString รับ resolved_at string แปลงเป็น time แล้วบวก 7 ชั่วโมง
+// TimeFromString takes a time string, parses it, adds 7 hours, and formats it
 func TimeFromString(TimeStr string) string {
 	if TimeStr == "" {
 		return ""

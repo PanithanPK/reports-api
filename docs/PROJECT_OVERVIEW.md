@@ -56,24 +56,22 @@ Reports API is a comprehensive Backend API system developed with Go (Golang) and
 - **dashboard.go**: Dashboard data aggregation
 - **datasummary.go**: Data export and summary
 - **common/**: Common services
-  - **fundamentalService.go**: Core utility functions
-  - **minioService.go**: File storage operations
-  - **telegramService.go**: Telegram integration
+  - **fundamentalService.go**: Core utility functions (time handling, ticket generation)
+  - **minioService.go**: File storage operations with MinIO
+  - **telegramService.go**: Telegram bot integration
+  - **imageProcessor.go**: Image processing utilities
 
 ### 5. Routes (`routes/`)
 - **routes.go**: API routes registration
-- Separate Authentication routes and Business logic routes
-
 ### 6. Utils (`utils/`)
 - **pagination.go**: Pagination utilities
 - **datetime.go**: Date/time utility functions
 
-### 7. Configuration (`config/`)
-- **config.go**: Application configuration management
+### 7. Constants (`constants/`)
+- **constants.go**: Application-wide constants and messages
 
-### 8. Middleware (`middleware/`)
-- **middleware.go**: Rate limiting and security middleware
-- **SECURITY_RECOMMENDATIONS.md**: Security guidelines
+### 8. Configuration (`config/`)
+- **config.go**: Application configuration management
 
 ### 9. Documentation (`docs/`)
 - **swagger.json/yaml**: API documentation
@@ -527,11 +525,13 @@ go run main.go
 - CPU limit (2 cores) with GOMAXPROCS
 - Garbage collection optimization (50% threshold)
 - Query optimization with proper indexing
-- Efficient pagination implementation
+- Efficient pagination implementation with helper utilities
 - File streaming for large uploads
 - Concurrent file processing
-- Response compression
+- Response compression with gzip
 - Static file serving optimization
+- Reusable utility functions to reduce overhead
+- Standardized response helpers for consistent formatting
 
 ## API Documentation
 - Comprehensive Swagger/OpenAPI documentation
@@ -651,13 +651,13 @@ mc mirror minio/reports-bucket /backup/minio/$DATE/
 - **Geographic Redundancy**: Multi-region backup storage
 
 ## Current Status
-- **Latest Version**: v1.15.0
+- **Latest Version**: v1.16.0
 - **Environment**: Production-ready with full infrastructure
 - **Database**: MySQL 8.0 with connection pooling and backups
 - **File Storage**: MinIO cluster with redundancy
 - **Notifications**: Telegram bot with image support
 - **Documentation**: Complete API and infrastructure documentation
-- **CI/CD**: GitLab pipeline with automated testing and deployment
+{{ ... }}
 - **Monitoring**: Health checks and logging infrastructure
 - **Security**: SSL/TLS, authentication, and security headers
 - **Scalability**: Load balancing and horizontal scaling ready

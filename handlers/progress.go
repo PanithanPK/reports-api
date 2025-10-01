@@ -359,8 +359,8 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 		Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + idStr
 	}
 
-	CreatedAt := common.Fixtimefeature(createdAt)
-	UpdatedAt := common.Fixtimefeature(updatedAt)
+	CreatedAt := common.FixTimeFeature(createdAt)
+	UpdatedAt := common.FixTimeFeature(updatedAt)
 
 	if err == nil {
 		// Parse file_paths JSON
@@ -481,8 +481,8 @@ func GetProgressHandler(c *fiber.Ctx) error {
 		parseProgressFilePaths(filePathsJSON, &entry)
 
 		// Set assignto from task
-		entry.CreatedAt = common.Fixtimefeature(CreatedAt)
-		entry.UpdateAt = common.Fixtimefeature(UpdateAt)
+		entry.CreatedAt = common.FixTimeFeature(CreatedAt)
+		entry.UpdateAt = common.FixTimeFeature(UpdateAt)
 		entry.Ticketno = ticketno
 		entry.AssignTo = assignto
 

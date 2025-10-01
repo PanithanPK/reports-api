@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"database/sql"
+	"reports-api/constants"
 	"reports-api/db"
 	"reports-api/models"
+	"reports-api/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -12,7 +14,7 @@ func ListScoresHandler(c *fiber.Ctx) error {
 	query := `SELECT department_id, year, month, score FROM scores`
 	rows, err := db.DB.Query(query)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to query scores"})
+		return utils.ErrorResponse(c, 500, constants.ErrorFailedToQuery+" scores")
 	}
 	defer rows.Close()
 
@@ -21,12 +23,12 @@ func ListScoresHandler(c *fiber.Ctx) error {
 		var score models.Score
 		err := rows.Scan(&score.DepartmentID, &score.Year, &score.Month, &score.Score)
 		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to scan score"})
+			return utils.ErrorResponse(c, 500, "Failed to scan score")
 		}
 		scores = append(scores, score)
 	}
 	if err := rows.Err(); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Row error"})
+		return utils.ErrorResponse(c, 500, "Row error")
 	}
 
 	return c.JSON(fiber.Map{"scores": scores})
@@ -42,13 +44,12 @@ func GetScoreDetailHandler(c *fiber.Ctx) error {
 	err := row.Scan(&score.DepartmentID, &score.Year, &score.Month, &score.Score)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return c.Status(404).JSON(fiber.Map{"error": "Score not found"})
-		} else {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to query score"})
+			return utils.ErrorResponse(c, 404, constants.ErrorNotFound)
 		}
+		return utils.ErrorResponse(c, 500, constants.ErrorFailedToQuery+" score")
 	}
 
-	return c.JSON(score)
+	return utils.SuccessResponse(c, score)
 }
 
 func UpdateScoreHandler(c *fiber.Ctx) error {
@@ -57,7 +58,7 @@ func UpdateScoreHandler(c *fiber.Ctx) error {
 	var score models.ScoreUpdateRequest
 	err := c.BodyParser(&score)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+		return utils.ErrorResponse(c, 400, constants.MessageInvalidRequest)
 	}
 
 	var query string
@@ -73,10 +74,10 @@ func UpdateScoreHandler(c *fiber.Ctx) error {
 
 	_, err = db.DB.Exec(query, args...)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to update score"})
+		return utils.ErrorResponse(c, 500, constants.ErrorFailedToUpdate+" score")
 	}
 
-	return c.SendStatus(204)
+	return utils.UpdatedResponse(c)
 }
 
 func DeleteScoreHandler(c *fiber.Ctx) error {
@@ -98,8 +99,8 @@ func DeleteScoreHandler(c *fiber.Ctx) error {
 
 	_, err = db.DB.Exec(query, args...)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete score"})
+		return utils.ErrorResponse(c, 500, constants.ErrorFailedToDelete+" score")
 	}
 
-	return c.SendStatus(204)
+	return utils.DeletedResponse(c)
 }

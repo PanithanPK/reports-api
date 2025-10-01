@@ -53,7 +53,7 @@ func GetDashboardDataHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	// ดึงข้อมูล branches
+	// Fetch branches
 	branches := []models.BranchDb{}
 	branchRows, err := db.DB.Query("SELECT id, name, created_at, updated_at FROM branches WHERE deleted_at IS NULL")
 	if err == nil {
@@ -67,7 +67,7 @@ func GetDashboardDataHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// ดึงข้อมูล departments
+	// Fetch departments
 	departments := []models.DepartmentDb{}
 	departmentRows, err := db.DB.Query(`
 	SELECT d.id, d.name, d.branch_id, b.name as branch_name, d.created_at, d.updated_at
@@ -107,7 +107,7 @@ func GetDashboardDataHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// ดึงข้อมูล ip_phones
+	// Fetch IP phones
 	ipPhones := []models.IPPhoneDb{}
 	ipPhoneRows, err := db.DB.Query(`
 		SELECT 
@@ -140,7 +140,7 @@ func GetDashboardDataHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// ดึงข้อมูล programs
+	// Fetch programs
 	programs := []models.ProgramDb{}
 	programRows, err := db.DB.Query("SELECT id, name, created_at, updated_at FROM systems_program WHERE deleted_at IS NULL")
 	if err == nil {
@@ -154,7 +154,7 @@ func GetDashboardDataHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// ดึงข้อมูล issue_types
+	// Fetch issue types
 	issueTypes := []models.IssueTypeDb{}
 	issueTypeRows, err := db.DB.Query("SELECT id, name, created_at FROM issue_types")
 	if err == nil {
@@ -168,7 +168,7 @@ func GetDashboardDataHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// ดึงข้อมูล tasks
+	// Fetch tasks
 	tasks := []models.TaskWithDetailsDb{}
 	tasksQuery := `SELECT 
 	       t.id, 
@@ -241,7 +241,7 @@ func GetDashboardDataHandler(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-// calculateChartData คำนวณข้อมูลสำหรับกราฟ
+// calculateChartData calculates data for charts
 func calculateChartData(tasks []models.TaskWithDetailsDb) models.ChartData {
 	return models.ChartData{
 		YearStats: []models.YearStat{},

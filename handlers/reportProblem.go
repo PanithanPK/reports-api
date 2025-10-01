@@ -210,7 +210,7 @@ func CreateTaskHandler(c *fiber.Ctx) error {
 	var req models.TaskRequest
 	var uploadedFiles []fiber.Map
 	// Get latest ID and add 1 for ticket number
-	ticketno := common.Generateticketno()
+	ticketno := common.GenerateTicketNo()
 
 	form, err := c.MultipartForm()
 	if err != nil {
@@ -631,8 +631,8 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 		`, id).Scan(&ticketno, &messageID, &reported, &existingFilePathsJSON, &telegramUser, &assigntoID, &createdAtStr, &telegramID, &updatedAtStr)
 
 	// Parse created_at string to time
-	CreatedAt := common.Fixtimefeature(createdAtStr)
-	UpdatedAt := common.Fixtimefeature(updatedAtStr)
+	CreatedAt := common.FixTimeFeature(createdAtStr)
+	UpdatedAt := common.FixTimeFeature(updatedAtStr)
 
 	log.Printf("Query result - err: %v, messageID: %d, telegramID: %d", err, messageID, telegramID)
 
@@ -679,7 +679,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 			db.DB.QueryRow(`SELECT IFNULL(resolved_at, "") FROM tasks WHERE id = ?`, id).Scan(&ResolvedAt)
 		}
 
-		resolvedAtnow := common.Fixtimefeature(ResolvedAt)
+		resolvedAtnow := common.FixTimeFeature(ResolvedAt)
 
 		telegramReq.PhoneNumber = phoneNumber
 		telegramReq.DepartmentName = departmentName
@@ -769,7 +769,7 @@ func UpdateTaskHandler(c *fiber.Ctx) error {
 				FROM resolutions WHERE id = ?
 			`, resolutionID.Int64).Scan(&resolutionText, &resolutionFilePathsJSON, &resolutionResolvedAt)
 
-			resolvedAt := common.Fixtimefeature(resolutionResolvedAt)
+			resolvedAt := common.FixTimeFeature(resolutionResolvedAt)
 
 			if err == nil {
 				// สร้าง ResolutionReq
@@ -1463,8 +1463,8 @@ func UpdateAssignedTo(c *fiber.Ctx) error {
 			Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + id
 		}
 
-		CreatedAt := common.Fixtimefeature(createdAt)
-		UpdatedAt := common.Fixtimefeature(updatedAt)
+		CreatedAt := common.FixTimeFeature(createdAt)
+		UpdatedAt := common.FixTimeFeature(updatedAt)
 
 		if err == nil {
 			// Parse file_paths JSON
