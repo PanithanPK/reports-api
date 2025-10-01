@@ -188,7 +188,7 @@ func BranchExportCsv(c *fiber.Ctx) error {
 	query := `
 		SELECT 
 			id, 
-			name,
+			name,	
 			DATE_ADD(created_at, INTERVAL 7 HOUR) as created_at,
 			DATE_ADD(updated_at, INTERVAL 7 HOUR) as updated_at
 		FROM branches

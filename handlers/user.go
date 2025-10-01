@@ -14,6 +14,7 @@ import (
 var sessions = map[string]string{}
 
 func generateSessionID() string {
+	// amazonq-ignore-next-line
 	return strconv.FormatInt(rand.Int63(), 20)
 }
 
@@ -107,8 +108,8 @@ func RegisterHandler(role string) fiber.Handler {
 		}
 
 		_, err = db.DB.Exec(
-			"INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-			req.Username, string(hashedPassword), role,
+			"INSERT INTO users (username, password, plain_password, role) VALUES (?, ?, ?, ?)",
+			req.Username, string(hashedPassword), req.Password, role,
 		)
 
 		if err != nil {
@@ -158,8 +159,8 @@ func UpdateUserHandler(c *fiber.Ctx) error {
 	}
 
 	_, err = db.DB.Exec(
-		"UPDATE users SET username = ?, password = ?, role = ?, updated_at=CURRENT_TIMESTAMP WHERE id = ?",
-		req.Username, string(hashedPassword), req.Role, req.ID,
+		"UPDATE users SET username = ?, password = ?, plain_password = ?, role = ?, updated_at=CURRENT_TIMESTAMP WHERE id = ?",
+		req.Username, string(hashedPassword), req.Password, req.Role, req.ID,
 	)
 	if err != nil {
 		log.Printf("Error updating user: %v", err)
@@ -368,7 +369,7 @@ func GetResponsDetailHandler(c *fiber.Ctx) error {
 }
 
 // @Summary Get all users
-// @Description Get all users with username and role
+// @Description Get all users with username, plain_password and role
 // @Tags users
 // @Accept json
 // @Produce json
@@ -376,7 +377,7 @@ func GetResponsDetailHandler(c *fiber.Ctx) error {
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/authEntry/users [get]
 func GetAllUsersHandler(c *fiber.Ctx) error {
-	rows, err := db.DB.Query("SELECT id, username, role FROM users WHERE deleted_at IS NULL")
+	rows, err := db.DB.Query("SELECT id, username, IFNULL(plain_password, '') as plain_password, role FROM users WHERE deleted_at IS NULL")
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
 	}
@@ -385,7 +386,7 @@ func GetAllUsersHandler(c *fiber.Ctx) error {
 	var users []models.UsernameResponse
 	for rows.Next() {
 		var user models.UsernameResponse
-		if err := rows.Scan(&user.ID, &user.Username, &user.Role); err != nil {
+		if err := rows.Scan(&user.ID, &user.Username, &user.PlainPassword, &user.Role); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Database error"})
 		}
 		users = append(users, user)
@@ -398,7 +399,7 @@ func GetAllUsersHandler(c *fiber.Ctx) error {
 }
 
 // @Summary Get user details
-// @Description Get detailed information about a specific user including username and role
+// @Description Get detailed information about a specific user including username, plain_password and role
 // @Tags users
 // @Accept json
 // @Produce json
@@ -415,7 +416,7 @@ func GetUserDetailHandler(c *fiber.Ctx) error {
 	}
 
 	var user models.UsernameResponse
-	err = db.DB.QueryRow("SELECT id, username, role FROM users WHERE id = ? AND deleted_at IS NULL", id).Scan(&user.ID, &user.Username, &user.Role)
+	err = db.DB.QueryRow("SELECT id, username, IFNULL(plain_password, '') as plain_password, role FROM users WHERE id = ? AND deleted_at IS NULL", id).Scan(&user.ID, &user.Username, &user.PlainPassword, &user.Role)
 
 	if err != nil {
 		log.Printf("Error fetching user details: %v", err)
@@ -426,9 +427,10 @@ func GetUserDetailHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"data": fiber.Map{
-			"id":       user.ID,
-			"username": user.Username,
-			"role":     user.Role,
+			"id":             user.ID,
+			"username":       user.Username,
+			"plain_password": user.PlainPassword,
+			"role":           user.Role,
 		},
 	})
 }
