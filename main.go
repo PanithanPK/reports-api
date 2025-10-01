@@ -135,7 +135,7 @@ func main() {
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
 		AppName:      "Reports API",
-		BodyLimit:    100 * 1024 * 1024, // 50MB limit for file uploads
+		BodyLimit:    50 * 1024 * 1024, // 50MB limit for file uploads
 		ReadTimeout:  time.Second * 30,
 		WriteTimeout: time.Second * 30,
 	})
@@ -165,13 +165,13 @@ func main() {
 	})
 	logger.Info.Println("🍪 Session middleware configured")
 
-	// Add middleware
-	app.Use(middleware.CompressionMiddleware())
+	// Add middleware (order matters!)
+	app.Use(middleware.RateLimiter()) // Rate limiting first to prevent abuse
 	app.Use(middleware.LoggingMiddleware())
+	app.Use(middleware.CompressionMiddleware())
 	app.Use(middleware.ResponseStandardizationMiddleware())
-	// app.Use(middleware.HeaderMiddleware())
-	app.Use(middleware.RateLimiter())
-	logger.Info.Println("✅ Middleware added")
+	// app.Use(middleware.HeaderMiddleware()) // Commented - not needed with ResponseStandardizationMiddleware
+	logger.Info.Println("✅ Middleware added (RateLimiter → Logging → Compression → Standardization)")
 
 	// Serve static files
 	app.Static("/static", "./fontend")

@@ -30,11 +30,9 @@ func InitDB() error {
 
 		dbPass := os.Getenv("DB_PASS")
 		if dbPass == "" {
-			dbPass = "123456"
-			log.Println("⚠️ Using default DB_PASS: PASS")
-		} else {
-			log.Println("✅ Using DB_PASS from environment")
+			log.Fatal("❌ DB_PASS environment variable is required")
 		}
+		log.Println("✅ Using DB_PASS from environment")
 
 		dbHost := os.Getenv("DB_HOST")
 		if dbHost == "" {

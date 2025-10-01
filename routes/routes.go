@@ -2,6 +2,7 @@ package routes
 
 import (
 	"reports-api/handlers"
+	"reports-api/middleware"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -36,10 +37,10 @@ func problemRoutes(r *fiber.App) {
 	r.Get("/api/v1/problem/list/:query", handlers.GetTasksWithQueryHandler)
 	r.Get("/api/v1/problem/list/:column/:query", handlers.GetTasksWithColumnQueryHandler)
 	r.Get("/api/v1/problem/list/sort/:column/:query", handlers.GetTaskSort)
-	r.Post("/api/v1/problem/create", handlers.CreateTaskHandler)
+	r.Post("/api/v1/problem/create", middleware.RateLimiter(), handlers.CreateTaskHandler)
 	r.Get("/api/v1/problem/:id", handlers.GetTaskDetailHandler)
-	r.Put("/api/v1/problem/update/:id", handlers.UpdateTaskHandler)
-	r.Delete("/api/v1/problem/delete/:id", handlers.DeleteTaskHandler)
+	r.Put("/api/v1/problem/update/:id", middleware.RateLimiter(), handlers.UpdateTaskHandler)
+	r.Delete("/api/v1/problem/delete/:id", middleware.RateLimiter(), handlers.DeleteTaskHandler)
 	r.Put("/api/v1/problem/update/assignto/:id", handlers.UpdateAssignedTo)
 }
 
@@ -108,12 +109,12 @@ func branchRoutes(r *fiber.App) {
 
 // RegisterAuthRoutes registers all authentication-related routes
 func RegisterAuthRoutes(r *fiber.App) {
-	// Authentication routes
-	r.Post("/api/authEntry/login", handlers.LoginHandler)
-	r.Post("/api/authEntry/registerUser", handlers.RegisterHandler("user"))
-	r.Post("/api/authEntry/registerAdmin", handlers.RegisterHandler("admin"))
-	r.Put("/api/authEntry/updateUser", handlers.UpdateUserHandler)
-	r.Delete("/api/authEntry/deleteUser", handlers.DeleteUserHandler)
+	// Authentication routes with rate limiting
+	r.Post("/api/authEntry/login", middleware.RateLimiter(), handlers.LoginHandler)
+	r.Post("/api/authEntry/registerUser", middleware.RateLimiter(), handlers.RegisterHandler("user"))
+	r.Post("/api/authEntry/registerAdmin", middleware.RateLimiter(), handlers.RegisterHandler("admin"))
+	r.Put("/api/authEntry/updateUser", middleware.RateLimiter(), handlers.UpdateUserHandler)
+	r.Delete("/api/authEntry/deleteUser", middleware.RateLimiter(), handlers.DeleteUserHandler)
 	r.Post("/api/authEntry/logout", handlers.LogoutHandler)
 
 	// User management routes
