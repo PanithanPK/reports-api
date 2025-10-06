@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"log"
-	"math/rand"
 	"reports-api/db"
 	"reports-api/models"
+	"reports-api/utils"
 	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -14,17 +17,25 @@ import (
 var sessions = map[string]string{}
 
 func generateSessionID() string {
-	// amazonq-ignore-next-line
-	return strconv.FormatInt(rand.Int63(), 20)
+	// Generate cryptographically secure random bytes
+	bytes := make([]byte, 16) // 16 bytes = 128 bits of entropy
+	if _, err := rand.Read(bytes); err != nil {
+		log.Printf("Error generating session ID: %v", err)
+		// Fallback to timestamp-based ID (not ideal but better than predictable)
+		return strconv.FormatInt(time.Now().UnixNano(), 36)
+	}
+	return hex.EncodeToString(bytes)
 }
 
 func generateDummyToken() string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	token := make([]byte, 32)
-	for i := range token {
-		token[i] = charset[rand.Intn(len(charset))]
+	// Generate cryptographically secure random bytes for token
+	bytes := make([]byte, 32) // 32 bytes = 256 bits of entropy
+	if _, err := rand.Read(bytes); err != nil {
+		log.Printf("Error generating dummy token: %v", err)
+		// Fallback to hex encoding of timestamp (not ideal but better than predictable)
+		return hex.EncodeToString([]byte(strconv.FormatInt(time.Now().UnixNano(), 10)))
 	}
-	return string(token)
+	return hex.EncodeToString(bytes)
 }
 
 // @Summary User login
@@ -103,14 +114,21 @@ func RegisterHandler(role string) fiber.Handler {
 			return c.Status(409).JSON(fiber.Map{"error": "Username already exists"})
 		}
 
+		// Hash password for authentication (login verification)
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to hash password"})
 		}
 
+		// Encrypt password for admin viewing (reversible)
+		encryptedPassword, err := utils.EncryptPassword(req.Password)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to encrypt password"})
+		}
+
 		_, err = db.DB.Exec(
 			"INSERT INTO users (username, password, plain_password, role) VALUES (?, ?, ?, ?)",
-			req.Username, string(hashedPassword), req.Password, role,
+			req.Username, string(hashedPassword), encryptedPassword, role,
 		)
 
 		if err != nil {
@@ -153,15 +171,21 @@ func UpdateUserHandler(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "User not found"})
 	}
 
-	// Hash the password
+	// Hash password for authentication (login verification)
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to hash password"})
 	}
 
+	// Encrypt password for admin viewing (reversible)
+	encryptedPassword, err := utils.EncryptPassword(req.Password)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to encrypt password"})
+	}
+
 	_, err = db.DB.Exec(
 		"UPDATE users SET username = ?, password = ?, plain_password = ?, role = ?, updated_at=CURRENT_TIMESTAMP WHERE id = ?",
-		req.Username, string(hashedPassword), req.Password, req.Role, req.ID,
+		req.Username, string(hashedPassword), encryptedPassword, req.Role, req.ID,
 	)
 	if err != nil {
 		log.Printf("Error updating user: %v", err)
@@ -370,7 +394,7 @@ func GetResponsibilityDetailHandler(c *fiber.Ctx) error {
 }
 
 // @Summary Get all users
-// @Description Get all users with username, plain_password and role
+// @Description Get all users with username, decrypted password and role (Admin only)
 // @Tags users
 // @Accept json
 // @Produce json
@@ -387,9 +411,22 @@ func GetAllUsersHandler(c *fiber.Ctx) error {
 	var users []models.UsernameResponse
 	for rows.Next() {
 		var user models.UsernameResponse
-		if err := rows.Scan(&user.ID, &user.Username, &user.PlainPassword, &user.Role); err != nil {
+		var encryptedPassword string
+		if err := rows.Scan(&user.ID, &user.Username, &encryptedPassword, &user.Role); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Database error"})
 		}
+
+		// Decrypt password for admin viewing
+		if encryptedPassword != "" {
+			decryptedPassword, err := utils.DecryptPassword(encryptedPassword)
+			if err != nil {
+				log.Printf("Error decrypting password for user %s: %v", user.Username, err)
+				user.PlainPassword = "[Decryption Error]"
+			} else {
+				user.PlainPassword = decryptedPassword
+			}
+		}
+
 		users = append(users, user)
 	}
 
@@ -400,7 +437,7 @@ func GetAllUsersHandler(c *fiber.Ctx) error {
 }
 
 // @Summary Get user details
-// @Description Get detailed information about a specific user including username, plain_password and role
+// @Description Get detailed information about a specific user including username, decrypted password and role (Admin only)
 // @Tags users
 // @Accept json
 // @Produce json
@@ -417,11 +454,24 @@ func GetUserDetailHandler(c *fiber.Ctx) error {
 	}
 
 	var user models.UsernameResponse
-	err = db.DB.QueryRow("SELECT id, username, IFNULL(plain_password, '') as plain_password, role FROM users WHERE id = ? AND deleted_at IS NULL", id).Scan(&user.ID, &user.Username, &user.PlainPassword, &user.Role)
+	var encryptedPassword string
+	err = db.DB.QueryRow("SELECT id, username, IFNULL(plain_password, '') as plain_password, role FROM users WHERE id = ? AND deleted_at IS NULL", id).Scan(&user.ID, &user.Username, &encryptedPassword, &user.Role)
 
 	if err != nil {
 		log.Printf("Error fetching user details: %v", err)
 		return c.Status(404).JSON(fiber.Map{"error": "User not found"})
+	}
+
+	// Decrypt password for admin viewing
+	var plainPassword string
+	if encryptedPassword != "" {
+		decryptedPassword, err := utils.DecryptPassword(encryptedPassword)
+		if err != nil {
+			log.Printf("Error decrypting password for user %s: %v", user.Username, err)
+			plainPassword = "[Decryption Error]"
+		} else {
+			plainPassword = decryptedPassword
+		}
 	}
 
 	log.Printf("Getting user details Success for ID: %d", id)
@@ -430,7 +480,7 @@ func GetUserDetailHandler(c *fiber.Ctx) error {
 		"data": fiber.Map{
 			"id":             user.ID,
 			"username":       user.Username,
-			"plain_password": user.PlainPassword,
+			"plain_password": plainPassword,
 			"role":           user.Role,
 		},
 	})
