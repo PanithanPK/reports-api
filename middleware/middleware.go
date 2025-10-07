@@ -3,6 +3,8 @@ package middleware
 import (
 	"encoding/json"
 	"log"
+	"reports-api/config"
+	"reports-api/handlers"
 	"reports-api/models"
 	"strings"
 	"time"
@@ -264,5 +266,71 @@ func RateLimiter() fiber.Handler {
 		})
 
 		return limiterMiddleware(c)
+	}
+}
+
+// SessionMiddleware validates session and adds user info to context for frontend use
+// In development environment, this middleware is bypassed to allow access without login
+func SessionMiddleware() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// Skip session validation in development environment
+		if config.AppConfig != nil && config.AppConfig.Environment == "dev" {
+			// Set default user data for development
+			c.Set("X-User-Username", "dev-user")
+			c.Set("X-User-Role", "admin")
+			c.Locals("username", "dev-user")
+			c.Locals("role", "admin")
+			// Load Thailand timezone (UTC+7)
+			thailandTZ, err := time.LoadLocation("Asia/Bangkok")
+			if err != nil {
+				// Fallback to UTC+7 fixed offset if timezone loading fails
+				thailandTZ = time.FixedZone("ICT", 7*3600) // UTC+7
+			}
+			now := time.Now().In(thailandTZ)
+
+			c.Locals("sessionData", handlers.SessionData{
+				Username:  "dev-user",
+				Role:      "admin",
+				CreatedAt: now,
+				ExpiresAt: now.Add(24 * time.Hour),
+			})
+			return c.Next()
+		}
+
+		sessionID := c.Cookies("session_cookie")
+		if sessionID == "" {
+			return c.Status(401).JSON(fiber.Map{
+				"error":   "No session found",
+				"message": "Please login to access this resource",
+			})
+		}
+
+		sessionData, exists := handlers.GetSessionData(sessionID)
+		if !exists {
+			// Clear the invalid session cookie
+			c.Cookie(&fiber.Cookie{
+				Name:     "session_cookie",
+				Value:    "",
+				Path:     "/",
+				MaxAge:   -1,
+				HTTPOnly: true,
+			})
+
+			return c.Status(401).JSON(fiber.Map{
+				"error":   "Invalid session",
+				"message": "Please login again",
+			})
+		}
+
+		// Add session data to response headers for frontend middleware
+		c.Set("X-User-Username", sessionData.Username)
+		c.Set("X-User-Role", sessionData.Role)
+
+		// Also set in context for handlers to use
+		c.Locals("username", sessionData.Username)
+		c.Locals("role", sessionData.Role)
+		c.Locals("sessionData", sessionData)
+
+		return c.Next()
 	}
 }

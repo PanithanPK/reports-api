@@ -396,6 +396,9 @@ func CreateProgressHandler(c *fiber.Ctx) error {
 			CreatedAt:      CreatedAt,
 			UpdatedAt:      UpdatedAt,
 		}
+		if status == 1 {
+			telegramReq.SendNotification = false
+		}
 		if len(photoURLs) > 0 {
 			assigntoID, _ := common.UpdateTelegram(telegramReq, photoURLs...)
 			_, err = db.DB.Exec(`UPDATE telegram_chat SET assignto_id = ? WHERE id = ?`, assigntoID, idStr)

@@ -9,8 +9,8 @@ import (
 
 // MainRoutes registers all API routes
 func MainRoutes(r *fiber.App) {
-	// Dashboard routes
-	r.Get("/api/v1/dashboard/data", handlers.GetDashboardDataHandler)
+	// Dashboard routes (with session validation)
+	r.Get("/api/v1/dashboard/data", middleware.SessionMiddleware(), handlers.GetDashboardDataHandler)
 
 	// Data export routes
 	r.Get("/api/v1/dashboard/data/phonecsv", handlers.IpphonesExportCsv)
@@ -36,7 +36,7 @@ func problemRoutes(r *fiber.App) {
 	r.Get("/api/v1/problem/list", handlers.GetTasksHandler)
 	r.Get("/api/v1/problem/list/:query", handlers.GetTasksWithQueryHandler)
 	r.Get("/api/v1/problem/list/:column/:query", handlers.GetTasksWithColumnQueryHandler)
-	r.Get("/api/v1/problem/list/sort/:column/:query", handlers.GetTaskSort)
+	r.Get("/api/v1/problem/list/sort/:column/:query", middleware.SessionMiddleware(), handlers.GetTaskSort)
 	r.Post("/api/v1/problem/create", middleware.RateLimiter(), handlers.CreateTaskHandler)
 	r.Get("/api/v1/problem/:id", handlers.GetTaskDetailHandler)
 	r.Put("/api/v1/problem/update/:id", middleware.RateLimiter(), handlers.UpdateTaskHandler)

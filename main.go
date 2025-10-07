@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"reports-api/db"
+	"reports-api/handlers"
 	"time"
 
 	_ "reports-api/docs"
@@ -132,6 +133,17 @@ func main() {
 		}
 	}()
 
+	// Start session cleanup goroutine
+	go func() {
+		ticker := time.NewTicker(30 * time.Minute) // Cleanup every 30 minutes
+		defer ticker.Stop()
+
+		for range ticker.C {
+			handlers.CleanupExpiredSessions()
+		}
+	}()
+	logger.Info.Println("🧹 Session cleanup service started (runs every 30 minutes)")
+
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
 		AppName:      "Reports API",
@@ -151,13 +163,14 @@ func main() {
 
 	// Add Session middleware
 	store := session.New(session.Config{
-		KeyLookup:      "cookie:session_id",
-		CookieDomain:   "",
-		CookiePath:     "/",
-		CookieSecure:   CurrentEnvironment == "prod",
-		CookieHTTPOnly: true,
-		CookieSameSite: "Lax",
-		Expiration:     time.Hour * 24,
+		KeyLookup:         "cookie:session_cookie",
+		CookieDomain:      "",
+		CookiePath:        "/",
+		CookieSecure:      CurrentEnvironment == "prod",
+		CookieSessionOnly: true,
+		CookieHTTPOnly:    true,
+		CookieSameSite:    "Lax",
+		Expiration:        time.Hour * 24,
 	})
 	app.Use(func(c *fiber.Ctx) error {
 		c.Locals("session", store)
@@ -189,13 +202,11 @@ func main() {
 			}
 		}
 		return c.JSON(fiber.Map{
-			"status":  "OK",
 			"version": version,
 		})
 	})
 
-	// Register all routes
-	logger.Info.Println("🔐 Registering routes...")
+	// Register routes
 	routes.RegisterRoutes(app)
 	logger.Info.Println("✅ Routes registered successfully")
 

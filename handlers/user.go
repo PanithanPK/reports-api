@@ -14,7 +14,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var sessions = map[string]string{}
+// SessionData holds session information
+type SessionData struct {
+	Username  string    `json:"username"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+var sessions = map[string]SessionData{}
 
 func generateSessionID() string {
 	// Generate cryptographically secure random bytes
@@ -36,6 +44,60 @@ func generateDummyToken() string {
 		return hex.EncodeToString([]byte(strconv.FormatInt(time.Now().UnixNano(), 10)))
 	}
 	return hex.EncodeToString(bytes)
+}
+
+// GetSessionData retrieves session data by session ID for middleware use
+// Returns session data and validity status (checks expiration)
+func GetSessionData(sessionID string) (SessionData, bool) {
+	sessionData, exists := sessions[sessionID]
+	if !exists {
+		return SessionData{}, false
+	}
+
+	// Check if session has expired using Thailand timezone
+	thailandTZ, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		// Fallback to UTC+7 fixed offset if timezone loading fails
+		thailandTZ = time.FixedZone("ICT", 7*3600) // UTC+7
+	}
+	now := time.Now().In(thailandTZ)
+	if now.After(sessionData.ExpiresAt) {
+		// Remove expired session
+		delete(sessions, sessionID)
+		log.Printf("Session %s expired and removed", sessionID)
+		return SessionData{}, false
+	}
+
+	return sessionData, true
+}
+
+// CleanupExpiredSessions removes all expired sessions from memory
+func CleanupExpiredSessions() {
+	// Use Thailand timezone for cleanup
+	thailandTZ, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		// Fallback to UTC+7 fixed offset if timezone loading fails
+		thailandTZ = time.FixedZone("ICT", 7*3600) // UTC+7
+	}
+	now := time.Now().In(thailandTZ)
+	expiredCount := 0
+
+	for sessionID, sessionData := range sessions {
+		if now.After(sessionData.ExpiresAt) {
+			delete(sessions, sessionID)
+			expiredCount++
+		}
+	}
+
+	if expiredCount > 0 {
+		log.Printf("Cleaned up %d expired sessions", expiredCount)
+	}
+}
+
+// IsSessionValid checks if a session exists and is not expired
+func IsSessionValid(sessionID string) bool {
+	_, valid := GetSessionData(sessionID)
+	return valid
 }
 
 // @Summary User login
@@ -66,7 +128,22 @@ func LoginHandler(c *fiber.Ctx) error {
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid username or password"})
 	}
 	sessionID := generateSessionID()
-	sessions[sessionID] = username
+	// Load Thailand timezone (UTC+7)
+	thailandTZ, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		// Fallback to UTC+7 fixed offset if timezone loading fails
+		thailandTZ = time.FixedZone("ICT", 7*3600) // UTC+7
+		log.Printf("Warning: Failed to load Asia/Bangkok timezone, using fixed UTC+7: %v", err)
+	}
+	now := time.Now().In(thailandTZ)
+	sessionExpiry := now.Add(24 * time.Hour) // 24 hours expiration
+
+	sessions[sessionID] = SessionData{
+		Username:  username,
+		Role:      role,
+		CreatedAt: now,
+		ExpiresAt: sessionExpiry,
+	}
 
 	c.Set("role", role)
 	c.Set("token", generateDummyToken())
