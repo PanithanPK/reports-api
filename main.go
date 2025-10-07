@@ -169,7 +169,6 @@ func main() {
 		CookieSecure:      CurrentEnvironment == "prod",
 		CookieSessionOnly: true,
 		CookieHTTPOnly:    true,
-		CookieSameSite:    "Lax",
 		Expiration:        time.Hour * 24,
 	})
 	app.Use(func(c *fiber.Ctx) error {

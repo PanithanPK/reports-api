@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"log"
 	"reports-api/db"
 	"reports-api/models"
@@ -35,15 +36,32 @@ func generateSessionID() string {
 	return hex.EncodeToString(bytes)
 }
 
-func generateDummyToken() string {
-	// Generate cryptographically secure random bytes for token
-	bytes := make([]byte, 32) // 32 bytes = 256 bits of entropy
-	if _, err := rand.Read(bytes); err != nil {
-		log.Printf("Error generating dummy token: %v", err)
-		// Fallback to hex encoding of timestamp (not ideal but better than predictable)
-		return hex.EncodeToString([]byte(strconv.FormatInt(time.Now().UnixNano(), 10)))
+func generateDummyToken(username, role string) string {
+	// Load Thailand timezone (UTC+7)
+	thailandTZ, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		thailandTZ = time.FixedZone("ICT", 7*3600) // UTC+7
 	}
-	return hex.EncodeToString(bytes)
+	now := time.Now().In(thailandTZ)
+
+	// Create token data with username, role, and timestamp
+	tokenData := map[string]interface{}{
+		"username": username,
+		"role":     role,
+		"iat":      now.Unix(),
+		"exp":      now.Add(24 * time.Hour).Unix(),
+	}
+
+	// Convert to JSON
+	jsonData, err := json.Marshal(tokenData)
+	if err != nil {
+		log.Printf("Error marshaling token data: %v", err)
+		// Fallback to simple concatenation
+		return hex.EncodeToString([]byte(username + ":" + role + ":" + strconv.FormatInt(now.Unix(), 10)))
+	}
+
+	// Encode to hex for simple obfuscation
+	return hex.EncodeToString(jsonData)
 }
 
 // GetSessionData retrieves session data by session ID for middleware use
@@ -127,6 +145,7 @@ func LoginHandler(c *fiber.Ctx) error {
 	if err := bcrypt.CompareHashAndPassword([]byte(password), []byte(credentials.Password)); err != nil {
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid username or password"})
 	}
+
 	sessionID := generateSessionID()
 	// Load Thailand timezone (UTC+7)
 	thailandTZ, err := time.LoadLocation("Asia/Bangkok")
@@ -145,8 +164,13 @@ func LoginHandler(c *fiber.Ctx) error {
 		ExpiresAt: sessionExpiry,
 	}
 
-	c.Set("role", role)
-	c.Set("token", generateDummyToken())
+	// Set response headers for frontend middleware
+	c.Set("X-User-Username", username)
+	c.Set("X-User-Role", role)
+	c.Set("token", generateDummyToken(username, role))
+
+	// Expose custom headers to frontend
+	c.Set("Access-Control-Expose-Headers", "X-User-Username, X-User-Role, token")
 
 	c.Cookie(&fiber.Cookie{
 		Name:     "session_cookie",

@@ -278,6 +278,10 @@ func SessionMiddleware() fiber.Handler {
 			// Set default user data for development
 			c.Set("X-User-Username", "dev-user")
 			c.Set("X-User-Role", "admin")
+
+			// Expose custom headers to frontend
+			c.Set("Access-Control-Expose-Headers", "X-User-Username, X-User-Role")
+
 			c.Locals("username", "dev-user")
 			c.Locals("role", "admin")
 			// Load Thailand timezone (UTC+7)
@@ -325,6 +329,9 @@ func SessionMiddleware() fiber.Handler {
 		// Add session data to response headers for frontend middleware
 		c.Set("X-User-Username", sessionData.Username)
 		c.Set("X-User-Role", sessionData.Role)
+
+		// Expose custom headers to frontend
+		c.Set("Access-Control-Expose-Headers", "X-User-Username, X-User-Role")
 
 		// Also set in context for handlers to use
 		c.Locals("username", sessionData.Username)
