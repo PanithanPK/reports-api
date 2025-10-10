@@ -3,10 +3,10 @@ package handlers
 import (
 	"log"
 	"net/url"
+	"reports-api/constants"
 	"reports-api/db"
 	"reports-api/models"
 	"reports-api/utils"
-	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -83,16 +83,16 @@ func ListBranchesHandler(c *fiber.Ctx) error {
 func CreateBranchHandler(c *fiber.Ctx) error {
 	var req models.BranchRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+		return utils.ErrorResponse(c, 400, constants.MessageInvalidRequest)
 	}
 
 	res, err := db.DB.Exec(`INSERT INTO branches (name, created_by, updated_by) VALUES (?, ?, ?)`, req.Name, req.CreatedBy, req.UpdatedBy)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert branch"})
+		return utils.ErrorResponse(c, 500, constants.ErrorFailedToCreate+" branch")
 	}
 
 	id, _ := res.LastInsertId()
-	return c.JSON(fiber.Map{"success": true, "id": id})
+	return utils.CreatedResponse(c, id)
 }
 
 // @Summary Update branch
@@ -107,23 +107,22 @@ func CreateBranchHandler(c *fiber.Ctx) error {
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/branch/update/{id} [put]
 func UpdateBranchHandler(c *fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := strconv.Atoi(idStr)
+	id, err := utils.ParseIDParam(c, "id")
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
+		return utils.ErrorResponse(c, 400, constants.MessageInvalidID)
 	}
 
 	var req models.BranchRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+		return utils.ErrorResponse(c, 400, constants.MessageInvalidRequest)
 	}
 
 	_, err = db.DB.Exec(`UPDATE branches SET name=?, updated_by=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL`, req.Name, req.UpdatedBy, id)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to update branch"})
+		return utils.ErrorResponse(c, 500, constants.ErrorFailedToUpdate+" branch")
 	}
 
-	return c.JSON(fiber.Map{"success": true})
+	return utils.UpdatedResponse(c)
 }
 
 // @Summary Delete branch
@@ -137,19 +136,18 @@ func UpdateBranchHandler(c *fiber.Ctx) error {
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/branch/delete/{id} [delete]
 func DeleteBranchHandler(c *fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := strconv.Atoi(idStr)
+	id, err := utils.ParseIDParam(c, "id")
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
+		return utils.ErrorResponse(c, 400, constants.MessageInvalidID)
 	}
 
 	_, err = db.DB.Exec(`DELETE FROM branches WHERE id=?`, id)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete branch"})
+		return utils.ErrorResponse(c, 500, constants.ErrorFailedToDelete+" branch")
 	}
 
 	log.Printf("Deleted branch ID: %d", id)
-	return c.JSON(fiber.Map{"success": true})
+	return utils.DeletedResponse(c)
 }
 
 // @Summary Get branch details
@@ -163,10 +161,9 @@ func DeleteBranchHandler(c *fiber.Ctx) error {
 // @Failure 404 {object} map[string]interface{}
 // @Router /api/v1/branch/{id} [get]
 func GetBranchDetailHandler(c *fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := strconv.Atoi(idStr)
+	id, err := utils.ParseIDParam(c, "id")
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid id"})
+		return utils.ErrorResponse(c, 400, constants.MessageInvalidID)
 	}
 
 	var branchDetail models.BranchDetail
@@ -178,7 +175,7 @@ func GetBranchDetailHandler(c *fiber.Ctx) error {
 
 	if err != nil {
 		log.Printf("Error fetching branch details: %v", err)
-		return c.Status(404).JSON(fiber.Map{"error": "Branch not found"})
+		return utils.ErrorResponse(c, 404, "Branch "+constants.ErrorNotFound)
 	}
 
 	err = db.DB.QueryRow(`
@@ -201,7 +198,7 @@ func GetBranchDetailHandler(c *fiber.Ctx) error {
 	}
 
 	log.Printf("Getting branch details Success for ID: %d", id)
-	return c.JSON(fiber.Map{"success": true, "data": branchDetail})
+	return utils.SuccessResponse(c, branchDetail)
 }
 
 // @Summary Search branches

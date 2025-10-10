@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"log"
 	"net/url"
 	"reports-api/db"
@@ -396,11 +397,11 @@ func DeleteTypeHandler(c *fiber.Ctx) error {
 }
 
 // @Summary Search program types
-// @Description Search program types by query string
+// @Description Search program types by query string or ID
 // @Tags programs
 // @Accept json
 // @Produce json
-// @Param query path string true "Search query (use 'all' for all types)"
+// @Param query path string true "Search query (use 'all' for all types, number for ID search, text for name search)"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
@@ -421,20 +422,38 @@ func GetTypeWithQueryHandler(c *fiber.Ctx) error {
 
 	// Clean query
 	decodedQuery = strings.TrimSpace(decodedQuery)
-	decodedQuery = strings.ReplaceAll(decodedQuery, "  ", " ")
-	decodedQuery = strings.ReplaceAll(decodedQuery, "%", "")
-	decodedQuery = strings.ReplaceAll(decodedQuery, "_", "")
-	decodedQuery = strings.ReplaceAll(decodedQuery, "'", "")
-	decodedQuery = strings.ReplaceAll(decodedQuery, "\"", "")
 
-	searchPattern := "%" + decodedQuery + "%"
+	var rows *sql.Rows
 
-	// Get search results
-	rows, err := db.DB.Query(`
-		SELECT id, name FROM issue_types
-		WHERE name LIKE ?
-		ORDER BY id
-	`, searchPattern)
+	// Check if query is a number (ID search)
+	if id, parseErr := strconv.Atoi(decodedQuery); parseErr == nil {
+		// Search by ID
+		rows, err = db.DB.Query(`
+			SELECT id, name FROM issue_types
+			WHERE id = ?
+			ORDER BY id
+		`, id)
+
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to search types by ID"})
+		}
+	} else {
+		// Search by name (text search)
+		decodedQuery = strings.ReplaceAll(decodedQuery, "  ", " ")
+		decodedQuery = strings.ReplaceAll(decodedQuery, "%", "")
+		decodedQuery = strings.ReplaceAll(decodedQuery, "_", "")
+		decodedQuery = strings.ReplaceAll(decodedQuery, "'", "")
+		decodedQuery = strings.ReplaceAll(decodedQuery, "\"", "")
+
+		searchPattern := "%" + decodedQuery + "%"
+
+		// Search by name
+		rows, err = db.DB.Query(`
+			SELECT id, name FROM issue_types
+			WHERE name LIKE ?
+			ORDER BY id
+		`, searchPattern)
+	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to search types"})
 	}

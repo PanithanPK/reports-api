@@ -145,7 +145,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 		log.Printf("Failed to retrieve report ID: %v", err)
 	}
 
-	CreatedAt := common.Fixtimefeature(createdAtStr)
+	CreatedAt := common.FixTimeFeature(createdAtStr)
 
 	// ลองแยกการ parse ข้อมูล
 	form, err := c.MultipartForm()
@@ -469,8 +469,8 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	}
 
 	// Parse created_at string to time
-	CreatedAt := common.Fixtimefeature(createdAtStr)
-	ResolvedAt := common.Fixtimefeature(resolvedat)
+	CreatedAt := common.FixTimeFeature(createdAtStr)
+	ResolvedAt := common.FixTimeFeature(resolvedat)
 
 	// Parse ข้อมูลจาก request
 	var keepImageURLs []string
@@ -942,7 +942,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 	}
 
 	// แปลง string เป็น time.Time
-	CreatedAt := common.Fixtimefeature(taskCreatedAtStr)
+	CreatedAt := common.FixTimeFeature(taskCreatedAtStr)
 	log.Printf("Task details: ticket=%s, assignto=%s, reportedby=%s, phoneID=%v, systemID=%d, departmentID=%d, assigntoID=%d, createdAt=%s",
 		ticketno, assignto, reportedby, phoneID, systemID, departmentID, assigntoID, taskCreatedAtStr)
 

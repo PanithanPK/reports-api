@@ -14,6 +14,7 @@ type TaskRequest struct {
 	AssignedtoID     int     `json:"assignedto_id" db:"assignedto_id"`
 	Assignto         string  `json:"assign_to"`
 	Status           int     `json:"status"`
+	SendNotification bool    `json:"send_notification"`
 	CreatedBy        int     `json:"created_by"`
 	UpdatedBy        int     `json:"updated_by"`
 	ResolvedAt       string  `json:"resolved_at"`

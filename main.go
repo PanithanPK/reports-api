@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"reports-api/db"
+	"reports-api/handlers"
 	"time"
 
 	_ "reports-api/docs"
@@ -23,7 +24,7 @@ import (
 	fiberSwagger "github.com/swaggo/fiber-swagger"
 )
 
-// CurrentEnvironment เก็บสภาพแวดล้อมปัจจุบัน (dev, prod, หรือ default)
+// CurrentEnvironment stores the current environment (dev, prod, or default)
 var CurrentEnvironment string
 
 // Custom logger with levels
@@ -132,6 +133,17 @@ func main() {
 		}
 	}()
 
+	// Start session cleanup goroutine
+	go func() {
+		ticker := time.NewTicker(30 * time.Minute) // Cleanup every 30 minutes
+		defer ticker.Stop()
+
+		for range ticker.C {
+			handlers.CleanupExpiredSessions()
+		}
+	}()
+	logger.Info.Println("🧹 Session cleanup service started (runs every 30 minutes)")
+
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
 		AppName:      "Reports API",
@@ -151,12 +163,11 @@ func main() {
 
 	// Add Session middleware
 	store := session.New(session.Config{
-		KeyLookup:      "cookie:session_id",
+		KeyLookup:      "cookie:session_cookie",
 		CookieDomain:   "",
 		CookiePath:     "/",
 		CookieSecure:   CurrentEnvironment == "prod",
 		CookieHTTPOnly: true,
-		CookieSameSite: "Lax",
 		Expiration:     time.Hour * 24,
 	})
 	app.Use(func(c *fiber.Ctx) error {
@@ -167,7 +178,7 @@ func main() {
 
 	// Add middleware (order matters!)
 	app.Use(middleware.RateLimiter()) // Rate limiting first to prevent abuse
-	app.Use(middleware.LoggingMiddleware())
+	// app.Use(middleware.LoggingMiddleware())
 	app.Use(middleware.CompressionMiddleware())
 	app.Use(middleware.ResponseStandardizationMiddleware())
 	// app.Use(middleware.HeaderMiddleware()) // Commented - not needed with ResponseStandardizationMiddleware
@@ -189,22 +200,13 @@ func main() {
 			}
 		}
 		return c.JSON(fiber.Map{
-			"status":  "OK",
 			"version": version,
 		})
 	})
 
-	// Register Authentication routes
-	logger.Info.Println("🔐 Registering routes...")
+	// Register routes
 	routes.RegisterRoutes(app)
 	logger.Info.Println("✅ Routes registered successfully")
-
-	// Test route for RecoveryMiddleware
-	app.Get("/test-panic", func(c *fiber.Ctx) error {
-		logger.Info.Println("🧪 Testing RecoveryMiddleware with a deliberate panic")
-		panic("This is a test panic to verify RecoveryMiddleware is working")
-	})
-	logger.Info.Println("🧪 Test route for RecoveryMiddleware added at /test-panic")
 
 	// Get port from environment variable
 	port := os.Getenv("PORT")

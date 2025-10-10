@@ -3051,6 +3051,9 @@ const docTemplate = `{
                         "$ref": "#/definitions/models.ProgramDb"
                     }
                 },
+                "request_id": {
+                    "type": "string"
+                },
                 "success": {
                     "type": "boolean"
                 },
@@ -3059,6 +3062,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.TaskWithDetailsDb"
                     }
+                },
+                "timestamp": {
+                    "type": "string"
                 }
             }
         },
@@ -3239,6 +3245,15 @@ const docTemplate = `{
                 "message": {
                     "type": "string"
                 },
+                "request_id": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
                 "token": {
                     "type": "string"
                 }
@@ -3262,11 +3277,20 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "data": {},
+                "message": {
+                    "type": "string"
+                },
                 "pagination": {
                     "$ref": "#/definitions/models.PaginationResponse"
                 },
+                "request_id": {
+                    "type": "string"
+                },
                 "success": {
                     "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
                 }
             }
         },

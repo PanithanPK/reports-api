@@ -1,30 +1,121 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"log"
-	"math/rand"
 	"reports-api/db"
 	"reports-api/models"
+	"reports-api/utils"
 	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var sessions = map[string]string{}
-
-func generateSessionID() string {
-	// amazonq-ignore-next-line
-	return strconv.FormatInt(rand.Int63(), 20)
+// SessionData holds session information
+type SessionData struct {
+	Username  string    `json:"username"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
-func generateDummyToken() string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	token := make([]byte, 32)
-	for i := range token {
-		token[i] = charset[rand.Intn(len(charset))]
+var sessions = map[string]SessionData{}
+
+func generateSessionID() string {
+	// Generate cryptographically secure random bytes
+	bytes := make([]byte, 16) // 16 bytes = 128 bits of entropy
+	if _, err := rand.Read(bytes); err != nil {
+		log.Printf("Error generating session ID: %v", err)
+		// Fallback to timestamp-based ID (not ideal but better than predictable)
+		return strconv.FormatInt(time.Now().UnixNano(), 36)
 	}
-	return string(token)
+	return hex.EncodeToString(bytes)
+}
+
+func generateDummyToken(username, role string) string {
+	// Load Thailand timezone (UTC+7)
+	thailandTZ, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		thailandTZ = time.FixedZone("ICT", 7*3600) // UTC+7
+	}
+	now := time.Now().In(thailandTZ)
+
+	// Create token data with username, role, and timestamp
+	tokenData := map[string]interface{}{
+		"username": username,
+		"role":     role,
+		"iat":      now.Unix(),
+		"exp":      now.Add(24 * time.Hour).Unix(),
+	}
+
+	// Convert to JSON
+	jsonData, err := json.Marshal(tokenData)
+	if err != nil {
+		log.Printf("Error marshaling token data: %v", err)
+		// Fallback to simple concatenation
+		return hex.EncodeToString([]byte(username + ":" + role + ":" + strconv.FormatInt(now.Unix(), 10)))
+	}
+
+	// Encode to hex for simple obfuscation
+	return hex.EncodeToString(jsonData)
+}
+
+// GetSessionData retrieves session data by session ID for middleware use
+// Returns session data and validity status (checks expiration)
+func GetSessionData(sessionID string) (SessionData, bool) {
+	sessionData, exists := sessions[sessionID]
+	if !exists {
+		return SessionData{}, false
+	}
+
+	// Check if session has expired using Thailand timezone
+	thailandTZ, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		// Fallback to UTC+7 fixed offset if timezone loading fails
+		thailandTZ = time.FixedZone("ICT", 7*3600) // UTC+7
+	}
+	now := time.Now().In(thailandTZ)
+	if now.After(sessionData.ExpiresAt) {
+		// Remove expired session
+		delete(sessions, sessionID)
+		log.Printf("Session %s expired and removed", sessionID)
+		return SessionData{}, false
+	}
+
+	return sessionData, true
+}
+
+// CleanupExpiredSessions removes all expired sessions from memory
+func CleanupExpiredSessions() {
+	// Use Thailand timezone for cleanup
+	thailandTZ, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		// Fallback to UTC+7 fixed offset if timezone loading fails
+		thailandTZ = time.FixedZone("ICT", 7*3600) // UTC+7
+	}
+	now := time.Now().In(thailandTZ)
+	expiredCount := 0
+
+	for sessionID, sessionData := range sessions {
+		if now.After(sessionData.ExpiresAt) {
+			delete(sessions, sessionID)
+			expiredCount++
+		}
+	}
+
+	if expiredCount > 0 {
+		log.Printf("Cleaned up %d expired sessions", expiredCount)
+	}
+}
+
+// IsSessionValid checks if a session exists and is not expired
+func IsSessionValid(sessionID string) bool {
+	_, valid := GetSessionData(sessionID)
+	return valid
 }
 
 // @Summary User login
@@ -54,11 +145,32 @@ func LoginHandler(c *fiber.Ctx) error {
 	if err := bcrypt.CompareHashAndPassword([]byte(password), []byte(credentials.Password)); err != nil {
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid username or password"})
 	}
-	sessionID := generateSessionID()
-	sessions[sessionID] = username
 
-	c.Set("role", role)
-	c.Set("token", generateDummyToken())
+	sessionID := generateSessionID()
+	// Load Thailand timezone (UTC+7)
+	thailandTZ, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		// Fallback to UTC+7 fixed offset if timezone loading fails
+		thailandTZ = time.FixedZone("ICT", 7*3600) // UTC+7
+		log.Printf("Warning: Failed to load Asia/Bangkok timezone, using fixed UTC+7: %v", err)
+	}
+	now := time.Now().In(thailandTZ)
+	sessionExpiry := now.Add(24 * time.Hour) // 24 hours expiration
+
+	sessions[sessionID] = SessionData{
+		Username:  username,
+		Role:      role,
+		CreatedAt: now,
+		ExpiresAt: sessionExpiry,
+	}
+
+	// Set response headers for frontend middleware
+	c.Set("X-User-Username", username)
+	c.Set("X-User-Role", role)
+	c.Set("token", generateDummyToken(username, role))
+
+	// Expose custom headers to frontend
+	c.Set("Access-Control-Expose-Headers", "X-User-Username, X-User-Role, token")
 
 	c.Cookie(&fiber.Cookie{
 		Name:     "session_cookie",
@@ -103,14 +215,21 @@ func RegisterHandler(role string) fiber.Handler {
 			return c.Status(409).JSON(fiber.Map{"error": "Username already exists"})
 		}
 
+		// Hash password for authentication (login verification)
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to hash password"})
 		}
 
+		// Encrypt password for admin viewing (reversible)
+		encryptedPassword, err := utils.EncryptPassword(req.Password)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to encrypt password"})
+		}
+
 		_, err = db.DB.Exec(
 			"INSERT INTO users (username, password, plain_password, role) VALUES (?, ?, ?, ?)",
-			req.Username, string(hashedPassword), req.Password, role,
+			req.Username, string(hashedPassword), encryptedPassword, role,
 		)
 
 		if err != nil {
@@ -153,15 +272,21 @@ func UpdateUserHandler(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "User not found"})
 	}
 
-	// Hash the password
+	// Hash password for authentication (login verification)
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to hash password"})
 	}
 
+	// Encrypt password for admin viewing (reversible)
+	encryptedPassword, err := utils.EncryptPassword(req.Password)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to encrypt password"})
+	}
+
 	_, err = db.DB.Exec(
 		"UPDATE users SET username = ?, password = ?, plain_password = ?, role = ?, updated_at=CURRENT_TIMESTAMP WHERE id = ?",
-		req.Username, string(hashedPassword), req.Password, req.Role, req.ID,
+		req.Username, string(hashedPassword), encryptedPassword, req.Role, req.ID,
 	)
 	if err != nil {
 		log.Printf("Error updating user: %v", err)
@@ -222,6 +347,7 @@ func LogoutHandler(c *fiber.Ctx) error {
 		Path:     "/",
 		MaxAge:   -1,
 		HTTPOnly: true,
+		Expires:  time.Now().Add(-time.Hour), // Set expiry to past to delete cookie
 	})
 
 	log.Printf("User logged out successfully")
@@ -236,7 +362,7 @@ func LogoutHandler(c *fiber.Ctx) error {
 // @Success 200 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/respons/list [get]
-func GetresponsHandler(c *fiber.Ctx) error {
+func GetResponsibilitiesHandler(c *fiber.Ctx) error {
 	rows, err := db.DB.Query("SELECT id, IFNULL(telegram_username, '') as telegram_username, COALESCE(name, '') as name FROM responsibilities")
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
@@ -268,7 +394,7 @@ func GetresponsHandler(c *fiber.Ctx) error {
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/respons/create [post]
-func AddresponsHandler(c *fiber.Ctx) error {
+func AddResponsibilityHandler(c *fiber.Ctx) error {
 	var req models.ResponseRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
@@ -297,7 +423,7 @@ func AddresponsHandler(c *fiber.Ctx) error {
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/respons/update/{id} [put]
-func UpdateResponsHandler(c *fiber.Ctx) error {
+func UpdateResponsibilityHandler(c *fiber.Ctx) error {
 	id := c.Params("id")
 	var req models.ResponseRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -326,7 +452,7 @@ func UpdateResponsHandler(c *fiber.Ctx) error {
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/respons/delete/{id} [delete]
-func DeleteResponsHandler(c *fiber.Ctx) error {
+func DeleteResponsibilityHandler(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	_, err := db.DB.Exec(
@@ -351,7 +477,7 @@ func DeleteResponsHandler(c *fiber.Ctx) error {
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
 // @Router /api/v1/respons/{id} [get]
-func GetResponsDetailHandler(c *fiber.Ctx) error {
+func GetResponsibilityDetailHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -370,7 +496,7 @@ func GetResponsDetailHandler(c *fiber.Ctx) error {
 }
 
 // @Summary Get all users
-// @Description Get all users with username, plain_password and role
+// @Description Get all users with username, decrypted password and role (Admin only)
 // @Tags users
 // @Accept json
 // @Produce json
@@ -387,9 +513,22 @@ func GetAllUsersHandler(c *fiber.Ctx) error {
 	var users []models.UsernameResponse
 	for rows.Next() {
 		var user models.UsernameResponse
-		if err := rows.Scan(&user.ID, &user.Username, &user.PlainPassword, &user.Role); err != nil {
+		var encryptedPassword string
+		if err := rows.Scan(&user.ID, &user.Username, &encryptedPassword, &user.Role); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Database error"})
 		}
+
+		// Decrypt password for admin viewing
+		if encryptedPassword != "" {
+			decryptedPassword, err := utils.DecryptPassword(encryptedPassword)
+			if err != nil {
+				log.Printf("Error decrypting password for user %s: %v", user.Username, err)
+				user.PlainPassword = "[Decryption Error]"
+			} else {
+				user.PlainPassword = decryptedPassword
+			}
+		}
+
 		users = append(users, user)
 	}
 
@@ -400,7 +539,7 @@ func GetAllUsersHandler(c *fiber.Ctx) error {
 }
 
 // @Summary Get user details
-// @Description Get detailed information about a specific user including username, plain_password and role
+// @Description Get detailed information about a specific user including username, decrypted password and role (Admin only)
 // @Tags users
 // @Accept json
 // @Produce json
@@ -417,11 +556,24 @@ func GetUserDetailHandler(c *fiber.Ctx) error {
 	}
 
 	var user models.UsernameResponse
-	err = db.DB.QueryRow("SELECT id, username, IFNULL(plain_password, '') as plain_password, role FROM users WHERE id = ? AND deleted_at IS NULL", id).Scan(&user.ID, &user.Username, &user.PlainPassword, &user.Role)
+	var encryptedPassword string
+	err = db.DB.QueryRow("SELECT id, username, IFNULL(plain_password, '') as plain_password, role FROM users WHERE id = ? AND deleted_at IS NULL", id).Scan(&user.ID, &user.Username, &encryptedPassword, &user.Role)
 
 	if err != nil {
 		log.Printf("Error fetching user details: %v", err)
 		return c.Status(404).JSON(fiber.Map{"error": "User not found"})
+	}
+
+	// Decrypt password for admin viewing
+	var plainPassword string
+	if encryptedPassword != "" {
+		decryptedPassword, err := utils.DecryptPassword(encryptedPassword)
+		if err != nil {
+			log.Printf("Error decrypting password for user %s: %v", user.Username, err)
+			plainPassword = "[Decryption Error]"
+		} else {
+			plainPassword = decryptedPassword
+		}
 	}
 
 	log.Printf("Getting user details Success for ID: %d", id)
@@ -430,7 +582,7 @@ func GetUserDetailHandler(c *fiber.Ctx) error {
 		"data": fiber.Map{
 			"id":             user.ID,
 			"username":       user.Username,
-			"plain_password": user.PlainPassword,
+			"plain_password": plainPassword,
 			"role":           user.Role,
 		},
 	})

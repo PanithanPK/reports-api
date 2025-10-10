@@ -24,6 +24,7 @@ func HandleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 	endpoint := config.AppConfig.EndPoint
 	accessKeyID := config.AppConfig.AccessKey
 	secretAccessKey := config.AppConfig.SecretAccessKey
+	env := config.AppConfig.Environment
 	useSSL := false
 	bucketName := config.AppConfig.BucketName
 
@@ -57,7 +58,13 @@ func HandleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 			errors = append(errors, fmt.Sprintf("Failed to process image %s: %v", file.Filename, err))
 			continue
 		}
+		var objectenv string
 
+		objectenv = "prod"
+
+		if env == "dev" {
+			objectenv = "dev"
+		}
 		// Name Object
 		dateStr := time.Now().Add(7 * time.Hour).Format("1504")
 		filenameSafe := strings.ReplaceAll(file.Filename, " ", "-")
@@ -70,7 +77,7 @@ func HandleFileUploads(files []*multipart.FileHeader, ticketno string) ([]fiber.
 			filenameSafe = strings.TrimSuffix(filenameSafe, ext) + ".jpg"
 		}
 
-		objectName := fmt.Sprintf("%s-%02d-%s-%s", ticketno, i+1, dateStr, filenameSafe)
+		objectName := fmt.Sprintf("%s-%s-%02d-%s-%s", ticketno, objectenv, i+1, dateStr, filenameSafe)
 
 		// Upload processed image to MinIO
 		_, err = minioClient.PutObject(
