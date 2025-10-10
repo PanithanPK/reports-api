@@ -163,13 +163,12 @@ func main() {
 
 	// Add Session middleware
 	store := session.New(session.Config{
-		KeyLookup:         "cookie:session_cookie",
-		CookieDomain:      "",
-		CookiePath:        "/",
-		CookieSecure:      CurrentEnvironment == "prod",
-		CookieSessionOnly: true,
-		CookieHTTPOnly:    true,
-		Expiration:        time.Hour * 24,
+		KeyLookup:      "cookie:session_cookie",
+		CookieDomain:   "",
+		CookiePath:     "/",
+		CookieSecure:   CurrentEnvironment == "prod",
+		CookieHTTPOnly: true,
+		Expiration:     time.Hour * 24,
 	})
 	app.Use(func(c *fiber.Ctx) error {
 		c.Locals("session", store)
@@ -179,7 +178,7 @@ func main() {
 
 	// Add middleware (order matters!)
 	app.Use(middleware.RateLimiter()) // Rate limiting first to prevent abuse
-	app.Use(middleware.LoggingMiddleware())
+	// app.Use(middleware.LoggingMiddleware())
 	app.Use(middleware.CompressionMiddleware())
 	app.Use(middleware.ResponseStandardizationMiddleware())
 	// app.Use(middleware.HeaderMiddleware()) // Commented - not needed with ResponseStandardizationMiddleware

@@ -318,6 +318,7 @@ func SessionMiddleware() fiber.Handler {
 				Path:     "/",
 				MaxAge:   -1,
 				HTTPOnly: true,
+				Expires:  time.Now().Add(-time.Hour),
 			})
 
 			return c.Status(401).JSON(fiber.Map{

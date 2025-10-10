@@ -347,6 +347,7 @@ func LogoutHandler(c *fiber.Ctx) error {
 		Path:     "/",
 		MaxAge:   -1,
 		HTTPOnly: true,
+		Expires:  time.Now().Add(-time.Hour), // Set expiry to past to delete cookie
 	})
 
 	log.Printf("User logged out successfully")
