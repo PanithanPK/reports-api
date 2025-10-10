@@ -1052,7 +1052,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// อัปเดตสถานะใน Telegram
+	// Update Telegram message
 	log.Printf("Updating Telegram message (reportID: %d) with %d photos", reportID, len(photoURLs))
 
 	var telegramUpdateErr error
