@@ -23,7 +23,7 @@ func getEncryptionKey() []byte {
 // EncryptPassword encrypts a password using AES-GCM
 func EncryptPassword(plaintext string) (string, error) {
 	key := getEncryptionKey()
-	
+
 	// Create AES cipher
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -44,7 +44,7 @@ func EncryptPassword(plaintext string) (string, error) {
 
 	// Encrypt the data
 	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
-	
+
 	// Encode to base64 for storage
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
@@ -52,7 +52,7 @@ func EncryptPassword(plaintext string) (string, error) {
 // DecryptPassword decrypts a password using AES-GCM
 func DecryptPassword(ciphertext string) (string, error) {
 	key := getEncryptionKey()
-	
+
 	// Decode from base64
 	data, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
@@ -79,7 +79,7 @@ func DecryptPassword(ciphertext string) (string, error) {
 
 	// Extract nonce and ciphertext
 	nonce, ciphertext_bytes := data[:nonceSize], data[nonceSize:]
-	
+
 	// Decrypt the data
 	plaintext, err := gcm.Open(nil, nonce, ciphertext_bytes, nil)
 	if err != nil {
