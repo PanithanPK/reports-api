@@ -83,7 +83,7 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 		Program = req.IssueElse
 	}
 
-	// สร้างข้อความตามสถานะ
+	// Create message based on status
 	var statusIcon, statusText, headerColor string
 	switch req.Status {
 	case 0:
@@ -131,7 +131,7 @@ func FormatRepostMessage(req models.TaskRequest, photoURLs ...string) string {
 	newMessage += "━━━━━━━━━━━━━━"
 	if req.Assignto != "" {
 		if req.TelegramUser != "" {
-			// ใช้ @ เพื่อแท็กผู้ใช้ Telegram
+			// Use @ to tag Telegram user
 			telegramTag := req.TelegramUser
 			if !strings.HasPrefix(telegramTag, "@") {
 				telegramTag = "@" + telegramTag
@@ -189,7 +189,7 @@ func SendTelegram(req models.TaskRequest, photoURL ...string) (int, string, erro
 	}
 
 	bot.Debug = false
-	// สร้างข้อความตามสถานะ
+	// Create message based on status
 	msg := FormatRepostMessage(req, photoURL...)
 
 	var sentMsg tgbotapi.Message
@@ -288,7 +288,7 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 		}
 	}
 
-	// ส่งการแจ้งเตือนเฉพาะเมื่อมีการเปลี่ยนผู้รับผิดชอบ
+	// Send notification only when assignee changes
 	var notificationID int
 
 	if req.TelegramUser != "" && req.PreviousAssignto != req.Assignto {
@@ -323,7 +323,7 @@ func UpdateTelegram(req models.TaskRequest, photoURL ...string) (int, error) {
 	if notificationID > 0 {
 		return notificationID, nil
 	}
-	return 0, nil // เปลี่ยนจาก notificationID เป็น 0 เพื่อความชัดเจน
+	return 0, nil // Return 0 instead of notificationID for clarity
 }
 
 func UpdateAssignedtoMsg(messageID int, req models.TaskRequest) (int, error) {
