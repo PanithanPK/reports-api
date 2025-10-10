@@ -95,7 +95,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 	var req models.ResolutionReq
 	var uploadedFiles []fiber.Map
 
-	// ดึงข้อมูล task ก่อน
+	// Retrieve task data first
 	var ticketno string
 	var assignto string
 	var reportedby string
@@ -147,16 +147,16 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 
 	CreatedAt := common.FixTimeFeature(createdAtStr)
 
-	// ลองแยกการ parse ข้อมูล
+	// Try to parse data separately
 	form, err := c.MultipartForm()
 	if err != nil {
-		// ถ้าไม่ใช่ multipart form ให้ใช้ BodyParser ปกติ
+		// If not multipart form, use regular BodyParser
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid request format"})
 		}
 	} else {
 
-		// จัดการไฟล์ที่อัปโหลด
+		// Handle uploaded files
 		var allFiles []*multipart.FileHeader
 		for key, files := range form.File {
 			if strings.HasPrefix(key, "image_") || key == "image" {
@@ -169,19 +169,18 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// ตรวจสอบว่ามี solution text หรือไฟล์รูป อย่างน้อยอย่างใดอย่างหนึ่ง
+	// Check if there is solution text or image files, at least one
 
-	// เตรียม file paths JSON
+	// Prepare file paths JSON
 	var filePathsJSON interface{}
 	if len(uploadedFiles) > 0 {
-
 		filePathsBytes, _ := json.Marshal(uploadedFiles)
 		filePathsJSON = string(filePathsBytes)
 	} else {
 		filePathsJSON = nil
 	}
 
-	// บันทึก resolution ลงฐานข้อมูล
+	// Save resolution to database
 	res, err := db.DB.Exec(`INSERT INTO resolutions (tasks_id, text, telegram_id, file_paths) VALUES (?, ?, ?, ?)`, id, req.Solution, telegramID, filePathsJSON)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to insert resolution"})
@@ -189,14 +188,14 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 
 	resolutionID, _ := res.LastInsertId()
 
-	// อัพเดต solution_id ใน tasks
+	// Update solution_id in tasks
 	_, err = db.DB.Exec(`UPDATE tasks SET solution_id = ?, status = 2, resolved_at=CURRENT_TIMESTAMP WHERE id = ?`, resolutionID, id)
 	if err != nil {
 		log.Printf("Failed to update solution_id in tasks: %q", err)
 	}
 
-	// ส่ง solution ไปยัง Telegram ถ้ามี reportID
-	// ดึง resolved_at จากฐานข้อมูล resolutions
+	// Send solution to Telegram if reportID exists
+	// Get resolved_at from resolutions database
 	resolvedAt, err := common.GetResolvedAtSafely(db.DB, int(resolutionID))
 	if err != nil {
 		log.Printf("Failed to get resolved_at: %v", err)
@@ -210,22 +209,22 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 		Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + id
 	}
 
-	// เตรียมข้อมูล response
+	// Prepare response data
 	req.TicketNo = ticketno
 	req.CreatedAt = CreatedAt
 	req.Url = Urlenv
 	req.ResolvedAt = resolvedAt.Add(7 * time.Hour).Format("2006/01/02/ 15:04:05")
 
 	var assignmsgID int
-	// ส่ง solution ไปยัง Telegram ถ้ามี reportID
+	// Send solution to Telegram if reportID exists
 	if reportID > 0 {
-		// ดึง MessageID จาก telegram_chat
+		// Get MessageID from telegram_chat
 		err = db.DB.QueryRow(`SELECT IFNULL(report_id, 0), IFNULL(assignto_id, 0) FROM telegram_chat WHERE id = ?`, telegramID).Scan(&req.MessageID, &assignmsgID)
 		if err != nil {
 			log.Printf("Failed to get message ID: %v", err)
 		}
 
-		// ดึงข้อมูลเพิ่มเติมสำหรับ UpdateTelegram
+		// Get additional data for UpdateTelegram
 		var phoneNumber int
 		var departmentName, branchName, programName string
 		var phoneID *int
@@ -262,12 +261,12 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 			db.DB.QueryRow(`SELECT name FROM systems_program WHERE id = ?`, systemID).Scan(&programName)
 		}
 
-		// ดึง telegram_user สำหรับ UpdateAssignedtoMsg
+		// Get telegram_user for UpdateAssignedtoMsg
 		if req.AssignedtoID > 0 {
 			db.DB.QueryRow(`SELECT IFNULL(telegram_username, '') FROM responsibilities WHERE id = ?`, req.AssignedtoID).Scan(&telegramUser)
 		}
 
-		// อัปเดตสถานะใน Telegram message
+		// Update status in Telegram message
 		taskReq := models.TaskRequest{
 			PhoneID:        phoneID,
 			PhoneElse:      phoneElse,
@@ -289,7 +288,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 			TelegramUser:   telegramUser,
 		}
 
-		// ดึง file paths จาก task เดิม
+		// Get file paths from original task
 		var existingFilePathsJSON string
 		db.DB.QueryRow(`SELECT IFNULL(file_paths, '[]') FROM tasks WHERE id = ?`, id).Scan(&existingFilePathsJSON)
 
@@ -305,7 +304,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		// อัปเดตสถานะใน Telegram
+		// Update status in Telegram
 		if len(photoURLs) > 0 {
 			_, err = common.UpdateTelegram(taskReq, photoURLs...)
 		} else {
@@ -326,7 +325,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		// เตรียม photo URLs สำหรับ reply message
+		// Prepare photo URLs for reply message
 		var replyPhotoURLs []string
 		for _, file := range uploadedFiles {
 			if url, ok := file["url"].(string); ok {
@@ -334,7 +333,7 @@ func CreateResolutionHandler(c *fiber.Ctx) error {
 			}
 		}
 		req.TelegramUser = telegramUser
-		// ส่ง reply message ไปยัง Telegram
+		// Send reply message to Telegram
 		log.Printf("Sending reply to Telegram - MessageID: %d, TelegramUser: %s, PhotoURLs count: %d", req.MessageID, req.TelegramUser, len(replyPhotoURLs))
 		replyMessageID, err := common.ReplyToSpecificMessage(req, replyPhotoURLs...)
 		if err != nil {
@@ -375,14 +374,14 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	var req models.ResolutionReq
 	var uploadedFiles []fiber.Map
 
-	// ดึงข้อมูล resolution เดิม
+	// Get existing resolution data
 	var existingResolution models.ResolutionReq
 	var telegramID int
 	var existingFilePathsJSON string
 	var resolutions int
 	var Assignto string
 
-	// ดึงข้อมูลเพิ่มเติมสำหรับ UpdateTelegram
+	// Get additional data for UpdateTelegram
 	var phoneNumber int
 	var departmentName, branchName, programName string
 	var phoneID *int
@@ -402,7 +401,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	if assigntoIDStr := c.FormValue("assignedto_id"); assigntoIDStr != "" {
 		req.AssignedtoID, _ = strconv.Atoi(assigntoIDStr)
 	}
-	// ดึงข้อมูล task ทั้งหมดที่จำเป็น
+	// Get all necessary task data
 	err := db.DB.QueryRow(`
 		SELECT IFNULL(phone_id, 0), IFNULL(phone_else, ''), IFNULL(system_id, 0), IFNULL(department_id, 0), 
 		       IFNULL(text, ''), IFNULL(telegram_id, 0), IFNULL(ticket_no, ''), 
@@ -435,7 +434,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		db.DB.QueryRow(`SELECT name FROM systems_program WHERE id = ?`, systemID).Scan(&programName)
 	}
 
-	// ดึง report_id สำหรับ UpdateTelegram
+	// Get report_id for UpdateTelegram
 	db.DB.QueryRow(`SELECT report_id FROM telegram_chat WHERE id = ?`, telegramID).Scan(&reportID)
 
 	err = db.DB.QueryRow(`
@@ -472,18 +471,18 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	CreatedAt := common.FixTimeFeature(createdAtStr)
 	ResolvedAt := common.FixTimeFeature(resolvedat)
 
-	// Parse ข้อมูลจาก request
+	// Parse data from request
 	var keepImageURLs []string
 	form, err := c.MultipartForm()
 	if err != nil {
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid request format"})
 		}
-		// รับ image_urls จาก JSON body
+		// Get image_urls from JSON body
 		keepImageURLs = req.ImageURLs
 	} else {
 
-		// รับ URL รูปเก่าที่ต้องการเก็บไว้
+		// Get old image URLs to keep
 		imageURLsStr := c.FormValue("image_urls")
 		if imageURLsStr != "" {
 			if err := json.Unmarshal([]byte(imageURLsStr), &keepImageURLs); err != nil {
@@ -491,7 +490,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		// จัดการไฟล์ใหม่
+		// Handle new files
 		var allFiles []*multipart.FileHeader
 		for key, files := range form.File {
 			if strings.HasPrefix(key, "image_") || key == "image" {
@@ -499,7 +498,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		// ตรวจสอบว่า ImageURLs ที่ส่งมาตรงกับที่มีอยู่แล้วหรือไม่
+		// Check if sent ImageURLs match existing ones
 		if len(allFiles) == 0 && len(keepImageURLs) > 0 {
 			var existingURLs []string
 			if existingFilePathsJSON != "" && existingFilePathsJSON != "[]" {
@@ -512,7 +511,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 					}
 				}
 			}
-			// ถ้า URLs ตรงกันทั้งหมด ไม่ต้องทำอะไร
+			// If URLs match completely, no need to do anything
 			if len(existingURLs) == len(keepImageURLs) {
 				allMatch := true
 				for _, keepURL := range keepImageURLs {
@@ -611,29 +610,29 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		// อัปโหลดไฟล์ใหม่ถ้ามี
+		// Upload new files if any
 		if len(allFiles) > 0 {
 			uploadedFiles, _ = common.HandleFileUploadsResolution(allFiles, ticketno)
 		}
 
-		// รวมรูปเก่าที่เก็บไว้กับรูปใหม่
+		// Combine kept old images with new images
 		for _, keepURL := range keepImageURLs {
 			uploadedFiles = append(uploadedFiles, fiber.Map{"url": keepURL})
 		}
 	}
 
-	// ใช้ solution เดิมถ้าไม่ได้ส่งมาใหม่
+	// Use existing solution if not sent new one
 	if req.Solution == "" {
 		req.Solution = existingResolution.Solution
 	}
 
-	// เตรียม file paths JSON
+	// Prepare file paths JSON
 	var filePathsJSON interface{}
 	if len(uploadedFiles) > 0 {
 		filePathsBytes, _ := json.Marshal(uploadedFiles)
 		filePathsJSON = string(filePathsBytes)
 	} else if len(keepImageURLs) > 0 {
-		// ใช้เฉพาะรูปเก่าที่เก็บไว้
+		// Use only kept old images
 		var keepFiles []fiber.Map
 		for _, url := range keepImageURLs {
 			keepFiles = append(keepFiles, fiber.Map{"url": url})
@@ -641,11 +640,11 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		filePathsBytes, _ := json.Marshal(keepFiles)
 		filePathsJSON = string(filePathsBytes)
 	} else {
-		// ไม่มีไฟล์ใดๆ
+		// No files
 		filePathsJSON = nil
 	}
 
-	// อัปเดต tasks ถ้ามีการส่ง assignto มา
+	// Update tasks if assignto is sent
 	if req.Assignto != "" || req.AssignedtoID != 0 {
 		_, err = db.DB.Exec(`UPDATE tasks SET assignto_id = ?, assignto = ? WHERE id = ?`, req.AssignedtoID, req.Assignto, id)
 		if err != nil {
@@ -653,13 +652,13 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// อัปเดต resolution
+	// Update resolution
 	_, err = db.DB.Exec(`UPDATE resolutions SET text = ?, file_paths = ? WHERE id = ?`, req.Solution, filePathsJSON, resolutions)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update resolution"})
 	}
 
-	// ดึง resolved_at
+	// Get resolved_at
 	var Urlenv string
 	env := config.AppConfig.Environment
 	if env == "dev" {
@@ -667,7 +666,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	} else {
 		Urlenv = "http://helpdesk.nopadol.com/tasks/show/" + id
 	}
-	// เตรียมข้อมูลสำหรับ Telegram
+	// Prepare Telegram data
 	req.TicketNo = ticketno
 	var telegramUser string
 	if req.AssignedtoID > 0 {
@@ -684,7 +683,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 	req.ResolvedAt = ResolvedAt
 	req.TelegramUser = telegramUser
 
-	// อัปเดตสถานะใน Telegram message ด้วยข้อมูลที่ครบ
+	// Update Telegram message with complete data
 	taskReq := models.TaskRequest{
 		PhoneID:        phoneID,
 		PhoneElse:      phoneElse,
@@ -706,7 +705,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		TelegramUser:   telegramUser,
 	}
 
-	// ดึง file paths จาก task เดิม
+	// Get file paths from task
 	var existingFilePaths string
 	db.DB.QueryRow(`SELECT IFNULL(file_paths, '[]') FROM tasks WHERE id = ?`, id).Scan(&existingFilePaths)
 
@@ -722,7 +721,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// อัปเดตสถานะใน Telegram
+	// Update Telegram status
 	if len(photoURLs) > 0 {
 		_, err = common.UpdateTelegram(taskReq, photoURLs...)
 	} else {
@@ -732,11 +731,11 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		log.Printf("Failed to update Telegram status: %q", err)
 	}
 
-	// อัปเดต Telegram reply message ถ้ามี solution_id
+	// Update Telegram reply message if solution_id exists
 	var solutionMessageID int
 	err = db.DB.QueryRow(`SELECT solution_id FROM telegram_chat WHERE id = ?`, telegramID).Scan(&solutionMessageID)
 	if err == nil && solutionMessageID > 0 {
-		// เตรียม photo URLs จากไฟล์ทั้งหมด (เก่าและใหม่)
+		// Prepare photo URLs from all files (old and new)
 		var solutionPhotoURLs []string
 		if filePathsJSON != nil {
 			var allFiles []fiber.Map
@@ -749,7 +748,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		// ตั้งค่าข้อมูลให้ครบถ้วนสำหรับ reply
+		// Set data for reply
 		req.MessageID = reportID
 		req.TicketNo = ticketno
 		if req.Assignto == "" {
@@ -759,7 +758,7 @@ func UpdateResolutionHandler(c *fiber.Ctx) error {
 		req.Url = Urlenv
 
 		var messageID int
-		// อัปเดต reply message
+		// Update reply message
 		log.Printf("Updating Telegram reply - SolutionMessageID: %d, MessageID: %d, TelegramUser: %s, PhotoURLs count: %d", solutionMessageID, req.MessageID, req.TelegramUser, len(solutionPhotoURLs))
 		messageID, err = common.UpdatereplyToSpecificMessage(solutionMessageID, req, solutionPhotoURLs...)
 		if err != nil {
@@ -810,7 +809,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 	var existingFilePathsJSON string
 	var messageID int
 
-	// ดึง solution_id จาก tasks
+	// Get solution_id from tasks
 	err = db.DB.QueryRow(`
 		SELECT solution_id
 		FROM tasks WHERE id = ?
@@ -821,7 +820,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 	}
 	log.Printf("Found solution_id: %d for task ID: %d", resolutions, id)
 
-	// ดึงข้อมูล resolution
+	// Get resolution data
 	err = db.DB.QueryRow(`
 		SELECT text, telegram_id, IFNULL(file_paths, '[]')
 		FROM resolutions 
@@ -834,7 +833,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 	}
 	log.Printf("Found resolution - telegramID: %d, file_paths: %s", telegramID, existingFilePathsJSON)
 
-	// ดึง solution_id จาก telegram_chat (message ID สำหรับลบใน Telegram)
+	// Get solution_id from telegram_chat (message ID for deletion in Telegram)
 	err = db.DB.QueryRow(`
 		SELECT solution_id
 		FROM telegram_chat
@@ -877,7 +876,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 	}
 	log.Printf("Successfully deleted resolution ID: %d", resolutions)
 
-	// อัปเดต solution_id เป็น NULL ใน telegram_chat
+	// Update solution_id to NULL in telegram_chat
 	_, err = db.DB.Exec(`UPDATE telegram_chat SET solution_id = NULL WHERE id = ?`, telegramID)
 	if err != nil {
 		log.Printf("Failed to update telegram_chat solution_id to NULL for ID %d: %v", telegramID, err)
@@ -885,7 +884,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 		log.Printf("Successfully updated telegram_chat solution_id to NULL for ID: %d", telegramID)
 	}
 
-	// อัปเดต solution_id และ status ใน tasks
+	// Update solution_id and status in tasks
 	_, err = db.DB.Exec(`UPDATE tasks SET solution_id = NULL, status = 0, resolved_at=NULL WHERE id = ?`, id)
 	if err != nil {
 		log.Printf("Failed to update tasks solution_id to NULL for ID %d: %v", id, err)
@@ -893,7 +892,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 		log.Printf("Successfully updated task ID %d: solution_id=NULL, status=0, resolved_at=NULL", id)
 	}
 
-	// ลบ solution message จาก Telegram ก่อน
+	// Delete solution message from Telegram
 	if messageID > 0 {
 		log.Printf("Deleting solution message from Telegram, messageID: %d", messageID)
 		_, err = common.DeleteTelegram(messageID)
@@ -904,7 +903,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// อัปเดตสถานะใน Telegram message กลับเป็น "รอดำเนินการ"
+	// Update status in Telegram message back to "รอดำเนินการ"
 	var reportID int
 	err = db.DB.QueryRow(`SELECT report_id FROM telegram_chat WHERE id = ?`, telegramID).Scan(&reportID)
 	log.Printf("Debug - telegramID: %d, reportID: %d, query error: %v", telegramID, reportID, err)
@@ -921,7 +920,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 
 	log.Printf("Processing Telegram update for reportID: %d", reportID)
 
-	// ดึงข้อมูล task สำหรับอัปเดต Telegram
+	// Get task data for Telegram update
 	var ticketno, assignto, reportedby string
 	var phoneID *int
 	var phoneElse *string
@@ -941,12 +940,12 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"success": true, "warning": "Resolution deleted but failed to get task details"})
 	}
 
-	// แปลง string เป็น time.Time
+	// Convert string to time.Time
 	CreatedAt := common.FixTimeFeature(taskCreatedAtStr)
 	log.Printf("Task details: ticket=%s, assignto=%s, reportedby=%s, phoneID=%v, systemID=%d, departmentID=%d, assigntoID=%d, createdAt=%s",
 		ticketno, assignto, reportedby, phoneID, systemID, departmentID, assigntoID, taskCreatedAtStr)
 
-	// ดึงข้อมูลเพิ่มเติม
+	// Get additional data
 	var phoneNumber int
 	var departmentName, branchName, programName string
 
@@ -986,7 +985,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// ดึง telegram_user สำหรับ UpdateAssignedtoMsg
+	// Get telegram_user for UpdateAssignedtoMsg
 	var telegramUser string
 	if assigntoID > 0 {
 		err = db.DB.QueryRow(`SELECT IFNULL(telegram_user, '') FROM responsibilities WHERE id = ?`, assigntoID).Scan(&telegramUser)
@@ -997,7 +996,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// เตรียมข้อมูลสำหรับ UpdateTelegram
+	// Prepare data for UpdateTelegram
 	var Urlenv string
 	env := config.AppConfig.Environment
 	if env == "dev" {
@@ -1018,7 +1017,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 		ReportedBy:     reportedby,
 		CreatedAt:      CreatedAt,
 		UpdatedAt:      "",
-		Status:         0, // เปลี่ยนกลับเป็น "รอดำเนินการ"
+		Status:         0,
 		Url:            Urlenv,
 		PhoneNumber:    phoneNumber,
 		DepartmentName: departmentName,
@@ -1029,7 +1028,7 @@ func DeleteResolutionHandler(c *fiber.Ctx) error {
 
 	log.Printf("TaskRequest prepared: MessageID=%d, Status=%d, Url=%s", taskReq.MessageID, taskReq.Status, taskReq.Url)
 
-	// ดึง file paths จาก task เดิม (ไม่ใช่จาก resolution)
+	// Get file paths from task (not from resolution)
 	var taskFilePathsJSON string
 	err = db.DB.QueryRow(`SELECT IFNULL(file_paths, '[]') FROM tasks WHERE id = ?`, id).Scan(&taskFilePathsJSON)
 	if err != nil {
